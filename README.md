@@ -23,6 +23,6 @@ Code Layout:
 
 The source code is divided into subdirectories, as follows:
 
-* `src/data`: routines to acquire data and metadata
-* `src/analysis`: routines to analyze data
-* `src/plot`: routines to plot data
+* `src/pysd2cat/data`: routines to acquire data and metadata
+* `src/pysd2cat/analysis`: routines to analyze data
+* `src/pysd2cat/plot`: routines to plot data
