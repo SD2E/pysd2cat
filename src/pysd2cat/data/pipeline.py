@@ -92,7 +92,7 @@ def get_metadata_dataframe(results):
     return meta_df
 
 
-def get_data_and_metadata_df(metadata_df, data_dir, fraction=None):
+def get_data_and_metadata_df(metadata_df, data_dir, fraction=None, max_records=None):
     """
     Join each FCS datatable with its metadata.  Costly!
     """
@@ -106,7 +106,9 @@ def get_data_and_metadata_df(metadata_df, data_dir, fraction=None):
         ## Create a data frame out of FCS file
         data_df = FCT.FCMeasurement(ID=record['filename'],
                                     datafile=os.path.join(data_dir, record['filename'])).read_data()
-        if fraction is not None:
+        if max_records is not None:
+            data_df = data_df[0:min(len(data_df), max_records)]
+        elif fraction is not None:
             data_df = data_df.sample(frac=fraction, replace=True)
             #data_df = data_df.replace([np.inf, -np.inf], np.nan)
         #data_df = data_df[~data_df.isin(['NaN', 'NaT']).any(axis=1)]
