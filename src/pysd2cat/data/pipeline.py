@@ -3,7 +3,7 @@ import json
 import pandas as pd
 import os
 import FlowCytometryTools as FCT
-import numpy as np
+from pysd2cat.analysis.Names import Names
 
 ***REMOVED***
 client = pymongo.MongoClient(dbURI)
@@ -14,19 +14,19 @@ science_table=db.science_table
 # Helpers for building a live/dead classifier #
 ###############################################
 
-def get_dataframe_for_live_dead_classifier(data_dir):
+def get_dataframe_for_live_dead_classifier(data_dir,fraction=None, max_records=None):
     """
     Get pooled FCS data for every live and dead control. 
     """
     meta_df = get_metadata_dataframe(get_live_dead_controls())
     
     ##Drop columns that we don't need
-    da = meta_df[['strain', 'filename']].copy()
-    da['strain'] = da['strain'].mask(da['strain'] == 'WT-Dead-Control',  0)
-    da['strain'] = da['strain'].mask(da['strain'] == 'WT-Live-Control',  1)
-    da = da.rename(index=str, columns={"strain": "class_label"})
-    da = get_data_and_metadata_df(da, data_dir)
-    da = da.drop(columns=['filename', 'Time'])
+    da = meta_df[[Names.STRAIN, Names.FILENAME]].copy()
+    da[Names.STRAIN] = da[Names.STRAIN].mask(da[Names.STRAIN] == Names.WT_DEAD_CONTROL,  0)
+    da[Names.STRAIN] = da[Names.STRAIN].mask(da[Names.STRAIN] == Names.WT_LIVE_CONTROL,  1)
+    da = da.rename(index=str, columns={Names.STRAIN: "class_label"})
+    da = get_data_and_metadata_df(da, data_dir,fraction,max_records)
+    da = da.drop(columns=[Names.FILENAME, 'Time'])
     return da
 
 def get_live_dead_controls():
@@ -35,9 +35,9 @@ def get_live_dead_controls():
     all experiments.
     """
     query={}
-    query['challenge_problem'] = 'YEAST_GATES'
-    query['file_type'] = 'FCS'
-    query['strain'] = {"$in": ['WT-Dead-Control', 'WT-Live-Control']}
+    query[Names.CHALLENGE_PROBLEM] = Names.YEAST_STATES
+    query[Names.FILE_TYPE] = Names.FCS
+    query[Names.STRAIN] = {"$in": [Names.WT_DEAD_CONTROL, Names.WT_LIVE_CONTROL]}
 
     results = []
     for match in science_table.find(query):
@@ -53,9 +53,9 @@ def get_metadata_dataframe(results):
     meta_df = pd.DataFrame()
     for result in results:
         result_df = {}
-        keys_to_set = ['strain', 'filename', 'lab', 'sample_id',
-                       'strain_circuit', 'strain_input_state', 
-                       'strain_sbh_uri', 'experiment_id'
+        keys_to_set = [Names.STRAIN, Names.FILENAME, Names.LAB, Names.SAMPLE_ID,
+                       Names.STRAIN_CIRCUIT, Names.STRAIN_INPUT_STATE,
+                       Names.STRAIN_SBH_URI, Names.EXPERIMENT_ID
                       ]
         for k in keys_to_set:
             if k in result:
@@ -64,8 +64,8 @@ def get_metadata_dataframe(results):
                 result_df[k] = None
 
         ## Other values (not at top level)
-        if 'inoculation_density' in result:
-            result_df['od'] = result['inoculation_density']['value']
+        if Names.INOCULATION_DENSITY in result:
+            result_df['od'] = result[Names.INOCULATION_DENSITY]['value']
         else:
             result_df['od'] = None
         if 'sample_contents' in result:
@@ -73,8 +73,8 @@ def get_metadata_dataframe(results):
         else:
             result_df['media'] = None
             
-        if 'strain_circuit' in result and 'strain_input_state' in result:
-            result_df['output'] = gate_output(result['strain_circuit'], result['strain_input_state'])
+        if Names.STRAIN_CIRCUIT in result and Names.STRAIN_INPUT_STATE in result:
+            result_df['output'] = gate_output(result[Names.STRAIN_CIRCUIT], result[Names.STRAIN_INPUT_STATE])
         else:
             result_df['output'] = None
 
@@ -104,8 +104,8 @@ def get_data_and_metadata_df(metadata_df, data_dir, fraction=None, max_records=N
         #dataset_local_df = dataset_local_df.append(record)
     
         ## Create a data frame out of FCS file
-        data_df = FCT.FCMeasurement(ID=record['filename'],
-                                    datafile=os.path.join(data_dir, record['filename'])).read_data()
+        data_df = FCT.FCMeasurement(ID=record[Names.FILENAME],
+                                    datafile=os.path.join(data_dir, record[Names.FILENAME])).read_data()
         if max_records is not None:
             data_df = data_df[0:min(len(data_df), max_records)]
         elif fraction is not None:
@@ -113,11 +113,11 @@ def get_data_and_metadata_df(metadata_df, data_dir, fraction=None, max_records=N
             #data_df = data_df.replace([np.inf, -np.inf], np.nan)
         #data_df = data_df[~data_df.isin(['NaN', 'NaT']).any(axis=1)]
         
-        data_df['filename'] = record['filename']
+        data_df[Names.FILENAME] = record[Names.FILENAME]
         all_data_df = all_data_df.append(data_df)
 
     ## Join data and metadata
-    final_df = metadata_df.set_index('filename').join(all_data_df.set_index('filename'))
+    final_df = metadata_df.set_index(Names.FILENAME).join(all_data_df.set_index(Names.FILENAME))
     final_df = final_df.reset_index()
     final_df = final_df.dropna()
     
@@ -129,33 +129,33 @@ def get_data_and_metadata_df(metadata_df, data_dir, fraction=None, max_records=N
 ###############################################
 
 def gate_output(gate, inputs):
-    if gate == 'NOR':
-        if inputs == '00':
+    if gate == Names.NOR:
+        if inputs == Names.INPUT_00:
             return 1
         else:
             return 0
-    elif gate == 'AND':
-        if inputs == '11':
+    elif gate == Names.AND:
+        if inputs == Names.INPUT_11:
             return 1
         else:
             return 0
-    elif gate == 'NAND':
-        if inputs == '11':
+    elif gate == Names.NAND:
+        if inputs == Names.INPUT_11:
             return 0
         else:
             return 1
-    elif gate == 'OR':
-        if inputs == '00':
+    elif gate == Names.OR:
+        if inputs == Names.INPUT_00:
             return 0
         else:
             return 1
-    elif gate == 'XOR':
-        if inputs == '00' or inputs == '11':
+    elif gate == Names.XOR:
+        if inputs == Names.INPUT_00 or inputs == Names.INPUT_11:
             return 0
         else:
             return 1
-    elif gate == 'XNOR':
-        if inputs == '00' or inputs == '11':
+    elif gate == Names.XNOR:
+        if inputs == Names.INPUT_00 or inputs == Names.INPUT_11:
             return 1
         else:
             return 0
@@ -164,7 +164,7 @@ def get_strain_dataframe_for_classifier(circuit, input, od=0.0003, media='SC Med
     """
     """
     meta_df = get_metadata_dataframe(get_strain(circuit, input, od=od, media=media, experiment=experiment))
-    da = meta_df[['filename', 'output']].copy()
+    da = meta_df[[Names.FILENAME, 'output']].copy()
     #da['strain'] = da['strain'].mask(da['strain'] == 'WT-Dead-Control',  0)
     #da['strain'] = da['strain'].mask(da['strain'] == 'WT-Live-Control',  1)
     da = get_data_and_metadata_df(da, data_dir, fraction=fraction)
@@ -175,16 +175,16 @@ def get_strain_dataframe_for_classifier(circuit, input, od=0.0003, media='SC Med
 
 def get_strain(strain_circuit, strain_input_state,od=0.0003, media='SC Media',experiment=''):
     query={}
-    query['challenge_problem'] = 'YEAST_GATES'
-    query['file_type'] = 'FCS'
-    query['lab'] = 'Transcriptic'
+    query[Names.CHALLENGE_PROBLEM] = Names.YEAST_STATES
+    query[Names.FILE_TYPE] = Names.FCS
+    query[Names.LAB] = Names.TRANSCRIPTIC
     
 #    if strain_circuit == 'XOR' and strain_input_state == '00':
 #        query['strain'] = '16970'
 #    else:
-    query['strain_circuit'] = strain_circuit
-    query['strain_input_state'] = strain_input_state
-    query['inoculation_density.value'] =  od
+    query[Names.STRAIN_CIRCUIT] = strain_circuit
+    query[Names.STRAIN_INPUT_STATE] = strain_input_state
+    query[Names.INOCULATION_DENSITY_VALUE] =  od
     query['sample_contents.0.name.label'] =  media
 
     #    query['experiment_id'] = experiment
@@ -210,7 +210,7 @@ def get_strain(strain_circuit, strain_input_state,od=0.0003, media='SC Media',ex
 
 def get_control(circuit, control, od=0.0003, media='SC Media'):
     query={}
-    query['challenge_problem'] = 'YEAST_GATES'
+    query['challenge_problem'] = 'YEAST_STATES'
     query['file_type'] = 'FCS'
     query['lab'] = 'Transcriptic'
     #query['strain_circuit'] = strain_circuit
@@ -228,7 +228,7 @@ def get_control(circuit, control, od=0.0003, media='SC Media'):
     json.dump(results,open(dumpfile,'w'))
     return results
 
-def get_experiment_ids(challenge_problem='YEAST_GATES', lab='Transcriptic'):
+def get_experiment_ids(challenge_problem='YEAST_STATES', lab='Transcriptic'):
     query={}
     query['challenge_problem'] = challenge_problem
     query['lab'] = lab
