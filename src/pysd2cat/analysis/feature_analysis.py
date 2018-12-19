@@ -11,7 +11,7 @@ from pprint import pprint
 from pysd2cat.data import pipeline
 from matplotlib.ticker import NullFormatter
 import numpy as np
-
+from sklearn.preprocessing import StandardScaler
 from sklearn import datasets
 
 ####
@@ -63,7 +63,9 @@ def tsne_analysis(df,x_colname='FSC-H',y_colname='FSC-W',label_name='class_label
     plt.close()
 
 
-def clustering_analysis():
+def clustering_analysis(df,x_colname='FSC-H',y_colname='FSC-W',label_name='class_label'):
+    # normalize dataset for easier parameter selection
+    #X = StandardScaler().fit_transform(X)
     return 0
 
 
