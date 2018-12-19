@@ -45,4 +45,6 @@ class Names:
     INPUT_01 = '01'
     INPUT_10 = '10'
     INPUT_11 = '11'
+    
+    REPLICATE = 'replicate'
 

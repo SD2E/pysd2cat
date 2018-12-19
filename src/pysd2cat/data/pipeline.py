@@ -46,6 +46,23 @@ def get_live_dead_controls():
     return results
 
 
+def get_experiment_samples(experiment_id, file_type):
+    """
+    Get metadata for every live and dead control sample across
+    all experiments.
+    """
+    query={}
+    query['experiment_id'] = experiment_id
+    query['file_type'] = file_type
+
+    results = []
+    for match in science_table.find(query):
+        match.pop('_id')
+        results.append(match)
+    return results
+
+
+
 def get_metadata_dataframe(results):
     """
     Convert science table results into metadata dataframe.
@@ -55,7 +72,7 @@ def get_metadata_dataframe(results):
         result_df = {}
         keys_to_set = [Names.STRAIN, Names.FILENAME, Names.LAB, Names.SAMPLE_ID,
                        Names.STRAIN_CIRCUIT, Names.STRAIN_INPUT_STATE,
-                       Names.STRAIN_SBH_URI, Names.EXPERIMENT_ID
+                       Names.STRAIN_SBH_URI, Names.EXPERIMENT_ID, Names.REPLICATE
                       ]
         for k in keys_to_set:
             if k in result:
@@ -117,13 +134,37 @@ def get_data_and_metadata_df(metadata_df, data_dir, fraction=None, max_records=N
         all_data_df = all_data_df.append(data_df)
 
     ## Join data and metadata
-    final_df = metadata_df.set_index(Names.FILENAME).join(all_data_df.set_index(Names.FILENAME))
-    final_df = final_df.reset_index()
-    final_df = final_df.dropna()
-    
+    final_df = metadata_df.merge(all_data_df, left_on='filename', right_on='filename', how='outer')    
     return final_df
 
-
+def get_xplan_data_and_metadata_df(metadata_df, data_dir, fraction=None, max_records=None):
+    """
+    Rename columns from data and metadata to match xplan columns
+    """
+    df = get_data_and_metadata_df(metadata_df, data_dir, fraction=fraction, max_records=max_records)
+    rename_map = {
+        "experiment_id" : "plan",
+        "sample_id" : "id",
+        "strain_input_state" : "input",
+        "strain_circuit" : "gate",
+        "strain_sbh_uri" : "strain"        
+    }
+    
+    #pipeline columns
+    #Index([ 'lab',  'output',
+    #    
+    #   'strain_sbh_uri', 'Time', 'FSC-A', 'SSC-A', 'BL1-A', 'RL1-A', 'FSC-H',
+    #   'SSC-H', 'BL1-H', 'RL1-H', 'FSC-W', 'SSC-W', 'BL1-W', 'RL1-W'],
+    #  dtype='object')
+    
+    #xplan columns
+    #['Unnamed: 0',  'replicate',
+    #   'od', 'bead', 'filename', 'gate', 'Time', 'FSC-A', 'SSC-A', 'BL1-A',
+    #   'FSC-H', 'SSC-H', 'BL1-H', 'FSC-W', 'SSC-W', 'BL1-W']
+    
+    df = df.rename(index=str, columns=rename_map)
+    return df
+    
 ###############################################
 # Helpers for getting sample data to classify #
 ###############################################
