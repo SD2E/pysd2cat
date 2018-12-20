@@ -67,6 +67,7 @@ def get_metadata_dataframe(results):
     """
     Convert science table results into metadata dataframe.
     """
+    runtime = detect_runtime()
     meta_df = pd.DataFrame()
     for result in results:
         result_df = {}
@@ -79,7 +80,12 @@ def get_metadata_dataframe(results):
                 result_df[k] = result[k]
             else:
                 result_df[k] = None
-
+        if runtime == 'jupyter':
+            result_df['filename'] = result['jupyter_path']
+        else:
+            result_df['filename'] = result['hpc_path']
+        
+                
         ## Other values (not at top level)
         if Names.INOCULATION_DENSITY in result:
             result_df['od'] = result[Names.INOCULATION_DENSITY]['value']
@@ -108,6 +114,15 @@ def get_metadata_dataframe(results):
     #pd.set_option('display.max_colwidth', -1)    
     return meta_df
 
+def detect_runtime():
+    if 'REACTORS_VERSION' in os.environ:
+        return 'abaco'
+    elif 'JUPYTERHUB_USER' in os.environ:
+        return 'jupyter'
+    elif 'TACC_DOMAIN' in os.environ:
+        return 'hpc'
+    else:
+        raise Exception('Not a known runtime')
 
 def get_data_and_metadata_df(metadata_df, data_dir, fraction=None, max_records=None):
     """
@@ -119,6 +134,13 @@ def get_data_and_metadata_df(metadata_df, data_dir, fraction=None, max_records=N
         ## Substitute local file for SD2 URI to agave file 
         #record['fcs_files'] = local_datafile(record['fcs_files'][0], data_dir)
         #dataset_local_df = dataset_local_df.append(record)
+        
+        if not os.path.exists(record[Names.FILENAME]):
+            # Fix error where wrong path exists with `uploads`
+            if 'uploads' in record[Names.FILENAME]:
+                record[Names.FILENAME] = record[Names.FILENAME].replace('uploads/', '')               
+            else:
+                continue
     
         ## Create a data frame out of FCS file
         data_df = FCT.FCMeasurement(ID=record[Names.FILENAME],
