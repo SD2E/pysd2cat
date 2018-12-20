@@ -34,7 +34,7 @@ def tsne_analysis(df,x_colname='FSC-H',y_colname='FSC-W',label_name='class_label
     perplexities = [2,5,30,50,100]
 
     #Choose three subplots, one for both, one for live, and one for dead
-    (fig, subplots) = plt.subplots(1, 6, figsize=(15, 8))
+    (fig, subplots) = plt.subplots(1, 6, figsize=(15, 8), squeeze=False)
     X = df.drop(columns=['class_label'])
     y = df['class_label'].astype(int)
     green = y == 0
@@ -42,7 +42,7 @@ def tsne_analysis(df,x_colname='FSC-H',y_colname='FSC-W',label_name='class_label
 
     #Define your subplot region
     #BOTH
-    ax = subplots[0][0]
+    ax = subplots[0,0]
     ax = axis_formatter(ax,X[x_colname][red],X[y_colname][red],c="r")
     ax = axis_formatter(ax, X[x_colname][green],X[y_colname][green], c="g")
     ax.set_title("Channels: " + x_colname + " x " + y_colname )

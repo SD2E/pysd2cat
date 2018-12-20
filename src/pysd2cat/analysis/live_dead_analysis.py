@@ -3,9 +3,13 @@ import os
 import json
 import pandas as pd
 import math
+import matplotlib
+matplotlib.use('Agg')
 from matplotlib.backends.backend_pdf import PdfPages
 
-from pysd2cat.data import pipeline 
+
+
+from pysd2cat.data import pipeline
 from pysd2cat.analysis import threshold as thold
 from pysd2cat.analysis import live_dead_classifier as ldc
 from pysd2cat.plot import plot
@@ -13,24 +17,24 @@ from pysd2cat.plot import plot
 
 
 
-def compute_sytox_threshold_accuracy(live_dead_df, thresholds=[2000], sytox_channel='RL1-A'): 
+def compute_sytox_threshold_accuracy(live_dead_df, thresholds=[2000], sytox_channel='RL1-A'):
     value_df = live_dead_df[[sytox_channel, 'class_label']].rename(index=str, columns={sytox_channel: "value", 'class_label': 'output'})
     value_df['output'] = value_df['output'].apply(lambda x: math.fabs(x-1))
     value_df = value_df.sample(frac=0.1, replace=True)
     plot_df = thold.do_threshold_analysis(value_df, thresholds)
-    
+
     return plot_df
 
 def compute_model_predictions(model, scaler, circuits, inputs, ods, media, fraction=0.06, data_dir='.'):
     predictions = pd.DataFrame()
     for circuit in circuits:
-        for input in inputs: 
+        for input in inputs:
             for od in ods:
                 for m in media:
                     m_df = pipeline.get_strain_dataframe_for_classifier(circuit, input, od=od, media=m, data_dir=data_dir, fraction=fraction)
                     #print(circuit + " " + input + " " + str(od))
                     pred_df = ldc.predict_live_dead(m_df.drop(columns=['output']), model, scaler)
-                    m_df['class_label'] = pred_df['class_label']                               
+                    m_df['class_label'] = pred_df['class_label']
                     m_df['circuit'] = circuit
                     m_df['input'] = input
                     m_df['media'] = m
@@ -38,19 +42,19 @@ def compute_model_predictions(model, scaler, circuits, inputs, ods, media, fract
 
 
                     predictions = predictions.append(m_df, ignore_index=True)
-    return predictions                  
+    return predictions
 
 def compare_accuracy_of_gating(model, scaler, circuits, inputs, ods, media, fraction=0.06, data_dir='.', channel='BL1-A', thresholds=[10000]):
-    
+
     plot_df = pd.DataFrame()
     for circuit in circuits:
-        for input in inputs: 
+        for input in inputs:
             for od in ods:
                 for m in media:
-                    m_df = pipeline.get_strain_dataframe_for_classifier(circuit, input, od=od, media=m, data_dir=data_dir, fraction=fraction)    
+                    m_df = pipeline.get_strain_dataframe_for_classifier(circuit, input, od=od, media=m, data_dir=data_dir, fraction=fraction)
                     #print(m_df.head())
                     pred_df = ldc.predict_live_dead(m_df.drop(columns=['output']), model, scaler)
-                    m_df['class_label'] = pred_df['class_label']                
+                    m_df['class_label'] = pred_df['class_label']
                     gated_df = m_df.loc[m_df['class_label'] == 1] # live cells
                     num_gated = len(m_df.index) - len(gated_df.index)
 
@@ -74,8 +78,8 @@ def compare_accuracy_of_gating(model, scaler, circuits, inputs, ods, media, frac
 
                     #print(thold_df)
                     plot_df = plot_df.append(thold_df, ignore_index=True)
-    return plot_df                
-                
+    return plot_df
+
 def plot_strain_live_dead_predictions(predictions, circuits, inputs, ods, media, filename='live_dead_predictions.pdf'):
     with PdfPages(filename) as pdfpages:
         for circuit in circuits:
@@ -91,7 +95,7 @@ def plot_strain_live_dead_predictions(predictions, circuits, inputs, ods, media,
 def main():
     ## Where data files live
     ##HPC
-    data_dir = '/work/projects/SD2E-Community/prod/data/uploads/' 
+    data_dir = '/work/projects/SD2E-Community/prod/data/uploads/'
 
     ##Jupyter Hub
     #data_dir = '/home/jupyter/sd2e-community/'
@@ -102,16 +106,16 @@ def main():
     circuits=['XOR', 'XNOR', 'OR', 'NOR', 'NAND', 'AND']
     inputs=['00', '01', '10', '11']
     data_fraction=0.06
-    
+
     print("Building Live/Dead Control Dataframe...")
     live_dead_df = pipeline.get_dataframe_for_live_dead_classifier(data_dir)
-    
+
     print("Training Live/Dead Classifier...")
     (model, mean_absolute_error, test_X, test_y, scaler) = ldc.build_model(live_dead_df)
     print("MAE = " + str(mean_absolute_error))
 
     print("Plotting Classifier Predictions on Test Set by channel...")
-    plot.plot_live_dead_control_predictions_by_channel(test_X, test_y, 
+    plot.plot_live_dead_control_predictions_by_channel(test_X, test_y,
                                                      filename='live_dead_control_model_channels.png')
 
     print("Computing Sytox Threshold Accuracy...")
@@ -121,13 +125,13 @@ def main():
     print("Plotting Sytox Threshold Accuracy...")
     plot.plot_live_dead_threshold(threshold_analysis, 'Live/Dead Sytox Threshold',
                                   filename='live_dead_control_threshold_accuracy.png')
-    
-    
+
+
     print("Computing mean number of live cells per sample (comparing threshold to classifier)...")
-    mean_live = ldc.compute_mean_live(model, 
+    mean_live = ldc.compute_mean_live(model,
                                       scaler,
-                      data_dir, 
-                      threshold=2000, 
+                      data_dir,
+                      threshold=2000,
                       ods=ods,
                       media=media,
                       circuits=circuits,
@@ -141,10 +145,10 @@ def main():
 
     print("Plotting Live/Dead Predictions for strains...")
     plot_strain_live_dead_predictions(predictions, circuits, inputs, ods, media)
-    
+
     print("Performing Comparison of Accuracy Before and After gating with Live/Dead classifier")
     gating_comparison = compare_accuracy_of_gating(model, scaler, circuits, inputs, ods, media, fraction=data_fraction, data_dir=data_dir,thresholds=[10000])
     gating_comparison.to_csv('gating_comparison.csv')
-    
+
 if __name__ == '__main__':
     main()
