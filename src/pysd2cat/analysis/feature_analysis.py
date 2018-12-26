@@ -92,7 +92,7 @@ def main():
 if __name__ == '__main__':
     main()
     ###TESTING WITH SCI-KIT DATA####
-    ##X, y = datasets.make_circles(n_samples=300, factor=.5, noise=.05)
-    ##df = pd.DataFrame(np.column_stack((X,y)),columns=['col_'+ str(i) for i in range(0,X.shape[1]+1)])
-    ##df = df.rename(columns={'col_'+str(X.shape[1]):'class_label'})
-    ##tsne_analysis(df,x_colname='col_0',y_colname='col_1')
+    #X, y = datasets.make_circles(n_samples=300, factor=.5, noise=.05)
+    #df = pd.DataFrame(np.column_stack((X,y)),columns=['col_'+ str(i) for i in range(0,X.shape[1]+1)])
+    #df = df.rename(columns={'col_'+str(X.shape[1]):'class_label'})
+    #tsne_analysis(df,x_colname='col_0',y_colname='col_1')
