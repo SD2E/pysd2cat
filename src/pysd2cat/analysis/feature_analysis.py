@@ -50,6 +50,7 @@ def tsne_analysis(df,x_colname='FSC-H',y_colname='FSC-W',label_name='class_label
 
     for i, perplexity in enumerate(perplexities):
         ax = subplots[0][i+1]
+        print("Running loop {0}: t-sne with perplexity {1}".format(i,perplexity))
         tsne = TSNE(n_components=2, init='random',
                              random_state=0, perplexity=perplexity)
         Y = tsne.fit_transform(X)
@@ -58,7 +59,7 @@ def tsne_analysis(df,x_colname='FSC-H',y_colname='FSC-W',label_name='class_label
         ax = axis_formatter(ax,Y[green.as_matrix(),0],Y[green.as_matrix(),1],c="g")
         ax.axis('tight')
 
-
+    print("Saving figure...")
     plt.savefig("Tsne_plot_live_dead.png")
     plt.close()
 
@@ -82,6 +83,10 @@ def main():
 
     print("Building Live/Dead Control Dataframe...")
     live_dead_df = pipeline.get_dataframe_for_live_dead_classifier(data_dir,fraction=.06)
+    nrows = len(live_dead_df)
+    ncols = len(live_dead_df.columns)
+    print("Dataframe constructed with {0} rows and {1} columns".format(nrows,ncols))
+    print("Starting t-sne analysis:")
     tsne_analysis(live_dead_df)
 
 if __name__ == '__main__':
