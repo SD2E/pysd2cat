@@ -3,6 +3,8 @@ import os
 import json
 import pandas as pd
 import math
+import matplotlib
+matplotlib.use('Agg')
 from matplotlib import pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 from sklearn.preprocessing import Normalizer
