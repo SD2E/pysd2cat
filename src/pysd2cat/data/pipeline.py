@@ -104,6 +104,8 @@ def get_data_and_metadata_df(metadata_df, data_dir, fraction=None, max_records=N
         #dataset_local_df = dataset_local_df.append(record)
     
         ## Create a data frame out of FCS file
+        print("data dir",data_dir)
+        print("Filename",record[Names.FILENAME])
         data_df = FCT.FCMeasurement(ID=record[Names.FILENAME],
                                     datafile=os.path.join(data_dir, record[Names.FILENAME])).read_data()
         if max_records is not None:
