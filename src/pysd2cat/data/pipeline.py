@@ -80,7 +80,7 @@ def get_metadata_dataframe(results):
                 result_df[k] = result[k]
             else:
                 result_df[k] = None
-        if runtime == 'jupyter':
+        if 'jupyter' in runtime:
             result_df['filename'] = result['jupyter_path']
         else:
             result_df['filename'] = result['hpc_path']
