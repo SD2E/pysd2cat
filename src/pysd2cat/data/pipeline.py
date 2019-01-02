@@ -85,6 +85,14 @@ def get_metadata_dataframe(results):
         else:
             result_df['filename'] = result['hpc_path']
         
+        if not os.path.exists(result_df[Names.FILENAME]):
+            # Fix error where wrong path exists with `uploads`
+            if 'uploads' in result_df[Names.FILENAME]:
+                result_df[Names.FILENAME] = result_df[Names.FILENAME].replace('uploads/', '')               
+            else:
+                continue
+
+
                 
         ## Other values (not at top level)
         if Names.INOCULATION_DENSITY in result:
