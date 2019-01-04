@@ -62,7 +62,6 @@ def get_experiment_samples(experiment_id, file_type):
     return results
 
 
-
 def get_metadata_dataframe(results):
     """
     Convert science table results into metadata dataframe.
@@ -167,6 +166,9 @@ def get_data_and_metadata_df(metadata_df, data_dir, fraction=None, max_records=N
     final_df = metadata_df.merge(all_data_df, left_on='filename', right_on='filename', how='outer')    
     return final_df
 
+def sanitize(my_string):
+    return my_string.replace('-', '_').replace(' ', '_')
+
 def get_xplan_data_and_metadata_df(metadata_df, data_dir, fraction=None, max_records=None):
     """
     Rename columns from data and metadata to match xplan columns
@@ -179,18 +181,9 @@ def get_xplan_data_and_metadata_df(metadata_df, data_dir, fraction=None, max_rec
         "strain_circuit" : "gate",
         "strain_sbh_uri" : "strain"        
     }
-    
-    #pipeline columns
-    #Index([ 'lab',  'output',
-    #    
-    #   'strain_sbh_uri', 'Time', 'FSC-A', 'SSC-A', 'BL1-A', 'RL1-A', 'FSC-H',
-    #   'SSC-H', 'BL1-H', 'RL1-H', 'FSC-W', 'SSC-W', 'BL1-W', 'RL1-W'],
-    #  dtype='object')
-    
-    #xplan columns
-    #['Unnamed: 0',  'replicate',
-    #   'od', 'bead', 'filename', 'gate', 'Time', 'FSC-A', 'SSC-A', 'BL1-A',
-    #   'FSC-H', 'SSC-H', 'BL1-H', 'FSC-W', 'SSC-W', 'BL1-W']
+    for col in df.columns:
+        if col not in rename_map:
+            rename_map[col] = sanitize(col)
     
     df = df.rename(index=str, columns=rename_map)
     return df
