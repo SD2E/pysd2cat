@@ -63,31 +63,30 @@ def get_experiment_samples(experiment_id, file_type):
 
 
 strain_inputs = {
-            'https://hub.sd2e.org/user/sd2e/design/UWBF_7376/1' :
-            {'gate' : 'UWBF_AND', 'input' : '00','entropy' : 10.640062},
-            'https://hub.sd2e.org/user/sd2e/design/UWBF_7375/1' : {'gate' : 'AND', 'input' : '01','entropy' : 10.570885},
-            'https://hub.sd2e.org/user/sd2e/design/UWBF_7373/1' : {'gate' : 'AND', 'input' : '10','entropy' : 10.347003},
-            'https://hub.sd2e.org/user/sd2e/design/UWBF_7374/1' : {'gate' : 'AND', 'input' : '11','entropy' : 9.953647},
-            'https://hub.sd2e.org/user/sd2e/design/UWBF_8544/1' : {'gate' : 'NAND', 'input' : '00','entropy' : 11.260336},
-            'https://hub.sd2e.org/user/sd2e/design/UWBF_8545/1' : {'gate' : 'NAND', 'input' : '01','entropy' : 11.275791},
-            'https://hub.sd2e.org/user/sd2e/design/UWBF_8543/1' : {'gate' : 'NAND', 'input' : '10','entropy' : 11.003327},
-            'https://hub.sd2e.org/user/sd2e/design/UWBF_8542/1' : {'gate' : 'NAND', 'input' : '11','entropy' : 11.134974},
-            'https://hub.sd2e.org/user/sd2e/design/UWBF_6390/1' : {'gate' : 'NOR', 'input' : '00','entropy' : 9.678551},
-            'https://hub.sd2e.org/user/sd2e/design/UWBF_6388/1' : {'gate' : 'NOR', 'input' : '01','entropy' : 9.047884},
-            'https://hub.sd2e.org/user/sd2e/design/UWBF_6389/1' : {'gate' : 'NOR', 'input' : '10','entropy' : 9.429766},
-            'https://hub.sd2e.org/user/sd2e/design/UWBF_6391/1' : {'gate' : 'NOR', 'input' : '11','entropy' : 8.576688},
-            'https://hub.sd2e.org/user/sd2e/design/UWBF_8225/1' : {'gate' : 'OR', 'input' : '00','entropy' : 9.656962},
-            'https://hub.sd2e.org/user/sd2e/design/UWBF_5993/1' : {'gate' : 'OR', 'input' : '01','entropy' : 9.56502},
-            'https://hub.sd2e.org/user/sd2e/design/UWBF_5783/1' : {'gate' : 'OR', 'input' : '10','entropy' : 9.485656},
-            'https://hub.sd2e.org/user/sd2e/design/UWBF_5992/1' : {'gate' : 'OR', 'input' : '11','entropy' : 9.504662},
-            'https://hub.sd2e.org/user/sd2e/design/UWBF_7300/1' : {'gate' : 'XNOR', 'input' : '00','entropy' : 10.576265},
-            'https://hub.sd2e.org/user/sd2e/design/UWBF_8231/1' : {'gate' : 'XNOR', 'input' : '01','entropy' : 9.90062},
-            'https://hub.sd2e.org/user/sd2e/design/UWBF_7377/1' : {'gate' : 'XNOR', 'input' : '10','entropy' : 9.602538},
-            'https://hub.sd2e.org/user/sd2e/design/UWBF_7299/1' : {'gate' : 'XNOR', 'input' : '11','entropy' : 10.010689},
-            'https://hub.sd2e.org/user/sd2e/design/UWBF_16970/1' : {'gate' : 'XOR', 'input' : '00','entropy' : 10.952173},
-            'https://hub.sd2e.org/user/sd2e/design/UWBF_16969/1' : {'gate' : 'XOR', 'input' : '01','entropy' : 10.497917},
-            'https://hub.sd2e.org/user/sd2e/design/UWBF_16968/1' : {'gate' : 'XOR', 'input' : '10','entropy' : 10.8009},
-            'https://hub.sd2e.org/user/sd2e/design/UWBF_16967/1' : {'gate' : 'XOR', 'input' : '11','entropy' : 10.870113}
+            'https://hub.sd2e.org/user/sd2e/design/UWBF_7376/1' : {'gate' : 'AND', 'input' : '00','output' : '0'},
+            'https://hub.sd2e.org/user/sd2e/design/UWBF_7375/1' : {'gate' : 'AND', 'input' : '01','output' : '0'},
+            'https://hub.sd2e.org/user/sd2e/design/UWBF_7373/1' : {'gate' : 'AND', 'input' : '10','output' : '0'},
+            'https://hub.sd2e.org/user/sd2e/design/UWBF_7374/1' : {'gate' : 'AND', 'input' : '11','output' : '1'},
+            'https://hub.sd2e.org/user/sd2e/design/UWBF_8544/1' : {'gate' : 'NAND', 'input' : '00','output' : '1'},
+            'https://hub.sd2e.org/user/sd2e/design/UWBF_8545/1' : {'gate' : 'NAND', 'input' : '01','output' : '1'},
+            'https://hub.sd2e.org/user/sd2e/design/UWBF_8543/1' : {'gate' : 'NAND', 'input' : '10','output' : '1'},
+            'https://hub.sd2e.org/user/sd2e/design/UWBF_8542/1' : {'gate' : 'NAND', 'input' : '11','output' : '0'},
+            'https://hub.sd2e.org/user/sd2e/design/UWBF_6390/1' : {'gate' : 'NOR', 'input' : '00','output' : '1'},
+            'https://hub.sd2e.org/user/sd2e/design/UWBF_6388/1' : {'gate' : 'NOR', 'input' : '01','output' : '0'},
+            'https://hub.sd2e.org/user/sd2e/design/UWBF_6389/1' : {'gate' : 'NOR', 'input' : '10','output' : '0'},
+            'https://hub.sd2e.org/user/sd2e/design/UWBF_6391/1' : {'gate' : 'NOR', 'input' : '11','output' : '0'},
+            'https://hub.sd2e.org/user/sd2e/design/UWBF_8225/1' : {'gate' : 'OR', 'input' : '00','output' : '0'},
+            'https://hub.sd2e.org/user/sd2e/design/UWBF_5993/1' : {'gate' : 'OR', 'input' : '01','output' : '1'},
+            'https://hub.sd2e.org/user/sd2e/design/UWBF_5783/1' : {'gate' : 'OR', 'input' : '10','output' : '1'},
+            'https://hub.sd2e.org/user/sd2e/design/UWBF_5992/1' : {'gate' : 'OR', 'input' : '11','output' : '1'},
+            'https://hub.sd2e.org/user/sd2e/design/UWBF_7300/1' : {'gate' : 'XNOR', 'input' : '00','output' : '1'},
+            'https://hub.sd2e.org/user/sd2e/design/UWBF_8231/1' : {'gate' : 'XNOR', 'input' : '01','output' : '0'},
+            'https://hub.sd2e.org/user/sd2e/design/UWBF_7377/1' : {'gate' : 'XNOR', 'input' : '10','output' : '0'},
+            'https://hub.sd2e.org/user/sd2e/design/UWBF_7299/1' : {'gate' : 'XNOR', 'input' : '11','output' : '1'},
+            'https://hub.sd2e.org/user/sd2e/design/UWBF_16970/1' : {'gate' : 'XOR', 'input' : '00','output' : '0'},
+            'https://hub.sd2e.org/user/sd2e/design/UWBF_16969/1' : {'gate' : 'XOR', 'input' : '01','output' : '1'},
+            'https://hub.sd2e.org/user/sd2e/design/UWBF_16968/1' : {'gate' : 'XOR', 'input' : '10','output' : '1'},
+            'https://hub.sd2e.org/user/sd2e/design/UWBF_16967/1' : {'gate' : 'XOR', 'input' : '11','output' : '0'}
         }
     
 
@@ -104,6 +103,9 @@ def handle_missing_data(result, key):
         return strain_inputs[strain]['input']
     elif key in Names.STRAIN_CIRCUIT and strain is not None  and strain in strain_inputs:
         return strain_inputs[strain]['gate']
+    elif key in Names.OUTPUT and strain is not None  and strain in strain_inputs:
+        return strain_inputs[strain]['output']
+
     else:
         return None
 
@@ -119,7 +121,7 @@ def get_metadata_dataframe(results):
         result_df = {}
         keys_to_set = [Names.STRAIN, Names.FILENAME, Names.LAB, Names.SAMPLE_ID,
                        Names.STRAIN_CIRCUIT, Names.STRAIN_INPUT_STATE,
-                       Names.EXPERIMENT_ID, Names.REPLICATE
+                       Names.EXPERIMENT_ID, Names.REPLICATE, Names.OUTPUT
                       ]
         for k in keys_to_set:
             if k in result:
@@ -151,9 +153,9 @@ def get_metadata_dataframe(results):
             result_df['media'] = None
             
         if Names.STRAIN_CIRCUIT in result_df and Names.STRAIN_INPUT_STATE in result_df:
-            result_df['output'] = gate_output(result_df[Names.STRAIN_CIRCUIT], result_df[Names.STRAIN_INPUT_STATE])
+            result_df[Names.OUTPUT] = gate_output(result_df[Names.STRAIN_CIRCUIT], result_df[Names.STRAIN_INPUT_STATE])
         else:
-            result_df['output'] = None
+            result_df[Names.OUTPUT] = None
 
         #result_df['fcs_files'] = ['agave://' + result['agave_system'] + result['agave_path']]
 
@@ -226,12 +228,13 @@ def get_xplan_data_and_metadata_df(metadata_df, data_dir, fraction=None, max_rec
         "sample_id" : "id",
         "strain_input_state" : "input",
         "strain_circuit" : "gate",
-        "strain_sbh_uri" : "strain"        
+        "strain_sbh_uri" : "strain",
+        "strain" : "strain_name"
     }
     for col in df.columns:
         if col not in rename_map:
             rename_map[col] = sanitize(col)
-    
+    print("renaming columns as: " + str(rename_map))
     df = df.rename(index=str, columns=rename_map)
     return df
     
