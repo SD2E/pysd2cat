@@ -118,6 +118,7 @@ def get_metadata_dataframe(results):
     runtime = detect_runtime()
     meta_df = pd.DataFrame()
     for result in results:
+               
         result_df = {}
         keys_to_set = [Names.STRAIN, Names.FILENAME, Names.LAB, Names.SAMPLE_ID,
                        Names.STRAIN_CIRCUIT, Names.STRAIN_INPUT_STATE,
@@ -194,7 +195,9 @@ def get_data_and_metadata_df(metadata_df, data_dir, fraction=None, max_records=N
         if not os.path.exists(record[Names.FILENAME]):
             # Fix error where wrong path exists with `uploads`
             if 'uploads' in record[Names.FILENAME]:
-                record[Names.FILENAME] = record[Names.FILENAME].replace('uploads/', '')               
+                record[Names.FILENAME] = record[Names.FILENAME].replace('uploads/', '')    
+                if not os.path.exists(record[Names.FILENAME]):
+                    continue
             else:
                 continue
     
