@@ -89,7 +89,12 @@ strain_inputs = {
             'https://hub.sd2e.org/user/sd2e/design/UWBF_16967/1' : {'gate' : 'XOR', 'input' : '11','output' : '0'}
         }
     
-
+media_map = {
+    'https://hub.sd2e.org/user/sd2e/design/culture_media_4/1' : 'SC Media',
+    'https://hub.sd2e.org/user/sd2e/design/culture_media_5/1' : 'YPAD',
+    'https://hub.sd2e.org/user/sd2e/design/culture_media_3/1' : 'SC High Osm',
+    'https://hub.sd2e.org/user/sd2e/design/culture_media_2/1' : 'SC Slow'
+}
 
 def handle_missing_data(result, key):
     if Names.STRAIN in result: 
@@ -105,7 +110,8 @@ def handle_missing_data(result, key):
         return strain_inputs[strain]['gate']
     elif key in Names.OUTPUT and strain is not None  and strain in strain_inputs:
         return strain_inputs[strain]['output']
-
+    elif key in 'media':
+        return media_map[result['media']]
     else:
         return None
 
@@ -150,6 +156,8 @@ def get_metadata_dataframe(results):
             result_df['od'] = None
         if 'sample_contents' in result:
             result_df['media'] = result['sample_contents'][0]['name']['label']
+            if 'https://hub.sd2e.org/user/sd2e/design' in result_df['media']:
+                result_df['media'] = handle_missing_data(result_df, 'media')
         else:
             result_df['media'] = None
             
