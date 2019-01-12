@@ -38,12 +38,12 @@ def get_live_dead_controls():
     query[Names.CHALLENGE_PROBLEM] = Names.YEAST_STATES
     query[Names.FILE_TYPE] = Names.FCS
     query[Names.STRAIN] = {"$in": [Names.WT_DEAD_CONTROL, Names.WT_LIVE_CONTROL]}
-    print("Query:")
-    print(query)
+    #print("Query:")
+    #print(query)
     results = []
     print("Printing results of query...")
     for match in science_table.find(query):
-        print(match)
+        #print(match)
         match.pop('_id')
         results.append(match)
     return results
@@ -215,8 +215,8 @@ def get_data_and_metadata_df(metadata_df, data_dir, fraction=None, max_records=N
                 continue
     
         ## Create a data frame out of FCS file
-        print("data dir",data_dir)
-        print("Filename",record[Names.FILENAME])
+        #print("data dir",data_dir)
+        #print("Filename",record[Names.FILENAME])
         data_df = FCT.FCMeasurement(ID=record[Names.FILENAME],
                                     datafile=os.path.join(data_dir, record[Names.FILENAME])).read_data()
         if max_records is not None:
