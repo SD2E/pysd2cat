@@ -49,37 +49,125 @@ def get_live_dead_controls():
     return results
 
 
+def get_experiment_samples(experiment_id, file_type):
+    """
+    Get metadata for every live and dead control sample across
+    all experiments.
+    """
+    query={}
+    query['experiment_id'] = experiment_id
+    query['file_type'] = file_type
+
+    results = []
+    for match in science_table.find(query):
+        match.pop('_id')
+        results.append(match)
+    return results
+
+
+strain_inputs = {
+            'https://hub.sd2e.org/user/sd2e/design/UWBF_7376/1' : {'gate' : 'AND', 'input' : '00','output' : '0'},
+            'https://hub.sd2e.org/user/sd2e/design/UWBF_7375/1' : {'gate' : 'AND', 'input' : '01','output' : '0'},
+            'https://hub.sd2e.org/user/sd2e/design/UWBF_7373/1' : {'gate' : 'AND', 'input' : '10','output' : '0'},
+            'https://hub.sd2e.org/user/sd2e/design/UWBF_7374/1' : {'gate' : 'AND', 'input' : '11','output' : '1'},
+            'https://hub.sd2e.org/user/sd2e/design/UWBF_8544/1' : {'gate' : 'NAND', 'input' : '00','output' : '1'},
+            'https://hub.sd2e.org/user/sd2e/design/UWBF_8545/1' : {'gate' : 'NAND', 'input' : '01','output' : '1'},
+            'https://hub.sd2e.org/user/sd2e/design/UWBF_8543/1' : {'gate' : 'NAND', 'input' : '10','output' : '1'},
+            'https://hub.sd2e.org/user/sd2e/design/UWBF_8542/1' : {'gate' : 'NAND', 'input' : '11','output' : '0'},
+            'https://hub.sd2e.org/user/sd2e/design/UWBF_6390/1' : {'gate' : 'NOR', 'input' : '00','output' : '1'},
+            'https://hub.sd2e.org/user/sd2e/design/UWBF_6388/1' : {'gate' : 'NOR', 'input' : '01','output' : '0'},
+            'https://hub.sd2e.org/user/sd2e/design/UWBF_6389/1' : {'gate' : 'NOR', 'input' : '10','output' : '0'},
+            'https://hub.sd2e.org/user/sd2e/design/UWBF_6391/1' : {'gate' : 'NOR', 'input' : '11','output' : '0'},
+            'https://hub.sd2e.org/user/sd2e/design/UWBF_8225/1' : {'gate' : 'OR', 'input' : '00','output' : '0'},
+            'https://hub.sd2e.org/user/sd2e/design/UWBF_5993/1' : {'gate' : 'OR', 'input' : '01','output' : '1'},
+            'https://hub.sd2e.org/user/sd2e/design/UWBF_5783/1' : {'gate' : 'OR', 'input' : '10','output' : '1'},
+            'https://hub.sd2e.org/user/sd2e/design/UWBF_5992/1' : {'gate' : 'OR', 'input' : '11','output' : '1'},
+            'https://hub.sd2e.org/user/sd2e/design/UWBF_7300/1' : {'gate' : 'XNOR', 'input' : '00','output' : '1'},
+            'https://hub.sd2e.org/user/sd2e/design/UWBF_8231/1' : {'gate' : 'XNOR', 'input' : '01','output' : '0'},
+            'https://hub.sd2e.org/user/sd2e/design/UWBF_7377/1' : {'gate' : 'XNOR', 'input' : '10','output' : '0'},
+            'https://hub.sd2e.org/user/sd2e/design/UWBF_7299/1' : {'gate' : 'XNOR', 'input' : '11','output' : '1'},
+            'https://hub.sd2e.org/user/sd2e/design/UWBF_16970/1' : {'gate' : 'XOR', 'input' : '00','output' : '0'},
+            'https://hub.sd2e.org/user/sd2e/design/UWBF_16969/1' : {'gate' : 'XOR', 'input' : '01','output' : '1'},
+            'https://hub.sd2e.org/user/sd2e/design/UWBF_16968/1' : {'gate' : 'XOR', 'input' : '10','output' : '1'},
+            'https://hub.sd2e.org/user/sd2e/design/UWBF_16967/1' : {'gate' : 'XOR', 'input' : '11','output' : '0'}
+        }
+    
+media_map = {
+    'https://hub.sd2e.org/user/sd2e/design/culture_media_4/1' : 'SC Media',
+    'https://hub.sd2e.org/user/sd2e/design/culture_media_5/1' : 'YPAD',
+    'https://hub.sd2e.org/user/sd2e/design/culture_media_3/1' : 'SC High Osm',
+    'https://hub.sd2e.org/user/sd2e/design/culture_media_2/1' : 'SC Slow'
+}
+
+def handle_missing_data(result, key):
+    if Names.STRAIN in result: 
+        strain = str(result[Names.STRAIN])
+    else:
+        strain = None
+      
+
+        
+    if key in Names.STRAIN_INPUT_STATE and strain is not None and strain in strain_inputs:
+        return strain_inputs[strain]['input']
+    elif key in Names.STRAIN_CIRCUIT and strain is not None  and strain in strain_inputs:
+        return strain_inputs[strain]['gate']
+    elif key in Names.OUTPUT and strain is not None  and strain in strain_inputs:
+        return strain_inputs[strain]['output']
+    elif key in 'media':
+        return media_map[result['media']]
+    else:
+        return None
+
+
+
 def get_metadata_dataframe(results):
     """
     Convert science table results into metadata dataframe.
     """
+    runtime = detect_runtime()
     meta_df = pd.DataFrame()
     for result in results:
+               
         result_df = {}
         keys_to_set = [Names.STRAIN, Names.FILENAME, Names.LAB, Names.SAMPLE_ID,
                        Names.STRAIN_CIRCUIT, Names.STRAIN_INPUT_STATE,
-                       Names.STRAIN_SBH_URI, Names.EXPERIMENT_ID
+                       Names.EXPERIMENT_ID, Names.REPLICATE, Names.OUTPUT
                       ]
         for k in keys_to_set:
             if k in result:
                 result_df[k] = result[k]
             else:
-                result_df[k] = None
+                result_df[k] = handle_missing_data(result, k)
+        if 'jupyter' in runtime:
+            result_df['filename'] = result['jupyter_path']
+        else:
+            result_df['filename'] = result['hpc_path']
+        
+        if not os.path.exists(result_df[Names.FILENAME]):
+            # Fix error where wrong path exists with `uploads`
+            if 'uploads' in result_df[Names.FILENAME]:
+                result_df[Names.FILENAME] = result_df[Names.FILENAME].replace('uploads/', '')               
+            else:
+                continue
 
+            
+                
         ## Other values (not at top level)
         if Names.INOCULATION_DENSITY in result:
             result_df['od'] = result[Names.INOCULATION_DENSITY]['value']
         else:
             result_df['od'] = None
         if 'sample_contents' in result:
-            result_df['media'] = result['sample_contents'][0]['name']['sbh_uri']
+            result_df['media'] = result['sample_contents'][0]['name']['label']
+            if 'https://hub.sd2e.org/user/sd2e/design' in result_df['media']:
+                result_df['media'] = handle_missing_data(result_df, 'media')
         else:
             result_df['media'] = None
             
-        if Names.STRAIN_CIRCUIT in result and Names.STRAIN_INPUT_STATE in result:
-            result_df['output'] = gate_output(result[Names.STRAIN_CIRCUIT], result[Names.STRAIN_INPUT_STATE])
+        if Names.STRAIN_CIRCUIT in result_df and Names.STRAIN_INPUT_STATE in result_df:
+            result_df[Names.OUTPUT] = gate_output(result_df[Names.STRAIN_CIRCUIT], result_df[Names.STRAIN_INPUT_STATE])
         else:
-            result_df['output'] = None
+            result_df[Names.OUTPUT] = None
 
         #result_df['fcs_files'] = ['agave://' + result['agave_system'] + result['agave_path']]
 
@@ -96,6 +184,15 @@ def get_metadata_dataframe(results):
     print(meta_df)
     return meta_df
 
+def detect_runtime():
+    if 'REACTORS_VERSION' in os.environ:
+        return 'abaco'
+    elif 'JUPYTERHUB_USER' in os.environ:
+        return 'jupyter'
+    elif 'TACC_DOMAIN' in os.environ:
+        return 'hpc'
+    else:
+        raise Exception('Not a known runtime')
 
 def get_data_and_metadata_df(metadata_df, data_dir, fraction=None, max_records=None):
     """
@@ -107,6 +204,15 @@ def get_data_and_metadata_df(metadata_df, data_dir, fraction=None, max_records=N
         ## Substitute local file for SD2 URI to agave file 
         #record['fcs_files'] = local_datafile(record['fcs_files'][0], data_dir)
         #dataset_local_df = dataset_local_df.append(record)
+        
+        if not os.path.exists(record[Names.FILENAME]):
+            # Fix error where wrong path exists with `uploads`
+            if 'uploads' in record[Names.FILENAME]:
+                record[Names.FILENAME] = record[Names.FILENAME].replace('uploads/', '')    
+                if not os.path.exists(record[Names.FILENAME]):
+                    continue
+            else:
+                continue
     
         ## Create a data frame out of FCS file
         print("data dir",data_dir)
@@ -124,13 +230,32 @@ def get_data_and_metadata_df(metadata_df, data_dir, fraction=None, max_records=N
         all_data_df = all_data_df.append(data_df)
 
     ## Join data and metadata
-    final_df = metadata_df.set_index(Names.FILENAME).join(all_data_df.set_index(Names.FILENAME))
-    final_df = final_df.reset_index()
-    final_df = final_df.dropna()
-    
+    final_df = metadata_df.merge(all_data_df, left_on='filename', right_on='filename', how='outer')    
     return final_df
 
+def sanitize(my_string):
+    return my_string.replace('-', '_').replace(' ', '_')
 
+def get_xplan_data_and_metadata_df(metadata_df, data_dir, fraction=None, max_records=None):
+    """
+    Rename columns from data and metadata to match xplan columns
+    """
+    df = get_data_and_metadata_df(metadata_df, data_dir, fraction=fraction, max_records=max_records)
+    rename_map = {
+        "experiment_id" : "plan",
+        "sample_id" : "id",
+        "strain_input_state" : "input",
+        "strain_circuit" : "gate",
+        "strain_sbh_uri" : "strain",
+        "strain" : "strain_name"
+    }
+    for col in df.columns:
+        if col not in rename_map:
+            rename_map[col] = sanitize(col)
+    print("renaming columns as: " + str(rename_map))
+    df = df.rename(index=str, columns=rename_map)
+    return df
+    
 ###############################################
 # Helpers for getting sample data to classify #
 ###############################################

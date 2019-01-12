@@ -33,6 +33,7 @@ class Names:
     # Circuits
     STRAIN_CIRCUIT = STRAIN + '_circuit'
     STRAIN_INPUT_STATE = STRAIN + '_input_state'
+    OUTPUT = 'output'
     XOR = 'XOR'
     XNOR = 'XNOR'
     OR= 'OR'
@@ -45,4 +46,6 @@ class Names:
     INPUT_01 = '01'
     INPUT_10 = '10'
     INPUT_11 = '11'
+    
+    REPLICATE = 'replicate'
 
