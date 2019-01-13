@@ -25,6 +25,7 @@ def get_dataframe_for_live_dead_classifier(data_dir,fraction=None, max_records=N
     da[Names.STRAIN] = da[Names.STRAIN].mask(da[Names.STRAIN] == Names.WT_DEAD_CONTROL,  0)
     da[Names.STRAIN] = da[Names.STRAIN].mask(da[Names.STRAIN] == Names.WT_LIVE_CONTROL,  1)
     da = da.rename(index=str, columns={Names.STRAIN: "class_label"})
+    print("In get_dataframe_for_live_dead_classifier fraction is: ", fraction)
     da = get_data_and_metadata_df(da, data_dir,fraction,max_records)
     da = da.drop(columns=[Names.FILENAME, 'Time'])
     return da
@@ -217,15 +218,20 @@ def get_data_and_metadata_df(metadata_df, data_dir, fraction=None, max_records=N
         ## Create a data frame out of FCS file
         #print("data dir",data_dir)
         #print("Filename",record[Names.FILENAME])
+
         data_df = FCT.FCMeasurement(ID=record[Names.FILENAME],
                                     datafile=os.path.join(data_dir, record[Names.FILENAME])).read_data()
+        print("Length of data_df is",len(data_df))
+        print("In get_data_metadata_df fraction is: ",fraction)
         if max_records is not None:
             data_df = data_df[0:min(len(data_df), max_records)]
         elif fraction is not None:
+            print("In get_data_metadata_df ELIF condition fraction is: ", fraction)
             data_df = data_df.sample(frac=fraction, replace=True)
             #data_df = data_df.replace([np.inf, -np.inf], np.nan)
         #data_df = data_df[~data_df.isin(['NaN', 'NaT']).any(axis=1)]
-        
+        print("New Length of data_df is",len(data_df))
+
         data_df[Names.FILENAME] = record[Names.FILENAME]
         all_data_df = all_data_df.append(data_df)
 
