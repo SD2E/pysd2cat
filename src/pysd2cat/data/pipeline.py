@@ -9,6 +9,7 @@ from pysd2cat.analysis.Names import Names
 client = pymongo.MongoClient(dbURI)
 db = client.catalog
 science_table=db.science_table
+jobs_table=db.jobs
 
 ###############################################
 # Helpers for building a live/dead classifier #
@@ -45,6 +46,15 @@ def get_live_dead_controls():
         results.append(match)
     return results
 
+def get_experiment_jobs(experiment_id):
+    """
+    Get job info related to experiment
+    """
+    query={}
+    query['data.sample_id']=experiment_id
+    query['status']="VALIDATED"
+    matches=list(jobs_table.find(query))
+    return matches
 
 def get_experiment_samples(experiment_id, file_type):
     """
@@ -53,7 +63,7 @@ def get_experiment_samples(experiment_id, file_type):
     """
     query={}
     query['experiment_id'] = experiment_id
-    query['file_type'] = file_type
+    #query['file_type'] = file_type
 
     results = []
     for match in science_table.find(query):

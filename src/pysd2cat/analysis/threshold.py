@@ -1,6 +1,23 @@
 import pandas as pd
 import math
 
+
+def compute_accuracy(m_df, channel='BL1_A', thresholds=[10000]):
+    samples = m_df['id'].unique()
+    plot_df = pd.DataFrame()
+    for sample_id in samples:
+        #print(sample_id)
+        sample = m_df.loc[m_df['id'] == sample_id]
+        circuit = sample['gate'].unique()[0]
+        if type(circuit) is str:
+            #print(output)
+            value_df = sample[[channel, 'output']].rename(index=str, columns={channel: "value"})
+            #print(value_df.shape())
+            thold_df = do_threshold_analysis(value_df, thresholds)
+            thold_df['id'] = sample_id
+            plot_df = plot_df.append(thold_df, ignore_index=True)
+    return plot_df 
+
 def do_threshold_analysis(df, thresholds):
     """
     Get Probability that samples fall on correct side of threshold
