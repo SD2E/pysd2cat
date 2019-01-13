@@ -84,7 +84,7 @@ def main():
 
 
     print("Building Live/Dead Control Dataframe...")
-    live_dead_df = pipeline.get_dataframe_for_live_dead_classifier(data_dir,fraction=.06)
+    live_dead_df = pipeline.get_dataframe_for_live_dead_classifier(data_dir,fraction=.006)
     nrows = len(live_dead_df)
     ncols = len(live_dead_df.columns)
     print("Dataframe constructed with {0} rows and {1} columns".format(nrows,ncols))
