@@ -236,7 +236,9 @@ def get_data_and_metadata_df(metadata_df, data_dir, fraction=None, max_records=N
         all_data_df = all_data_df.append(data_df)
 
     ## Join data and metadata
-    final_df = metadata_df.merge(all_data_df, left_on='filename', right_on='filename', how='outer')    
+    print("Length of all_data_df: ",len(all_data_df))
+    final_df = metadata_df.merge(all_data_df, left_on='filename', right_on='filename', how='outer')
+    print("Length of final_df: ", len(final_df))
     return final_df
 
 def sanitize(my_string):
