@@ -211,6 +211,7 @@ def get_data_and_metadata_df(metadata_df, data_dir, fraction=None, max_records=N
     Join each FCS datatable with its metadata.  Costly!
     """
     #dataset_local_df=pd.DataFrame()
+    metadata_df.to_csv("metadata_df.csv")
     all_data_df = pd.DataFrame()
     for i, record in metadata_df.iterrows():
         ## Substitute local file for SD2 URI to agave file 
