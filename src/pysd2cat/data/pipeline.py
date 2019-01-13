@@ -240,7 +240,7 @@ def get_data_and_metadata_df(metadata_df, data_dir, fraction=None, max_records=N
     print("meatadata df length: ",len(metadata_df))
     print("Some examples of metadata_Df")
     print(metadata_df.head(3))
-    final_df = metadata_df.merge(all_data_df, left_on='filename', right_on='filename', how='outer')
+    final_df = metadata_df.merge(all_data_df, left_on='filename', right_on='filename', how='inner')
     print("Some examples of finaldata_Df")
     print(final_df.head(3))
     final_df.dropna(inplace=True)
