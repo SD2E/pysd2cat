@@ -20,7 +20,8 @@ def get_dataframe_for_live_dead_classifier(data_dir,fraction=None, max_records=N
     """
 
     meta_df = get_metadata_dataframe(get_live_dead_controls())
-    
+    meta_df.to_csv("metadata_before_masking.csv")
+
     ##Drop columns that we don't need
     da = meta_df[[Names.STRAIN, Names.FILENAME]].copy()
     da[Names.STRAIN] = da[Names.STRAIN].mask(da[Names.STRAIN] == Names.WT_DEAD_CONTROL,  0)
