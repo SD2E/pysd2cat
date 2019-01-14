@@ -19,6 +19,7 @@ def get_dataframe_for_live_dead_classifier(data_dir,fraction=None, max_records=N
     """
     Get pooled FCS data for every live and dead control. 
     """
+
     meta_df = get_metadata_dataframe(get_live_dead_controls())
     
     ##Drop columns that we don't need
@@ -48,6 +49,8 @@ def get_live_dead_controls():
         #print(match)
         match.pop('_id')
         results.append(match)
+    print("Printing length of results...")
+    print(len(results))
     return results
 
 def get_experiment_jobs(experiment_id, gating = 'auto'):
