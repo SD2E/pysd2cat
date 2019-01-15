@@ -6,7 +6,7 @@ def compute_accuracy(m_df, channel='BL1_A', thresholds=[10000]):
     samples = m_df['id'].unique()
     plot_df = pd.DataFrame()
     for sample_id in samples:
-        #print(sample_id)
+        print(sample_id)
         sample = m_df.loc[m_df['id'] == sample_id]
         circuit = sample['gate'].unique()[0]
         if type(circuit) is str:
