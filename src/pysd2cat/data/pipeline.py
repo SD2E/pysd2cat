@@ -64,7 +64,7 @@ def get_experiment_samples(experiment_id, file_type):
     """
     query={}
     query['experiment_id'] = experiment_id
-    #query['file_type'] = file_type
+    query['file_type'] = file_type
 
     results = []
     for match in science_table.find(query):
@@ -273,9 +273,9 @@ def get_mefl_data_and_metadata_df(metadata_df, data_dir, fraction=None, max_reco
     if runtime is 'jupyter':
         myfile = os.path.join('/home/jupyter/sd2e-community', output.split('data-sd2e-community')[1][1:])
     else:
-        myfile = os.path.join('/work/projects/SD2E-Community', output.split('data-sd2e-community')[1][1:])
+        myfile = os.path.join('/work/projects/SD2E-Community/prod/data', output.split('data-sd2e-community')[1][1:])
     df = pd.read_csv(myfile)   
-
+    df=df.drop(columns=['strain', 'replicate'])
     ## Join data and metadata
     final_df = metadata_df.merge(df, left_on=Names.SAMPLE_ID, right_on=Names.SAMPLE_ID, how='outer')    
     return final_df
@@ -300,6 +300,49 @@ def get_xplan_mefl_data_and_metadata_df(metadata_df, data_dir, fraction=None, ma
     df = df.rename(index=str, columns=rename_map)
     return df    
     
+
+def get_mefl_histograms_and_metadata_df(metadata_df, data_dir, fraction=None, max_records=None):
+    """
+    Join each FCS datatable with its metadata.  Costly!
+    """
+    
+    ex_id = metadata_df[Names.EXPERIMENT_ID].unique()[0]
+    results = get_experiment_jobs(ex_id)
+    output = [ x['UPDATE']['data']['outputs']['output'] for x in results[0]['history'] if 'UPDATE' in x and 'data' in x['UPDATE'] and 'outputs' in x['UPDATE']['data'] and 'output' in  x['UPDATE']['data']['outputs']][0]    
+    runtime = detect_runtime()
+    if runtime is 'jupyter':
+        myfile = os.path.join('/home/jupyter/sd2e-community', output.split('data-sd2e-community')[1][1:])
+    else:
+        myfile = os.path.join('/work/projects/SD2E-Community/prod/data', output.split('data-sd2e-community')[1][1:])
+    df = pd.read_csv(myfile)   
+    df=df.drop(columns=['strain', 'replicate'])
+    #for col in df.columns[8:]:
+    #    df[col] = df[col].astype(float)
+    #print(df.head())
+    #print(metadata_df.head())
+    ## Join data and metadata
+    final_df = metadata_df.merge(df, left_on=Names.SAMPLE_ID, right_on=Names.SAMPLE_ID, how='outer')    
+    return final_df
+
+def get_xplan_mefl_histograms_and_metadata_df(metadata_df, data_dir, fraction=None, max_records=None):
+    """
+    Rename columns from data and metadata to match xplan columns
+    """
+    df = get_mefl_histograms_and_metadata_df(metadata_df, data_dir, fraction=fraction, max_records=max_records)
+    rename_map = {
+        "experiment_id" : "plan",
+        "sample_id" : "id",
+        "strain_input_state" : "input",
+        "strain_circuit" : "gate",
+        "strain_sbh_uri" : "strain",
+        "strain" : "strain_name"
+    }
+    for col in df.columns:
+        if col not in rename_map:
+            rename_map[col] = sanitize(col)
+    #print("renaming columns as: " + str(rename_map))
+    df = df.rename(index=str, columns=rename_map)
+    return df      
     
 ###############################################
 # Helpers for getting sample data to classify #
