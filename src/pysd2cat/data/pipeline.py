@@ -199,12 +199,18 @@ def detect_runtime():
     else:
         raise Exception('Not a known runtime')
 
+def get_flow_dataframe(data_dir,filename):
+    df = FCT.FCMeasurement(ID=filename,
+                                    datafile=os.path.join(data_dir, filename)).read_data()
+
+    return df
+
+
 def get_data_and_metadata_df(metadata_df, data_dir, fraction=None, max_records=None):
     """
     Join each FCS datatable with its metadata.  Costly!
     """
     #dataset_local_df=pd.DataFrame()
-    metadata_df.to_csv("metadata_df.csv")
     all_data_df = pd.DataFrame()
     for i, record in metadata_df.iterrows():
         ## Substitute local file for SD2 URI to agave file 
@@ -224,10 +230,8 @@ def get_data_and_metadata_df(metadata_df, data_dir, fraction=None, max_records=N
         #print("data dir",data_dir)
         #print("Filename",record[Names.FILENAME])
 
-        data_df = FCT.FCMeasurement(ID=record[Names.FILENAME],
-                                    datafile=os.path.join(data_dir, record[Names.FILENAME])).read_data()
-        print("Length of data_df is",len(data_df))
-        print("In get_data_metadata_df fraction is: ",fraction)
+        data_df = get_flow_dataframe(data_dir,record[Names.FILENAME])
+
         if max_records is not None:
             data_df = data_df[0:min(len(data_df), max_records)]
         elif fraction is not None:
@@ -235,22 +239,12 @@ def get_data_and_metadata_df(metadata_df, data_dir, fraction=None, max_records=N
             data_df = data_df.sample(frac=fraction, replace=True)
             #data_df = data_df.replace([np.inf, -np.inf], np.nan)
         #data_df = data_df[~data_df.isin(['NaN', 'NaT']).any(axis=1)]
-        print("New Length of data_df is",len(data_df))
 
         data_df[Names.FILENAME] = record[Names.FILENAME]
         all_data_df = all_data_df.append(data_df)
 
     ## Join data and metadata
-    print("Length of all_data_df: ",len(all_data_df))
-    print("meatadata df length: ",len(metadata_df))
-    print("Some examples of metadata_Df")
-    print(metadata_df.head(3))
     final_df = metadata_df.merge(all_data_df, left_on='filename', right_on='filename', how='inner')
-    print("Some examples of finaldata_Df")
-    print(final_df.head(3))
-    final_df.dropna(inplace=True)
-    print("Length of final_df: ", len(final_df))
-    print(final_df.head(3))
     return final_df
 
 def sanitize(my_string):
