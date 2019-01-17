@@ -89,6 +89,7 @@ def main():
     print("Dataframe constructed with {0} rows and {1} columns".format(nrows,ncols))
     print("Starting t-sne analysis:")
     live_dead_df = live_dead_df.sample(n=10000)
+    live_dead_df['class_label']=1
     tsne_analysis(live_dead_df)
 
 if __name__ == '__main__':
