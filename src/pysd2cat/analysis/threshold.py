@@ -15,6 +15,9 @@ def compute_accuracy(m_df, channel='BL1_A', thresholds=[10000]):
             #print(value_df.shape())
             thold_df = do_threshold_analysis(value_df, thresholds)
             thold_df['id'] = sample_id
+            for i in ['gate', 'input', 'od', 'media']:
+                thold_df[i] = sample[i]
+            
             plot_df = plot_df.append(thold_df, ignore_index=True)
     return plot_df 
 

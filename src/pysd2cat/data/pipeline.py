@@ -274,7 +274,7 @@ def get_mefl_data_and_metadata_df(metadata_df, data_dir, fraction=None, max_reco
         myfile = os.path.join('/home/jupyter/sd2e-community', output.split('data-sd2e-community')[1][1:])
     else:
         myfile = os.path.join('/work/projects/SD2E-Community/prod/data', output.split('data-sd2e-community')[1][1:])
-    df = pd.read_csv(myfile)   
+    df = pd.read_csv(myfile, memory_map=True)   
     df=df.drop(columns=['strain', 'replicate'])
     ## Join data and metadata
     final_df = metadata_df.merge(df, left_on=Names.SAMPLE_ID, right_on=Names.SAMPLE_ID, how='outer')    
@@ -293,9 +293,9 @@ def get_xplan_mefl_data_and_metadata_df(metadata_df, data_dir, fraction=None, ma
         "strain_sbh_uri" : "strain",
         "strain" : "strain_name"
     }
-    for col in df.columns:
-        if col not in rename_map:
-            rename_map[col] = sanitize(col)
+    #for col in df.columns:
+    #    if col not in rename_map:
+    #        rename_map[col] = sanitize(col)
     print("renaming columns as: " + str(rename_map))
     df = df.rename(index=str, columns=rename_map)
     return df    
