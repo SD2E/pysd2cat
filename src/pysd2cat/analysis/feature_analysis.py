@@ -77,19 +77,18 @@ def clustering_analysis(df,x_colname='FSC-H',y_colname='FSC-W',label_name='class
 def main():
     ## Where data files live
     ##HPC
-    data_dir = '/work/projects/SD2E-Community/prod/data/uploads/'
+    data_dir = '/work/projects/SD2E-Community/prod/data/uploads/transcriptic/201808/yeast_gates/r1bsmgdayg2yq_r1bsu7tb7bsuk/'
 
     ##Jupyter Hub
     # data_dir = '/home/jupyter/sd2e-community/'
 
-
     print("Building Live/Dead Control Dataframe...")
-    live_dead_df = pipeline.get_dataframe_for_live_dead_classifier(data_dir,fraction=.006)
+    live_dead_df = pipeline.get_flow_dataframe(data_dir,filename="WT-Dead-Control__.fcs")
     nrows = len(live_dead_df)
     ncols = len(live_dead_df.columns)
     print("Dataframe constructed with {0} rows and {1} columns".format(nrows,ncols))
     print("Starting t-sne analysis:")
-    live_dead_df = live_dead_df.sample(n=1000)
+    live_dead_df = live_dead_df.sample(n=10000)
     tsne_analysis(live_dead_df)
 
 if __name__ == '__main__':
