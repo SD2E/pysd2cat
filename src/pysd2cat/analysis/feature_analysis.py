@@ -15,6 +15,7 @@ from matplotlib.ticker import NullFormatter
 import numpy as np
 from sklearn.preprocessing import StandardScaler
 from sklearn import datasets
+from sklearn.cluster import MeanShift, estimate_bandwidth, KMeans, SpectralClustering
 
 ####
 #Important columns: FSC-H, FSC-W
@@ -72,6 +73,16 @@ def clustering_analysis(df,x_colname='FSC-H',y_colname='FSC-W',label_name='class
     return 0
 
 
+def ms_cluster(df, cols, bandwidth=None):
+    X = df[cols].values
+    if bandwidth == None:
+        bandwidth = estimate_bandwidth(X)
+    # setting bin_seeding=False takes way too long for large datasets
+    ms = MeanShift(bandwidth=bandwidth, bin_seeding=True)
+    ms.fit(X)
+    labels = ms.labels_
+    return labels
+
 
 
 def main():
@@ -89,7 +100,7 @@ def main():
     print("Dataframe constructed with {0} rows and {1} columns".format(nrows,ncols))
     print("Starting t-sne analysis:")
     live_dead_df = live_dead_df.sample(n=1000)
-    live_dead_df['class_label']=1
+    live_dead_df['class_label']=ms_cluster(live_dead_df, live_dead_df.columns)
     tsne_analysis(live_dead_df)
 
 if __name__ == '__main__':
