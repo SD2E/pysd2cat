@@ -63,7 +63,7 @@ def tsne_analysis(df,x_colname='FSC-H',y_colname='FSC-W',label_name='class_label
         ax.axis('tight')
 
     print("Saving figure...")
-    plt.savefig("Tsne_plot_live_dead.png")
+    plt.savefig("Tsne_plot_dead.png")
     plt.close()
 
 
