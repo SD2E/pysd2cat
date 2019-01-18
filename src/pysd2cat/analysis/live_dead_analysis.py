@@ -15,6 +15,13 @@ from pysd2cat.analysis import live_dead_classifier as ldc
 from pysd2cat.plot import plot
 
 
+def add_live_dead(input_df):
+    """
+    Take an input_df corresponding to one plate.
+    Build a live dead classifier from controls.
+    Apply classifier to each event to create 'live' column
+    """
+    return input_df
 
 
 def compute_sytox_threshold_accuracy(live_dead_df, thresholds=[2000], sytox_channel='RL1-A'):

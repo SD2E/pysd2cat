@@ -363,6 +363,8 @@ def get_xplan_mefl_histograms_and_metadata_df(metadata_df, data_dir, fraction=No
             rename_map[col] = sanitize(col)
     #print("renaming columns as: " + str(rename_map))
     df = df.rename(index=str, columns=rename_map)
+    
+    df['replicate'] = df['replicate'].fillna(-1).astype(int)
     return df      
     
 ###############################################
