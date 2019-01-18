@@ -19,13 +19,16 @@ def get_dataframe_for_live_dead_classifier(data_dir,fraction=None, max_records=N
     """
     Get pooled FCS data for every live and dead control. 
     """
+
     meta_df = get_metadata_dataframe(get_live_dead_controls())
-    
+    meta_df.to_csv("metadata_before_masking.csv")
+
     ##Drop columns that we don't need
     da = meta_df[[Names.STRAIN, Names.FILENAME]].copy()
     da[Names.STRAIN] = da[Names.STRAIN].mask(da[Names.STRAIN] == Names.WT_DEAD_CONTROL,  0)
     da[Names.STRAIN] = da[Names.STRAIN].mask(da[Names.STRAIN] == Names.WT_LIVE_CONTROL,  1)
     da = da.rename(index=str, columns={Names.STRAIN: "class_label"})
+    print("In get_dataframe_for_live_dead_classifier fraction is: ", fraction)
     da = get_data_and_metadata_df(da, data_dir,fraction,max_records)
     da = da.drop(columns=[Names.FILENAME, 'Time'])
     return da
@@ -39,11 +42,16 @@ def get_live_dead_controls():
     query[Names.CHALLENGE_PROBLEM] = Names.YEAST_STATES
     query[Names.FILE_TYPE] = Names.FCS
     query[Names.STRAIN] = {"$in": [Names.WT_DEAD_CONTROL, Names.WT_LIVE_CONTROL]}
-
+    #print("Query:")
+    #print(query)
     results = []
+    print("Printing results of query...")
     for match in science_table.find(query):
+        #print(match)
         match.pop('_id')
         results.append(match)
+    print("Printing length of results...")
+    print(len(results))
     return results
 
 def get_experiment_jobs(experiment_id, gating = 'auto'):
@@ -187,7 +195,9 @@ def get_metadata_dataframe(results):
 
 
         meta_df = meta_df.append(result_df, ignore_index=True)
-    #pd.set_option('display.max_colwidth', -1)    
+    #pd.set_option('display.max_colwidth', -1)
+    print("Printing metadata df")
+    print(meta_df)
     return meta_df
 
 def detect_runtime():
@@ -199,6 +209,13 @@ def detect_runtime():
         return 'hpc'
     else:
         raise Exception('Not a known runtime')
+
+def get_flow_dataframe(data_dir,filename):
+    df = FCT.FCMeasurement(ID=filename,
+                                    datafile=os.path.join(data_dir, filename)).read_data()
+
+    return df
+
 
 def get_data_and_metadata_df(metadata_df, data_dir, fraction=None, max_records=None):
     """
@@ -221,20 +238,24 @@ def get_data_and_metadata_df(metadata_df, data_dir, fraction=None, max_records=N
                 continue
     
         ## Create a data frame out of FCS file
-        data_df = FCT.FCMeasurement(ID=record[Names.FILENAME],
-                                    datafile=os.path.join(data_dir, record[Names.FILENAME])).read_data()
+        #print("data dir",data_dir)
+        #print("Filename",record[Names.FILENAME])
+
+        data_df = get_flow_dataframe(data_dir,record[Names.FILENAME])
+
         if max_records is not None:
             data_df = data_df[0:min(len(data_df), max_records)]
         elif fraction is not None:
+            print("In get_data_metadata_df ELIF condition fraction is: ", fraction)
             data_df = data_df.sample(frac=fraction, replace=True)
             #data_df = data_df.replace([np.inf, -np.inf], np.nan)
         #data_df = data_df[~data_df.isin(['NaN', 'NaT']).any(axis=1)]
-        
+
         data_df[Names.FILENAME] = record[Names.FILENAME]
         all_data_df = all_data_df.append(data_df)
 
     ## Join data and metadata
-    final_df = metadata_df.merge(all_data_df, left_on='filename', right_on='filename', how='outer')    
+    final_df = metadata_df.merge(all_data_df, left_on='filename', right_on='filename', how='inner')
     return final_df
 
 def sanitize(my_string):

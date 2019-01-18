@@ -12,6 +12,7 @@ setup(name='pysd2cat',
       install_requires=["pytest-runner", 
                       "pymongo",
                       "pandas",
-                      "scikit-learn"],
+                      "scikit-learn",
+                      "flowcytometrytools"],
       tests_require=["pytest"],
       zip_safe=False)
