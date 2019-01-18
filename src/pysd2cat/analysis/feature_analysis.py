@@ -16,7 +16,12 @@ import numpy as np
 from sklearn.preprocessing import StandardScaler
 from sklearn import datasets
 from sklearn.cluster import MeanShift, estimate_bandwidth, KMeans, SpectralClustering
+from mpi4py import MPI
+from mpi4py.futures import MPICommExecutor
+from itertools import repeat, islice,cycle
+import FlowCytometryTools as FCT
 
+rank = MPI.COMM_WORLD.Get_rank()
 ####
 #Important columns: FSC-H, FSC-W
 
@@ -26,51 +31,46 @@ def axis_formatter(ax,x,y,c):
     ax.yaxis.set_major_formatter(NullFormatter())
     return ax
 
-
-def tsne_analysis(df,x_colname='FSC-H',y_colname='FSC-W',label_name='class_label'):
+#TODO: Consider returning a dictionary
+def t_sne(X,perplexity):
     '''
-    Run a tsne analysis with multiple perplexities to see what the output data looks like
-    :param df: dataframe to perform T-SNE on
-    :param label_name: the name of the column that has the label
-    :return: nothing, just a T-SNE plot
+    Compute the first two t-sne components
+    :param df: dataframe
+    :param perplexity: perplexity value
+    :return: tuple of perplexity and transformed T-sne
     '''
-    perplexities = [2,5,30,50,100]
+    print("Starting t-sne analysis with perplexity: ",perplexity)
+    tsne = TSNE(n_components=2, init='random',
+                random_state=0, perplexity=perplexity)
+    Y = pd.DataFrame(tsne.fit_transform(X),columns=["dim1","dim2"],index=X.index)
 
-    #Choose three subplots, one for both, one for live, and one for dead
-    (fig, subplots) = plt.subplots(1, 6, figsize=(15, 8), squeeze=False)
-    X = df.drop(columns=['class_label'])
-    y = df['class_label'].astype(int)
-    green = y == 0
-    red = y == 1
+    return [perplexity,X.join(Y)]
 
-    #Define your subplot region
-    #BOTH
-    ax = subplots[0,0]
-    ax = axis_formatter(ax,X[x_colname][red],X[y_colname][red],c="r")
-    ax = axis_formatter(ax, X[x_colname][green],X[y_colname][green], c="g")
-    ax.set_title("Channels: " + x_colname + " x " + y_colname )
-    plt.axis('tight')
+def visualize(results_list,x_colname='FSC-H',y_colname='FSC-W',label_name='class_label'):
+    results_list[0][1]["class_label"] = ms_cluster(results_list[0][1], results_list[0][1].columns)
+    print(results_list[0][1]["class_label"].value_counts())
+    num_figs = len(results_list)
+    (fig, subplots) = plt.subplots(1, num_figs+1, figsize=(15, 8), squeeze=False)
+    colors = np.array(list(islice(cycle(['#377eb8', '#ff7f00', '#4daf4a',
+                                         '#f781bf', '#a65628', '#984ea3',
+                                         '#999999', '#e41a1c', '#dede00']),
+                                  int(max(results_list[0][1]['class_label']) + 1))))
+    print(int(max(results_list[0][1]['class_label']) + 1))
 
-    for i, perplexity in enumerate(perplexities):
+    for i,result in enumerate(results_list):
+        if i==0:
+            ax = subplots[0][0]
+            ax.scatter(result[1][x_colname],result[1][y_colname],s=10,color=colors)
+            ax.set_title("Flow data with channels " + x_colname + " x " + y_colname)
+
         ax = subplots[0][i+1]
-        print("Running loop {0}: t-sne with perplexity {1}".format(i,perplexity))
-        tsne = TSNE(n_components=2, init='random',
-                             random_state=0, perplexity=perplexity)
-        Y = tsne.fit_transform(X)
-        ax.set_title("Perplexity=%d" % perplexity)
-        ax = axis_formatter(ax,Y[red.as_matrix(),0],Y[red.as_matrix(),1],c="r")
-        ax = axis_formatter(ax,Y[green.as_matrix(),0],Y[green.as_matrix(),1],c="g")
-        ax.axis('tight')
+        ax.set_title("Perplexity=%d" % result[0])
+        ax.scatter(result[1]["dim1"],result[1]["dim2"],s=10,color=colors[list(results_list[0][1]["class_label"])])
 
     print("Saving figure...")
     plt.savefig("Tsne_plot_dead.png")
     plt.close()
 
-
-def clustering_analysis(df,x_colname='FSC-H',y_colname='FSC-W',label_name='class_label'):
-    # normalize dataset for easier parameter selection
-    #X = StandardScaler().fit_transform(X)
-    return 0
 
 
 def ms_cluster(df, cols, bandwidth=None):
@@ -78,33 +78,64 @@ def ms_cluster(df, cols, bandwidth=None):
     if bandwidth == None:
         bandwidth = estimate_bandwidth(X)
     # setting bin_seeding=False takes way too long for large datasets
+    #X = StandardScaler().fit_transform(X)
     ms = MeanShift(bandwidth=bandwidth, bin_seeding=True)
     ms.fit(X)
     labels = ms.labels_
     return labels
+
+def analyze(df):
+    '''
+    Run a clustering and tsne analysis with multiple perplexities to see what the output data looks like
+    :param df: dataframe to perform T-SNE on
+    :param label_name: the name of the column that has the label
+    :return: nothing, just a T-SNE plot
+    '''
+
+    #Get the numeric columns and get ready for clustering
+
+
+    perplexities = [2, 5, 30, 50, 100]
+    with MPICommExecutor(MPI.COMM_WORLD, root=0) as executor:
+        if executor is not None:
+            print("Running t-sne")
+            results = executor.map(t_sne, repeat(df), perplexities)
+    if rank == 0:
+        results_list = list(results)
+        return results_list
+    else:
+        return 0
+
 
 
 
 def main():
     ## Where data files live
     ##HPC
-    data_dir = '/work/projects/SD2E-Community/prod/data/uploads/transcriptic/201808/yeast_gates/r1bsmgdayg2yq_r1bsu7tb7bsuk/'
-
+    #data_dir = '/work/projects/SD2E-Community/prod/data/uploads/transcriptic/201808/yeast_gates/r1bsmgdayg2yq_r1bsu7tb7bsuk/'
+    data_dir = '/Users/meslami/Downloads/'
     ##Jupyter Hub
     # data_dir = '/home/jupyter/sd2e-community/'
 
     print("Building Live/Dead Control Dataframe...")
-    live_dead_df = pipeline.get_flow_dataframe(data_dir,filename="WT-Dead-Control__.fcs")
+    #live_dead_df = pipeline.get_flow_dataframe(data_dir,filename="WT-Dead-Control__.fcs")
+    filename = "WT-Dead-Control__.fcs"
+    live_dead_df = FCT.FCMeasurement(ID=filename,
+                           datafile=os.path.join(data_dir, filename)).read_data()
+
     nrows = len(live_dead_df)
     ncols = len(live_dead_df.columns)
     print("Dataframe constructed with {0} rows and {1} columns".format(nrows,ncols))
-    print("Starting t-sne analysis:")
-    live_dead_df = live_dead_df.sample(n=1000)
-    live_dead_df['class_label']=ms_cluster(live_dead_df, live_dead_df.columns)
-    tsne_analysis(live_dead_df)
+    live_dead_df = live_dead_df.head(n=1000)
+    results = analyze(live_dead_df)
+    if rank ==0:
+        visualize(results)
+
 
 if __name__ == '__main__':
     main()
+
+
     ###TESTING WITH SCI-KIT DATA####
     #X, y = datasets.make_circles(n_samples=300, factor=.5, noise=.05)
     #df = pd.DataFrame(np.column_stack((X,y)),columns=['col_'+ str(i) for i in range(0,X.shape[1]+1)])
