@@ -12,16 +12,28 @@ from matplotlib.backends.backend_pdf import PdfPages
 from pysd2cat.data import pipeline
 from pysd2cat.analysis import threshold as thold
 from pysd2cat.analysis import live_dead_classifier as ldc
+from pysd2cat.analysis.Names import Names
 from pysd2cat.plot import plot
 
 
-def add_live_dead(input_df):
+def add_live_dead(df):
     """
     Take an input_df corresponding to one plate.
     Build a live dead classifier from controls.
     Apply classifier to each event to create 'live' column
     """
-    return input_df
+    data_columns = ['FSC_A', 'SSC_A', 'BL1_A', 'RL1_A', 'FSC_H', 'SSC_H', 'BL1_H', 'RL1_H', 'FSC_W', 'SSC_W', 'BL1_W', 'RL1_W']
+    live_dead_df = df.loc[(df['strain_name'] == Names.WT_DEAD_CONTROL) | (df['strain_name'] == Names.WT_LIVE_CONTROL)]
+    live_dead_df['strain_name'] = live_dead_df['strain_name'].mask(live_dead_df['strain_name'] == Names.WT_DEAD_CONTROL,  0)
+    live_dead_df['strain_name'] = live_dead_df['strain_name'].mask(live_dead_df['strain_name'] == Names.WT_LIVE_CONTROL,  1)
+    live_dead_df = live_dead_df.rename(index=str, columns={'strain_name': "class_label"})
+    live_dead_df = live_dead_df[data_columns + ['class_label']]
+
+    (model, mean_absolute_error, test_X, test_y, scaler) = ldc.build_model(live_dead_df)
+    pred_df = df[data_columns]
+    pred_df = ldc.predict_live_dead(pred_df, model, scaler)
+    df['live'] = pred_df['class_label']
+    return df
 
 
 def compute_sytox_threshold_accuracy(live_dead_df, thresholds=[2000], sytox_channel='RL1-A'):
