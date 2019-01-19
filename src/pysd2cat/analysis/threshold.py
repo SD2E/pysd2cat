@@ -6,7 +6,7 @@ def compute_accuracy(m_df, channel='BL1_A', thresholds=[10000]):
     samples = m_df['id'].unique()
     plot_df = pd.DataFrame()
     for sample_id in samples:
-        print(sample_id)
+        #print(sample_id)
         sample = m_df.loc[m_df['id'] == sample_id]
         circuit = sample['gate'].unique()[0]
         if type(circuit) is str:
@@ -17,6 +17,15 @@ def compute_accuracy(m_df, channel='BL1_A', thresholds=[10000]):
             thold_df['id'] = sample_id
             for i in ['gate', 'input', 'od', 'media']:
                 thold_df[i] = sample[i]
+            
+            if 'live' in m_df.columns:
+                sample_live = sample.loc[sample['live'] == 1]
+                value_df = sample_live[[channel, 'output']].rename(index=str, columns={channel: "value"})
+                #print(value_df.shape())
+                thold_live_df = do_threshold_analysis(value_df, thresholds)
+                thold_df['probability_correct_live'] = thold_live_df['probability_correct']
+                thold_df['standard_error_correct_live'] = thold_live_df['standard_error_correct']
+                thold_df['count_live'] = thold_live_df['count']
             
             plot_df = plot_df.append(thold_df, ignore_index=True)
     return plot_df 

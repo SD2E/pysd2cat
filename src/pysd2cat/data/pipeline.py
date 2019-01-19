@@ -196,8 +196,8 @@ def get_metadata_dataframe(results):
 
         meta_df = meta_df.append(result_df, ignore_index=True)
     #pd.set_option('display.max_colwidth', -1)
-    print("Printing metadata df")
-    print(meta_df)
+    #print("Printing metadata df")
+    #print(meta_df)
     return meta_df
 
 def detect_runtime():

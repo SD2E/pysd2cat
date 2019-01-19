@@ -1,2 +1,7 @@
 **/__pycache__/**
 src/pysd2cat.egg-info
+.eggs
+*png
+*csv
+pysd2cat.egg-info
+*json
