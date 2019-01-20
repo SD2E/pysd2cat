@@ -23,9 +23,25 @@ def add_live_dead(df):
     Apply classifier to each event to create 'live' column
     """
     data_columns = ['FSC_A', 'SSC_A', 'BL1_A', 'RL1_A', 'FSC_H', 'SSC_H', 'BL1_H', 'RL1_H', 'FSC_W', 'SSC_W', 'BL1_W', 'RL1_W']
-    live_dead_df = df.loc[(df['strain_name'] == Names.WT_DEAD_CONTROL) | (df['strain_name'] == Names.WT_LIVE_CONTROL)]
-    live_dead_df['strain_name'] = live_dead_df['strain_name'].mask(live_dead_df['strain_name'] == Names.WT_DEAD_CONTROL,  0)
-    live_dead_df['strain_name'] = live_dead_df['strain_name'].mask(live_dead_df['strain_name'] == Names.WT_LIVE_CONTROL,  1)
+    def strain_to_class(x):
+        if x['strain_name'] == Names.WT_LIVE_CONTROL:
+            return "1"
+        elif x['strain_name'] == Names.WT_DEAD_CONTROL:
+            return "0"
+        else:
+            return None
+    live_df = df.loc[df['strain_name'] == Names.WT_LIVE_CONTROL]
+    dead_df = df.loc[df['strain_name'] == Names.WT_DEAD_CONTROL]
+    live_df['strain_name'] = live_df.apply(strain_to_class, axis=1)
+    dead_df['strain_name'] = dead_df.apply(strain_to_class, axis=1)
+    live_dead_df = live_df.append(dead_df)
+
+
+    
+    
+    #live_dead_df = df.loc[(df['strain_name'] == Names.WT_DEAD_CONTROL) | (df['strain_name'] == Names.WT_LIVE_CONTROL)]
+    #live_dead_df['strain_name'] = live_dead_df['strain_name'].mask(live_dead_df['strain_name'] == Names.WT_DEAD_CONTROL,  0)
+    #live_dead_df['strain_name'] = live_dead_df['strain_name'].mask(live_dead_df['strain_name'] == Names.WT_LIVE_CONTROL,  1)
     live_dead_df = live_dead_df.rename(index=str, columns={'strain_name': "class_label"})
     live_dead_df = live_dead_df[data_columns + ['class_label']]
 

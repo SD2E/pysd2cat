@@ -27,6 +27,12 @@ def compute_accuracy(m_df, channel='BL1_A', thresholds=[10000]):
                 thold_df['probability_correct_live'] = thold_live_df['probability_correct']
                 thold_df['standard_error_correct_live'] = thold_live_df['standard_error_correct']
                 thold_df['count_live'] = thold_live_df['count']
+            else:
+                thold_df['probability_correct_live'] = thold_df['probability_correct']
+                thold_df['standard_error_correct_live'] = thold_df['standard_error_correct']
+                thold_df['count_live'] = thold_df['count']
+
+
             #print(thold_df)
             plot_df = plot_df.append(thold_df, ignore_index=True)
     return plot_df 
