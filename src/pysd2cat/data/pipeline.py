@@ -182,7 +182,7 @@ def get_metadata_dataframe(results):
             
         if 'temperature' in result:
             result_df['temperature'] = result['temperature']['value']
-        else
+        else:
             result_df['temperature'] = None
             
         if Names.STRAIN_CIRCUIT in result_df and Names.STRAIN_INPUT_STATE in result_df:
