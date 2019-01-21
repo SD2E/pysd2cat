@@ -180,6 +180,11 @@ def get_metadata_dataframe(results):
         else:
             result_df['media'] = None
             
+        if 'temperature' in result:
+            result_df['temperature'] = result['temperature']['value']
+        else
+            result_df['temperature'] = None
+            
         if Names.STRAIN_CIRCUIT in result_df and Names.STRAIN_INPUT_STATE in result_df:
             result_df[Names.OUTPUT] = gate_output(result_df[Names.STRAIN_CIRCUIT], result_df[Names.STRAIN_INPUT_STATE])
         else:
@@ -272,7 +277,8 @@ def get_xplan_data_and_metadata_df(metadata_df, data_dir, fraction=None, max_rec
         "strain_input_state" : "input",
         "strain_circuit" : "gate",
         "strain_sbh_uri" : "strain",
-        "strain" : "strain_name"
+        "strain" : "strain_name",
+        "temperature" : 'inc_temp'
     }
     for col in df.columns:
         if col not in rename_map:
@@ -312,7 +318,8 @@ def get_xplan_mefl_data_and_metadata_df(metadata_df, data_dir, fraction=None, ma
         "strain_input_state" : "input",
         "strain_circuit" : "gate",
         "strain_sbh_uri" : "strain",
-        "strain" : "strain_name"
+        "strain" : "strain_name",
+        "temperature" : 'inc_temp'
     }
     #for col in df.columns:
     #    if col not in rename_map:
@@ -356,7 +363,8 @@ def get_xplan_mefl_histograms_and_metadata_df(metadata_df, data_dir, fraction=No
         "strain_input_state" : "input",
         "strain_circuit" : "gate",
         "strain_sbh_uri" : "strain",
-        "strain" : "strain_name"
+        "strain" : "strain_name",
+        "temperature" : 'inc_temp'
     }
     for col in df.columns:
         if col not in rename_map:
