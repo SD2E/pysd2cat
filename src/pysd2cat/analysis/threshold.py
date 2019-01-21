@@ -16,7 +16,7 @@ def compute_accuracy(m_df, channel='BL1_A', thresholds=[10000]):
             #print(value_df.shape())
             thold_df = do_threshold_analysis(value_df, thresholds)
             thold_df['id'] = sample_id
-            for i in ['gate', 'input', 'od', 'media']:
+            for i in ['gate', 'input', 'od', 'media', 'inc_temp']:
                 thold_df[i] = sample[i].unique()[0]
             
             if 'live' in m_df.columns:
