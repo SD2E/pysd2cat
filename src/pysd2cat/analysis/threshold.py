@@ -3,6 +3,66 @@ import math
 import numpy as np
 
 
+def get_experiment_accuracy_and_metadata(adf):
+    """
+    Cleanup the accuracy dataframe from an experiment.
+    """
+    def media_fix(x):
+        media_map = {
+            "SC Media" : "SC Media",
+            "SC+Oleate+Adenine" : "SC Media",
+            "standard_media" : "SC Media",
+
+            "Synthetic_Complete_2%Glycerol_2%Ethanol" : "SC Slow",
+            "SC Slow" : "SC Slow",
+            "slow_media" : "SC Slow",
+
+
+
+            "Synthetic_Complete_1%Sorbitol" : "SC High Osm",
+            "SC High Osm" : "SC High Osm",    
+            'high_osm_media' : "SC High Osm",    
+
+            "YPAD" : "YPAD",
+            "Yeast_Extract_Peptone_Adenine_Dextrose (a.k.a. YPAD Media)" : "YPAD",
+            "rich_media" : "YPAD",
+        }
+        if type(x) is str:
+            return media_map[x]
+        else:
+            return x
+
+    drop_list = ['Unnamed: 0', 'FSC_A',
+           'SSC_A', 'BL1_A', 'RL1_A', 'FSC_H', 'SSC_H', 'BL1_H', 'RL1_H', 'FSC_W',
+           'SSC_W', 'BL1_W', 'RL1_W', 'Time']
+    final_df = adf
+    final_df['media'] = final_df['media'].apply(media_fix)
+    return final_df
+
+def get_sample_accuracy(data):
+    """
+    Get a dataframe that includes the accuracy of all samples and condition sets.
+    Requires dataframes for accuracy are present in paths listed in 'data' parameter.
+    """
+    all_df = pd.DataFrame()
+    for d in data:
+        if os.path.isfile(d):
+            #print("Getting Accuracy for: " + str(d))
+            #df = pd.read_csv(d)
+            adata = os.path.join("/".join(d.split('/')[0:-1]), 'accuracy', d.split('/')[-1])
+            if os.path.isfile(adata):
+                adf = pd.read_csv(adata)
+                if 'media' in adf.columns:
+                    final_df = get_experiment_accuracy_and_metadata(adf)
+                    all_df = all_df.append(final_df)
+    all_df['prc_improve'] = all_df['probability_correct_live'] - all_df['probability_correct']
+    all_df['live_proportion'] = all_df['count_live'] / all_df['count']
+
+    return all_df
+
+
+
+
 def get_threshold(df, channel='BL1_A'):
 
     ## Prepare the data for high and low controls
