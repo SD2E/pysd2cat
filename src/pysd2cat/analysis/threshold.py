@@ -1,8 +1,64 @@
 import pandas as pd
 import math
+import numpy as np
 
 
-def compute_accuracy(m_df, channel='BL1_A', thresholds=[10000]):
+def get_threshold(df, channel='BL1_A'):
+
+    ## Prepare the data for high and low controls
+    high_df = df.loc[( df['strain_name'] == 'NOR-00-Control')]
+    high_df['output'] = 1
+    low_df = df.loc[(df['strain_name'] == 'WT-Live-Control') ]
+    low_df['output'] = 0
+    high_low_df = high_df.append(low_df)
+    high_low_df[channel] = np.log(high_low_df[channel]).replace([np.inf, -np.inf], np.nan).dropna()
+    high_low_df[channel]
+
+    ## Setup Gradient Descent Paramters
+
+    cur_x = high_low_df[channel].mean() # The algorithm starts at mean
+    rate = 0.0001 # Learning rate
+    precision = 0.000001 #This tells us when to stop the algorithm
+    previous_step_size = 1 #
+    max_iters = 10000 # maximum number of iterations
+    iters = 0 #iteration counter
+
+    def correct_side(threshold, value, output):
+        if output == 1 and value > threshold:
+            return 1
+        elif output == 0 and value <= threshold:
+            return 1
+        else:
+            return 0
+
+    def gradient(x):
+        delta = 0.1
+        xp = x + delta
+        correct = high_low_df.apply(lambda row : correct_side(x, row['BL1_A'], row['output']), axis=1)
+        correctp = high_low_df.apply(lambda row : correct_side(xp, row['BL1_A'], row['output']), axis=1)
+        # print(sum(correct))
+        # print(sum(correctp))
+        grad = (sum(correct) - sum(correctp))/delta
+        # print("Gradient at: " + str(x) + " is " + str(grad))
+        return grad
+
+    while previous_step_size > precision and iters < max_iters:
+        prev_x = cur_x #Store current x value in prev_x
+        cur_x = cur_x - rate * gradient(prev_x) #Grad descent
+        previous_step_size = abs(cur_x - prev_x) #Change in x
+        iters = iters+1 #iteration count
+        # print("Iteration",iters,"\nX value is",cur_x) #Print iterations
+
+    max_value = sum(high_low_df.apply(lambda row : correct_side(cur_x, row['BL1_A'], row['output']), axis=1))/len(high_low_df)
+    # print("Maximized at: " + str(cur_x))
+    # print("Value at Max: " + str(max_value))
+    return cur_x, max_value
+
+def compute_accuracy(m_df, channel='BL1_A', thresholds=None):
+    if thresholds is None:
+        threshold, threshold_quality = get_threshold(m_df, channel)
+        thresholds = [threshold]
+        
     samples = m_df['id'].unique()
     plot_df = pd.DataFrame()
     for sample_id in samples:
