@@ -54,7 +54,7 @@ def get_threshold(df, channel='BL1_A'):
     # print("Value at Max: " + str(max_value))
     return cur_x, max_value
 
-def compute_accuracy(m_df, channel='BL1_A', thresholds=None):
+def compute_accuracy(m_df, channel='BL1_A', thresholds=None, use_log_value=True):
     if thresholds is None:
         threshold, threshold_quality = get_threshold(m_df, channel)
         thresholds = [threshold]
@@ -69,6 +69,8 @@ def compute_accuracy(m_df, channel='BL1_A', thresholds=None):
         if type(circuit) is str:
             #print(output)
             value_df = sample[[channel, 'output']].rename(index=str, columns={channel: "value"})
+            if use_log_value:
+                value_df['value'] = np.log(value_df['value']).replace([np.inf, -np.inf], np.nan).dropna()
             #print(value_df.shape())
             thold_df = do_threshold_analysis(value_df, thresholds)
             thold_df['id'] = sample_id
@@ -78,6 +80,9 @@ def compute_accuracy(m_df, channel='BL1_A', thresholds=None):
             if 'live' in m_df.columns:
                 sample_live = sample.loc[sample['live'] == 1]
                 value_df = sample_live[[channel, 'output']].rename(index=str, columns={channel: "value"})
+                if use_log_value:
+                    value_df['value'] = np.log(value_df['value']).replace([np.inf, -np.inf], np.nan).dropna()
+
                 #print(value_df.shape())
                 thold_live_df = do_threshold_analysis(value_df, thresholds)
                 thold_df['probability_correct_live'] = thold_live_df['probability_correct']
