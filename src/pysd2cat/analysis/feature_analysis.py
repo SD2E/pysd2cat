@@ -19,6 +19,7 @@ from sklearn.cluster import MeanShift, estimate_bandwidth, KMeans, SpectralClust
 from mpi4py import MPI
 from mpi4py.futures import MPICommExecutor
 from itertools import repeat, islice,cycle
+from pysd2cat.analysis.Names import Names
 import FlowCytometryTools as FCT
 
 rank = MPI.COMM_WORLD.Get_rank()
@@ -118,8 +119,8 @@ def main():
 
     print("Building Live/Dead Control Dataframe...")
     #live_dead_df = pipeline.get_flow_dataframe(data_dir,filename="WT-Dead-Control__.fcs")
-    live_dead_df = pipeline.get_dataframe_for_live_dead_classifier(data_dir,fraction=.01,max_records=1000)
-
+    live_dead_df = pipeline.get_dataframe_for_live_dead_classifier(data_dir,control_type=[Names.WT_DEAD_CONTROL],fraction=.01,max_records=1000)
+    live_dead_df = live_dead_df.drop(columns=['class_label'])
     nrows = len(live_dead_df)
     ncols = len(live_dead_df.columns)
     print("Dataframe constructed with {0} rows and {1} columns".format(nrows,ncols))
