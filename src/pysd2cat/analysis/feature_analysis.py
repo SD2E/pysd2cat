@@ -47,8 +47,21 @@ def t_sne(X,perplexity):
 
     return [perplexity,X.join(Y)]
 
+def write_out_dataframe(results_list):
+    labels = ms_cluster(results_list[0][1], results_list[0][1].columns)
+    dfs = []
+    for result in results_list:
+        result[1]["class_label"] = labels
+        result[1]["perplexity"] = result[0]
+        dfs.append(result[1])
+    full_df = pd.concat(dfs)
+    print("Writing dataframe")
+    full_df.to_csv("Dead_dataframe_with_cluster_labels.csv")
+
 def visualize(results_list,x_colname='FSC-H',y_colname='FSC-W',label_name='class_label'):
-    results_list[0][1]["class_label"] = ms_cluster(results_list[0][1], results_list[0][1].columns)
+    labels = ms_cluster(results_list[0][1], results_list[0][1].columns)
+
+
     print(results_list[0][1]["class_label"].value_counts())
     num_figs = len(results_list)
     print("Writing dataframe")
@@ -129,7 +142,7 @@ def main():
     live_dead_df = live_dead_df.head(n=1000)
     results = analyze(live_dead_df)
     if rank ==0:
-        visualize(results)
+        write_out_dataframe(results)
 
 
 if __name__ == '__main__':
