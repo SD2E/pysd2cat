@@ -15,13 +15,14 @@ jobs_table=db.jobs
 # Helpers for building a live/dead classifier #
 ###############################################
 
-def get_dataframe_for_live_dead_classifier(data_dir,fraction=None, max_records=None):
+
+def get_dataframe_for_live_dead_classifier(data_dir,control_type=[Names.WT_DEAD_CONTROL, Names.WT_LIVE_CONTROL],fraction=None, max_records=None):
     """
     Get pooled FCS data for every live and dead control. 
     """
 
-    meta_df = get_metadata_dataframe(get_live_dead_controls())
-    meta_df.to_csv("metadata_before_masking.csv")
+    meta_df = get_metadata_dataframe(get_live_dead_controls(control_type))
+    #meta_df.to_csv("metadata_before_masking.csv")
 
     ##Drop columns that we don't need
     da = meta_df[[Names.STRAIN, Names.FILENAME]].copy()
@@ -33,7 +34,9 @@ def get_dataframe_for_live_dead_classifier(data_dir,fraction=None, max_records=N
     da = da.drop(columns=[Names.FILENAME, 'Time'])
     return da
 
-def get_live_dead_controls():
+
+
+def get_live_dead_controls(control_type=[Names.WT_DEAD_CONTROL, Names.WT_LIVE_CONTROL]):
     """
     Get metadata for every live and dead control sample across
     all experiments.
@@ -41,7 +44,7 @@ def get_live_dead_controls():
     query={}
     query[Names.CHALLENGE_PROBLEM] = Names.YEAST_STATES
     query[Names.FILE_TYPE] = Names.FCS
-    query[Names.STRAIN] = {"$in": [Names.WT_DEAD_CONTROL, Names.WT_LIVE_CONTROL]}
+    query[Names.STRAIN] = {"$in": control_type}
     #print("Query:")
     #print(query)
     results = []
@@ -196,8 +199,8 @@ def get_metadata_dataframe(results):
 
         meta_df = meta_df.append(result_df, ignore_index=True)
     #pd.set_option('display.max_colwidth', -1)
-    print("Printing metadata df")
-    print(meta_df)
+    #print("Printing metadata df")
+    #print(meta_df)
     return meta_df
 
 def detect_runtime():
