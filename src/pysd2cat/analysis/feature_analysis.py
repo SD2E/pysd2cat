@@ -64,7 +64,6 @@ def visualize(results_list,x_colname='FSC-H',y_colname='FSC-W',label_name='class
 
     print(results_list[0][1]["class_label"].value_counts())
     num_figs = len(results_list)
-    print("Writing dataframe")
     results_list[0][1].to_csv("Dead_dataframe_with_cluster_labels.csv")
     (fig, subplots) = plt.subplots(1, num_figs+1, figsize=(15, 8), squeeze=False)
     colors = np.array(list(islice(cycle(['#377eb8', '#ff7f00', '#4daf4a',
@@ -139,7 +138,7 @@ def main():
     nrows = len(live_dead_df)
     ncols = len(live_dead_df.columns)
     print("Dataframe constructed with {0} rows and {1} columns".format(nrows,ncols))
-    live_dead_df = live_dead_df.head(n=10000)
+    live_dead_df = live_dead_df.head(n=1000)
     results = analyze(live_dead_df)
     if rank ==0:
         write_out_dataframe(results)
