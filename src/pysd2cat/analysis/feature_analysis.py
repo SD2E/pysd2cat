@@ -111,7 +111,7 @@ def analyze(df):
     #Get the numeric columns and get ready for clustering
 
 
-    perplexities = [2, 5, 10, 20, 30]
+    perplexities = [10, 20]
     with MPICommExecutor(MPI.COMM_WORLD, root=0) as executor:
         if executor is not None:
             print("Running t-sne")
@@ -139,7 +139,7 @@ def main():
     nrows = len(live_dead_df)
     ncols = len(live_dead_df.columns)
     print("Dataframe constructed with {0} rows and {1} columns".format(nrows,ncols))
-    live_dead_df = live_dead_df.head(n=5000)
+    live_dead_df = live_dead_df.head(n=3000)
     results = analyze(live_dead_df)
     if rank ==0:
         write_out_dataframe(results)
