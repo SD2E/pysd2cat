@@ -1,6 +1,7 @@
 import pandas as pd
 import math
 import numpy as np
+import os
 
 
 def get_experiment_accuracy_and_metadata(adf):
@@ -71,6 +72,7 @@ def get_threshold(df, channel='BL1_A'):
     low_df = df.loc[(df['strain_name'] == 'WT-Live-Control') ]
     low_df['output'] = 0
     high_low_df = high_df.append(low_df)
+    high_low_df = high_low_df.loc[high_low_df[channel] > 0]
     high_low_df[channel] = np.log(high_low_df[channel]).replace([np.inf, -np.inf], np.nan).dropna()
     high_low_df[channel]
 
@@ -98,8 +100,13 @@ def get_threshold(df, channel='BL1_A'):
         correctp = high_low_df.apply(lambda row : correct_side(xp, row['BL1_A'], row['output']), axis=1)
         # print(sum(correct))
         # print(sum(correctp))
-        grad = (sum(correct) - sum(correctp))/delta
-        # print("Gradient at: " + str(x) + " is " + str(grad))
+        try:
+            grad = (np.sum(correct) - np.sum(correctp))/delta
+        except Exception as e:
+            print(sum(correct))
+            print(sum(correctp))
+            print(e)
+        print("Gradient at: " + str(x) + " is " + str(grad))
         return grad
 
     while previous_step_size > precision and iters < max_iters:
@@ -107,7 +114,7 @@ def get_threshold(df, channel='BL1_A'):
         cur_x = cur_x - rate * gradient(prev_x) #Grad descent
         previous_step_size = abs(cur_x - prev_x) #Change in x
         iters = iters+1 #iteration count
-        # print("Iteration",iters,"\nX value is",cur_x) #Print iterations
+        print("Iteration",iters,"\nX value is",cur_x) #Print iterations
 
     max_value = sum(high_low_df.apply(lambda row : correct_side(cur_x, row['BL1_A'], row['output']), axis=1))/len(high_low_df)
     # print("Maximized at: " + str(cur_x))
@@ -128,19 +135,26 @@ def compute_accuracy(m_df, channel='BL1_A', thresholds=None, use_log_value=True)
         circuit = sample['gate'].unique()[0]
         if type(circuit) is str:
             #print(output)
-            value_df = sample[[channel, 'output']].rename(index=str, columns={channel: "value"})
+            value_df = sample[[channel, 'output']].rename(index=str, columns={channel: "value"})          
             if use_log_value:
+                value_df = value_df.loc[value_df['value'] > 0]
                 value_df['value'] = np.log(value_df['value']).replace([np.inf, -np.inf], np.nan).dropna()
             #print(value_df.shape())
             thold_df = do_threshold_analysis(value_df, thresholds)
             thold_df['id'] = sample_id
             for i in ['gate', 'input', 'od', 'media', 'inc_temp']:
-                thold_df[i] = sample[i].unique()[0]
+                if i in thold_df.columns:
+                    thold_df[i] = sample[i].unique()[0]
+                elif i == 'inc_temp':
+                    thold_df[i] = 'warm_30'
+                else:
+                    thold_df[i] = None
             
             if 'live' in m_df.columns:
                 sample_live = sample.loc[sample['live'] == 1]
                 value_df = sample_live[[channel, 'output']].rename(index=str, columns={channel: "value"})
                 if use_log_value:
+                    value_df = value_df.loc[value_df['value'] > 0]
                     value_df['value'] = np.log(value_df['value']).replace([np.inf, -np.inf], np.nan).dropna()
 
                 #print(value_df.shape())

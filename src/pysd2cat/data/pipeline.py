@@ -294,6 +294,10 @@ def get_mefl_data_and_metadata_df(metadata_df, data_dir, fraction=None, max_reco
     
     ex_id = metadata_df[Names.EXPERIMENT_ID].unique()[0]
     results = get_experiment_jobs(ex_id)
+    
+    if len(results) == 0:
+        raise Exception("No MEFL results for: " + ex_id)
+    
     output = [ x['UPDATE']['data']['outputs']['bayesdb_data'] for x in results[0]['history'] if 'UPDATE' in x and 'data' in x['UPDATE'] and 'outputs' in x['UPDATE']['data'] and 'bayesdb_data' in  x['UPDATE']['data']['outputs']][0]
     print(output)
     runtime = detect_runtime()
@@ -306,7 +310,7 @@ def get_mefl_data_and_metadata_df(metadata_df, data_dir, fraction=None, max_reco
     ## Join data and metadata
     final_df = metadata_df.merge(df, left_on=Names.SAMPLE_ID, right_on=Names.SAMPLE_ID, how='outer')    
     return final_df
-
+    
 def get_xplan_mefl_data_and_metadata_df(metadata_df, data_dir, fraction=None, max_records=None):
     """
     Rename columns from data and metadata to match xplan columns
@@ -336,6 +340,10 @@ def get_mefl_histograms_and_metadata_df(metadata_df, data_dir, fraction=None, ma
     
     ex_id = metadata_df[Names.EXPERIMENT_ID].unique()[0]
     results = get_experiment_jobs(ex_id)
+    
+    if len(results) == 0:
+        raise Exception("No MEFL results for: " + ex_id)
+    
     output = [ x['UPDATE']['data']['outputs']['output'] for x in results[0]['history'] if 'UPDATE' in x and 'data' in x['UPDATE'] and 'outputs' in x['UPDATE']['data'] and 'output' in  x['UPDATE']['data']['outputs']][0]    
     runtime = detect_runtime()
     if runtime is 'jupyter':
@@ -452,11 +460,14 @@ def get_strain(strain_circuit, strain_input_state,od=0.0003, media='SC Media',ex
     return results
 
 
-
-
-
-
-
+def get_sample(sample_id):
+    query={}
+    query['sample_id'] = sample_id
+    results = []
+    for match in science_table.find(query):
+        match.pop('_id')
+        results.append(match)
+    return results
 
 
 def get_control(circuit, control, od=0.0003, media='SC Media'):
