@@ -64,6 +64,7 @@ def visualize(results_list,x_colname='FSC-H',y_colname='FSC-W',label_name='class
 
     print(results_list[0][1]["class_label"].value_counts())
     num_figs = len(results_list)
+    print("Writing dataframe")
     results_list[0][1].to_csv("Dead_dataframe_with_cluster_labels.csv")
     (fig, subplots) = plt.subplots(1, num_figs+1, figsize=(15, 8), squeeze=False)
     colors = np.array(list(islice(cycle(['#377eb8', '#ff7f00', '#4daf4a',
