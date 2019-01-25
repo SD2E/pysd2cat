@@ -469,6 +469,24 @@ def get_sample(sample_id):
         results.append(match)
     return results
 
+def get_sample_time(sample):
+    sample_id = sample['id']
+    #print("Getting time for: " + sample_id)
+    if 'transcriptic' in sample_id:
+        sample_results = get_sample(sample_id)
+    else:
+        sample_results = []
+        
+    if len(sample_results) == 0:
+        return None #"2019_04_01_12_00_00"
+        #raise Exception("No sample results for: " + str(sample_id))
+    elif len(sample_results) > 1:
+        return sample_results[0]['created']
+        #raise Exception("Multiple results for: " + str(sample_id))
+    else:
+        time = sample_results[0]['created']
+        return time #time.strftime("%Y_%m_%d_%H_%M_%S")
+
 
 def get_control(circuit, control, od=0.0003, media='SC Media'):
     query={}
