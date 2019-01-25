@@ -15,13 +15,14 @@ jobs_table=db.jobs
 # Helpers for building a live/dead classifier #
 ###############################################
 
-def get_dataframe_for_live_dead_classifier(data_dir,fraction=None, max_records=None):
+
+def get_dataframe_for_live_dead_classifier(data_dir,control_type=[Names.WT_DEAD_CONTROL, Names.WT_LIVE_CONTROL],fraction=None, max_records=None):
     """
     Get pooled FCS data for every live and dead control. 
     """
 
-    meta_df = get_metadata_dataframe(get_live_dead_controls())
-    meta_df.to_csv("metadata_before_masking.csv")
+    meta_df = get_metadata_dataframe(get_live_dead_controls(control_type))
+    #meta_df.to_csv("metadata_before_masking.csv")
 
     ##Drop columns that we don't need
     da = meta_df[[Names.STRAIN, Names.FILENAME]].copy()
@@ -33,7 +34,9 @@ def get_dataframe_for_live_dead_classifier(data_dir,fraction=None, max_records=N
     da = da.drop(columns=[Names.FILENAME, 'Time'])
     return da
 
-def get_live_dead_controls():
+
+
+def get_live_dead_controls(control_type=[Names.WT_DEAD_CONTROL, Names.WT_LIVE_CONTROL]):
     """
     Get metadata for every live and dead control sample across
     all experiments.
@@ -41,7 +44,7 @@ def get_live_dead_controls():
     query={}
     query[Names.CHALLENGE_PROBLEM] = Names.YEAST_STATES
     query[Names.FILE_TYPE] = Names.FCS
-    query[Names.STRAIN] = {"$in": [Names.WT_DEAD_CONTROL, Names.WT_LIVE_CONTROL]}
+    query[Names.STRAIN] = {"$in": control_type}
     #print("Query:")
     #print(query)
     results = []
@@ -294,6 +297,10 @@ def get_mefl_data_and_metadata_df(metadata_df, data_dir, fraction=None, max_reco
     
     ex_id = metadata_df[Names.EXPERIMENT_ID].unique()[0]
     results = get_experiment_jobs(ex_id)
+    
+    if len(results) == 0:
+        raise Exception("No MEFL results for: " + ex_id)
+    
     output = [ x['UPDATE']['data']['outputs']['bayesdb_data'] for x in results[0]['history'] if 'UPDATE' in x and 'data' in x['UPDATE'] and 'outputs' in x['UPDATE']['data'] and 'bayesdb_data' in  x['UPDATE']['data']['outputs']][0]
     print(output)
     runtime = detect_runtime()
@@ -306,7 +313,7 @@ def get_mefl_data_and_metadata_df(metadata_df, data_dir, fraction=None, max_reco
     ## Join data and metadata
     final_df = metadata_df.merge(df, left_on=Names.SAMPLE_ID, right_on=Names.SAMPLE_ID, how='outer')    
     return final_df
-
+    
 def get_xplan_mefl_data_and_metadata_df(metadata_df, data_dir, fraction=None, max_records=None):
     """
     Rename columns from data and metadata to match xplan columns
@@ -336,6 +343,10 @@ def get_mefl_histograms_and_metadata_df(metadata_df, data_dir, fraction=None, ma
     
     ex_id = metadata_df[Names.EXPERIMENT_ID].unique()[0]
     results = get_experiment_jobs(ex_id)
+    
+    if len(results) == 0:
+        raise Exception("No MEFL results for: " + ex_id)
+    
     output = [ x['UPDATE']['data']['outputs']['output'] for x in results[0]['history'] if 'UPDATE' in x and 'data' in x['UPDATE'] and 'outputs' in x['UPDATE']['data'] and 'output' in  x['UPDATE']['data']['outputs']][0]    
     runtime = detect_runtime()
     if runtime is 'jupyter':
@@ -452,11 +463,32 @@ def get_strain(strain_circuit, strain_input_state,od=0.0003, media='SC Media',ex
     return results
 
 
+def get_sample(sample_id):
+    query={}
+    query['sample_id'] = sample_id
+    results = []
+    for match in science_table.find(query):
+        match.pop('_id')
+        results.append(match)
+    return results
 
-
-
-
-
+def get_sample_time(sample):
+    sample_id = sample['id']
+    #print("Getting time for: " + sample_id)
+    if 'transcriptic' in sample_id:
+        sample_results = get_sample(sample_id)
+    else:
+        sample_results = []
+        
+    if len(sample_results) == 0:
+        return None #"2019_04_01_12_00_00"
+        #raise Exception("No sample results for: " + str(sample_id))
+    elif len(sample_results) > 1:
+        return sample_results[0]['created']
+        #raise Exception("Multiple results for: " + str(sample_id))
+    else:
+        time = sample_results[0]['created']
+        return time #time.strftime("%Y_%m_%d_%H_%M_%S")
 
 
 def get_control(circuit, control, od=0.0003, media='SC Media'):

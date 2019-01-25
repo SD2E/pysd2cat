@@ -19,6 +19,7 @@ from sklearn.cluster import MeanShift, estimate_bandwidth, KMeans, SpectralClust
 from mpi4py import MPI
 from mpi4py.futures import MPICommExecutor
 from itertools import repeat, islice,cycle
+from pysd2cat.analysis.Names import Names
 import FlowCytometryTools as FCT
 
 rank = MPI.COMM_WORLD.Get_rank()
@@ -46,10 +47,25 @@ def t_sne(X,perplexity):
 
     return [perplexity,X.join(Y)]
 
+def write_out_dataframe(results_list):
+    labels = ms_cluster(results_list[0][1], results_list[0][1].columns)
+    dfs = []
+    for result in results_list:
+        result[1]["class_label"] = labels
+        result[1]["perplexity"] = result[0]
+        dfs.append(result[1])
+    full_df = pd.concat(dfs)
+    print("Writing dataframe")
+    full_df.to_csv("Dead_dataframe_with_cluster_labels.csv")
+
 def visualize(results_list,x_colname='FSC-H',y_colname='FSC-W',label_name='class_label'):
-    results_list[0][1]["class_label"] = ms_cluster(results_list[0][1], results_list[0][1].columns)
+    labels = ms_cluster(results_list[0][1], results_list[0][1].columns)
+
+
     print(results_list[0][1]["class_label"].value_counts())
     num_figs = len(results_list)
+    print("Writing dataframe")
+    results_list[0][1].to_csv("Dead_dataframe_with_cluster_labels.csv")
     (fig, subplots) = plt.subplots(1, num_figs+1, figsize=(15, 8), squeeze=False)
     colors = np.array(list(islice(cycle(['#377eb8', '#ff7f00', '#4daf4a',
                                          '#f781bf', '#a65628', '#984ea3',
@@ -95,7 +111,7 @@ def analyze(df):
     #Get the numeric columns and get ready for clustering
 
 
-    perplexities = [2, 5, 30, 50, 100]
+    perplexities = [10, 20]
     with MPICommExecutor(MPI.COMM_WORLD, root=0) as executor:
         if executor is not None:
             print("Running t-sne")
@@ -112,24 +128,21 @@ def analyze(df):
 def main():
     ## Where data files live
     ##HPC
-    data_dir = '/work/projects/SD2E-Community/prod/data/uploads/transcriptic/201808/yeast_gates/r1bsmgdayg2yq_r1bsu7tb7bsuk/'
-    #data_dir = '/Users/meslami/Downloads/'
+    data_dir = '/work/projects/SD2E-Community/prod/data/uploads/'
     ##Jupyter Hub
     # data_dir = '/home/jupyter/sd2e-community/'
 
     print("Building Live/Dead Control Dataframe...")
-    live_dead_df = pipeline.get_flow_dataframe(data_dir,filename="WT-Dead-Control__.fcs")
-    #filename = "WT-Dead-Control__.fcs"
-    #live_dead_df = FCT.FCMeasurement(ID=filename,
-    #                       datafile=os.path.join(data_dir, filename)).read_data()
-
+    #live_dead_df = pipeline.get_flow_dataframe(data_dir,filename="WT-Dead-Control__.fcs")
+    live_dead_df = pipeline.get_dataframe_for_live_dead_classifier(data_dir,control_type=[Names.WT_DEAD_CONTROL],fraction=.01,max_records=1000)
+    live_dead_df = live_dead_df.drop(columns=['class_label'])
     nrows = len(live_dead_df)
     ncols = len(live_dead_df.columns)
     print("Dataframe constructed with {0} rows and {1} columns".format(nrows,ncols))
-    live_dead_df = live_dead_df.head(n=1000)
+    live_dead_df = live_dead_df.head(n=3000)
     results = analyze(live_dead_df)
     if rank ==0:
-        visualize(results)
+        write_out_dataframe(results)
 
 
 if __name__ == '__main__':
