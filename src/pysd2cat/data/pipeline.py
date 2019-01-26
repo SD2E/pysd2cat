@@ -29,7 +29,6 @@ def get_dataframe_for_live_dead_classifier(data_dir,control_type=[Names.WT_DEAD_
     da[Names.STRAIN] = da[Names.STRAIN].mask(da[Names.STRAIN] == Names.WT_DEAD_CONTROL,  0)
     da[Names.STRAIN] = da[Names.STRAIN].mask(da[Names.STRAIN] == Names.WT_LIVE_CONTROL,  1)
     da = da.rename(index=str, columns={Names.STRAIN: "class_label"})
-    print("In get_dataframe_for_live_dead_classifier fraction is: ", fraction)
     da = get_data_and_metadata_df(da, data_dir,fraction,max_records)
     da = da.drop(columns=[Names.FILENAME, 'Time'])
     return da
