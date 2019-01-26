@@ -79,7 +79,7 @@ def get_threshold(df, channel='BL1_A'):
     ## Setup Gradient Descent Paramters
 
     cur_x = high_low_df[channel].mean() # The algorithm starts at mean
-    rate = 0.0001 # Learning rate
+    rate = 0.00001 # Learning rate
     precision = 0.000001 #This tells us when to stop the algorithm
     previous_step_size = 1 #
     max_iters = 10000 # maximum number of iterations
