@@ -80,9 +80,9 @@ def get_threshold(df, channel='BL1_A'):
 
     cur_x = high_low_df[channel].mean() # The algorithm starts at mean
     rate = 0.00001 # Learning rate
-    precision = 0.000001 #This tells us when to stop the algorithm
+    precision = 0.0001 #This tells us when to stop the algorithm
     previous_step_size = 1 #
-    max_iters = 10000 # maximum number of iterations
+    max_iters = 100 # maximum number of iterations
     iters = 0 #iteration counter
 
     def correct_side(threshold, value, output):
@@ -106,7 +106,7 @@ def get_threshold(df, channel='BL1_A'):
             print(sum(correct))
             print(sum(correctp))
             print(e)
-        #print("Gradient at: " + str(x) + " is " + str(grad))
+        print("Gradient at: " + str(x) + " is " + str(grad))
         return grad
 
     while previous_step_size > precision and iters < max_iters:
@@ -130,7 +130,7 @@ def compute_accuracy(m_df, channel='BL1_A', thresholds=None, use_log_value=True)
             print("Could not find controls to auto-set threshold")
             thresholds = [np.log(10000)]
       
-        
+    print("Threshold  = " + str(thresholds[0]))
     samples = m_df['id'].unique()
     plot_df = pd.DataFrame()
     for sample_id in samples:
