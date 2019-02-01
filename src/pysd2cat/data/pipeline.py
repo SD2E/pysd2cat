@@ -107,6 +107,31 @@ strain_inputs = {
             'https://hub.sd2e.org/user/sd2e/design/UWBF_16970/1' : {'gate' : 'XOR', 'input' : '00','output' : '0'},
             'https://hub.sd2e.org/user/sd2e/design/UWBF_16969/1' : {'gate' : 'XOR', 'input' : '01','output' : '1'},
             'https://hub.sd2e.org/user/sd2e/design/UWBF_16968/1' : {'gate' : 'XOR', 'input' : '10','output' : '1'},
+            'https://hub.sd2e.org/user/sd2e/design/UWBF_16967/1' : {'gate' : 'XOR', 'input' : '11','output' : '0'},
+    
+            'https://hub.sd2e.org/user/sd2e/design/UWBF_7376/1' : {'gate' : 'AND', 'input' : '00','output' : '0'},
+            'https://hub.sd2e.org/user/sd2e/design/UWBF_7375/1' : {'gate' : 'AND', 'input' : '01','output' : '0'},
+            'https://hub.sd2e.org/user/sd2e/design/UWBF_7373/1' : {'gate' : 'AND', 'input' : '10','output' : '0'},
+            'https://hub.sd2e.org/user/sd2e/design/UWBF_7374/1' : {'gate' : 'AND', 'input' : '11','output' : '1'},
+            'https://hub.sd2e.org/user/sd2e/design/UWBF_8544/1' : {'gate' : 'NAND', 'input' : '00','output' : '1'},
+            'https://hub.sd2e.org/user/sd2e/design/UWBF_8545/1' : {'gate' : 'NAND', 'input' : '01','output' : '1'},
+            'https://hub.sd2e.org/user/sd2e/design/UWBF_8543/1' : {'gate' : 'NAND', 'input' : '10','output' : '1'},
+            'https://hub.sd2e.org/user/sd2e/design/UWBF_8542/1' : {'gate' : 'NAND', 'input' : '11','output' : '0'},
+            'https://hub.sd2e.org/user/sd2e/design/UWBF_6390/1' : {'gate' : 'NOR', 'input' : '00','output' : '1'},
+            'https://hub.sd2e.org/user/sd2e/design/UWBF_6388/1' : {'gate' : 'NOR', 'input' : '01','output' : '0'},
+            'https://hub.sd2e.org/user/sd2e/design/UWBF_6389/1' : {'gate' : 'NOR', 'input' : '10','output' : '0'},
+            'https://hub.sd2e.org/user/sd2e/design/UWBF_6391/1' : {'gate' : 'NOR', 'input' : '11','output' : '0'},
+            'UWBF_OR_00' : {'gate' : 'OR', 'input' : '00','output' : '0'},
+            'UWBF_OR_01' : {'gate' : 'OR', 'input' : '01','output' : '1'},
+            'UWBF_OR_10' : {'gate' : 'OR', 'input' : '10','output' : '1'},
+            'UWBF_OR_11' : {'gate' : 'OR', 'input' : '11','output' : '1'},
+            'https://hub.sd2e.org/user/sd2e/design/UWBF_7300/1' : {'gate' : 'XNOR', 'input' : '00','output' : '1'},
+            'https://hub.sd2e.org/user/sd2e/design/UWBF_8231/1' : {'gate' : 'XNOR', 'input' : '01','output' : '0'},
+            'https://hub.sd2e.org/user/sd2e/design/UWBF_7377/1' : {'gate' : 'XNOR', 'input' : '10','output' : '0'},
+            'https://hub.sd2e.org/user/sd2e/design/UWBF_7299/1' : {'gate' : 'XNOR', 'input' : '11','output' : '1'},
+            'https://hub.sd2e.org/user/sd2e/design/UWBF_16970/1' : {'gate' : 'XOR', 'input' : '00','output' : '0'},
+            'https://hub.sd2e.org/user/sd2e/design/UWBF_16969/1' : {'gate' : 'XOR', 'input' : '01','output' : '1'},
+            'https://hub.sd2e.org/user/sd2e/design/UWBF_16968/1' : {'gate' : 'XOR', 'input' : '10','output' : '1'},
             'https://hub.sd2e.org/user/sd2e/design/UWBF_16967/1' : {'gate' : 'XOR', 'input' : '11','output' : '0'}
         }
     
@@ -289,7 +314,7 @@ def get_xplan_data_and_metadata_df(metadata_df, data_dir, fraction=None, max_rec
     df = df.rename(index=str, columns=rename_map)
     return df
     
-def get_mefl_data_and_metadata_df(metadata_df, data_dir, fraction=None, max_records=None):
+def get_mefl_data_and_metadata_df(metadata_df, fraction=None, max_records=None):
     """
     Join each FCS datatable with its metadata.  Costly!
     """
@@ -313,11 +338,11 @@ def get_mefl_data_and_metadata_df(metadata_df, data_dir, fraction=None, max_reco
     final_df = metadata_df.merge(df, left_on=Names.SAMPLE_ID, right_on=Names.SAMPLE_ID, how='outer')    
     return final_df
     
-def get_xplan_mefl_data_and_metadata_df(metadata_df, data_dir, fraction=None, max_records=None):
+def get_xplan_mefl_data_and_metadata_df(metadata_df, fraction=None, max_records=None):
     """
     Rename columns from data and metadata to match xplan columns
     """
-    df = get_mefl_data_and_metadata_df(metadata_df, data_dir, fraction=fraction, max_records=max_records)
+    df = get_mefl_data_and_metadata_df(metadata_df, fraction=fraction, max_records=max_records)
     rename_map = {
         "experiment_id" : "plan",
         "sample_id" : "id",
@@ -335,7 +360,7 @@ def get_xplan_mefl_data_and_metadata_df(metadata_df, data_dir, fraction=None, ma
     return df    
     
 
-def get_mefl_histograms_and_metadata_df(metadata_df, data_dir, fraction=None, max_records=None):
+def get_mefl_histograms_and_metadata_df(metadata_df, fraction=None, max_records=None):
     """
     Join each FCS datatable with its metadata.  Costly!
     """
@@ -362,11 +387,11 @@ def get_mefl_histograms_and_metadata_df(metadata_df, data_dir, fraction=None, ma
     final_df = metadata_df.merge(df, left_on=Names.SAMPLE_ID, right_on=Names.SAMPLE_ID, how='outer')    
     return final_df
 
-def get_xplan_mefl_histograms_and_metadata_df(metadata_df, data_dir, fraction=None, max_records=None):
+def get_xplan_mefl_histograms_and_metadata_df(metadata_df, fraction=None, max_records=None):
     """
     Rename columns from data and metadata to match xplan columns
     """
-    df = get_mefl_histograms_and_metadata_df(metadata_df, data_dir, fraction=fraction, max_records=max_records)
+    df = get_mefl_histograms_and_metadata_df(metadata_df, fraction=fraction, max_records=max_records)
     rename_map = {
         "experiment_id" : "plan",
         "sample_id" : "id",
