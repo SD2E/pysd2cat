@@ -109,6 +109,7 @@ def predict_live_dead(df, model, scaler):
     df_norm = scaler.transform(df)
     predictions = model.predict(df_norm)
     #predictions = model.predict(df)
-    df['class_label'] = pd.DataFrame(predictions, columns = ['class_label'])
+    preds = pd.DataFrame(predictions, columns = ['class_label'])
+    df.loc[:,'class_label'] = preds['class_label']
     return df
     
