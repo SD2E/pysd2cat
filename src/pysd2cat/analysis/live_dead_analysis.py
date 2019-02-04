@@ -32,8 +32,8 @@ def add_live_dead(df):
             return None
     live_df = df.loc[df['strain_name'] == Names.WT_LIVE_CONTROL]
     dead_df = df.loc[df['strain_name'] == Names.WT_DEAD_CONTROL]
-    live_df.loc[live_df['strain_name'] == Names.WT_LIVE_CONTROL,'strain_name'] = live_df.apply(strain_to_class, axis=1)
-    dead_df.loc[dead_df['strain_name'] == Names.WT_DEAD_CONTROL,'strain_name'] = dead_df.apply(strain_to_class, axis=1)
+    live_df.loc[:,'strain_name'] = live_df.apply(strain_to_class, axis=1)
+    dead_df.loc[:,'strain_name'] = dead_df.apply(strain_to_class, axis=1)
     live_dead_df = live_df.append(dead_df)
     #print(live_dead_df)
 
