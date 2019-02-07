@@ -148,7 +148,7 @@ def compute_accuracy(m_df, channel='BL1_A', thresholds=None, use_log_value=True)
             thold_df = do_threshold_analysis(value_df, thresholds)
             
             thold_df['id'] = sample_id
-            for i in ['gate', 'input', 'od', 'media', 'inc_temp']:
+            for i in ['gate', 'input', 'output', 'od', 'media', 'inc_temp']:
                 if i in sample.columns:
                     thold_df[i] = sample[i].unique()[0]
                 elif i == 'inc_temp':
@@ -169,9 +169,9 @@ def compute_accuracy(m_df, channel='BL1_A', thresholds=None, use_log_value=True)
                 thold_df['standard_error_correct_live'] = thold_live_df['standard_error_correct']
                 thold_df['count_live'] = thold_live_df['count']
             else:
-                thold_df['probability_correct_live'] = thold_df['probability_correct']
-                thold_df['standard_error_correct_live'] = thold_df['standard_error_correct']
-                thold_df['count_live'] = thold_df['count']
+                thold_df['probability_correct_live'] = None #thold_df['probability_correct']
+                thold_df['standard_error_correct_live'] = None #thold_df['standard_error_correct']
+                thold_df['count_live'] = None #thold_df['count']
 
 
             #print(thold_df)
