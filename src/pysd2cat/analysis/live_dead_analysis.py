@@ -47,8 +47,11 @@ def add_live_dead(df):
 
     (model, mean_absolute_error, test_X, test_y, scaler) = ldc.build_model(live_dead_df)
     pred_df = df[data_columns]
+    #print(pred_df)
     pred_df = ldc.predict_live_dead(pred_df, model, scaler)
-    df['live'] = pred_df['class_label']
+    #print(pred_df.dtypes)
+    df.loc[:,'live'] = pred_df['class_label'].astype(int)
+    print(df)
     return df
 
 

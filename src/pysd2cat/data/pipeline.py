@@ -298,6 +298,7 @@ def get_xplan_data_and_metadata_df(metadata_df, data_dir, fraction=None, max_rec
     """
     Rename columns from data and metadata to match xplan columns
     """
+    print("Getting xplan dataframe for experiment...")
     df = get_data_and_metadata_df(metadata_df, data_dir, fraction=fraction, max_records=max_records)
     rename_map = {
         "experiment_id" : "plan",
@@ -311,7 +312,7 @@ def get_xplan_data_and_metadata_df(metadata_df, data_dir, fraction=None, max_rec
     for col in df.columns:
         if col not in rename_map:
             rename_map[col] = sanitize(col)
-    print("renaming columns as: " + str(rename_map))
+    #print("renaming columns as: " + str(rename_map))
     df = df.rename(index=str, columns=rename_map)
     return df
     

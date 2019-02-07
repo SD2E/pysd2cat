@@ -106,10 +106,14 @@ def compute_mean_live(model,
     return mean_live
 
 def predict_live_dead(df, model, scaler):
+    print("Predicting live...")
     df_norm = scaler.transform(df)
     predictions = model.predict(df_norm)
     #predictions = model.predict(df)
+    #print(predictions)
     preds = pd.DataFrame(predictions, columns = ['class_label'])
-    df.loc[:,'class_label'] = preds['class_label']
+    #df.loc[:,'class_label'] = preds['class_label'].astype(int)
+    df['class_label'] = predictions
+    #print(df)
     return df
     
