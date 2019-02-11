@@ -67,7 +67,7 @@ def get_experiment_jobs(experiment_id, gating = 'auto'):
     matches=list(jobs_table.find(query))
     return matches
 
-def get_experiment_samples(experiment_id, file_type):
+def get_experiment_samples(experiment_id, file_type='FCS'):
     """
     Get metadata for every live and dead control sample across
     all experiments.
@@ -356,43 +356,55 @@ def get_xplan_mefl_data_and_metadata_df(metadata_df, fraction=None, max_records=
     #for col in df.columns:
     #    if col not in rename_map:
     #        rename_map[col] = sanitize(col)
-    print("renaming columns as: " + str(rename_map))
+    #print("renaming columns as: " + str(rename_map))
     df = df.rename(index=str, columns=rename_map)
     return df    
     
 
-def get_mefl_histograms_and_metadata_df(metadata_df, fraction=None, max_records=None):
+def get_mefl_histograms_and_metadata_df(metadata_df, results):
     """
     Join each FCS datatable with its metadata.  Costly!
     """
     
-    ex_id = metadata_df[Names.EXPERIMENT_ID].unique()[0]
-    results = get_experiment_jobs(ex_id)
     
-    if len(results) == 0:
-        raise Exception("No MEFL results for: " + ex_id)
+    dfs = []
     
-    output = [ x['UPDATE']['data']['outputs']['output'] for x in results[0]['history'] if 'UPDATE' in x and 'data' in x['UPDATE'] and 'outputs' in x['UPDATE']['data'] and 'output' in  x['UPDATE']['data']['outputs']][0]    
-    runtime = detect_runtime()
-    if runtime is 'jupyter':
-        myfile = os.path.join('/home/jupyter/sd2e-community', output.split('data-sd2e-community')[1][1:])
-    else:
-        myfile = os.path.join('/work/projects/SD2E-Community/prod/data', output.split('data-sd2e-community')[1][1:])
-    df = pd.read_csv(myfile)   
-    df=df.drop(columns=['strain', 'replicate'])
-    #for col in df.columns[8:]:
-    #    df[col] = df[col].astype(float)
-    #print(df.head())
-    #print(metadata_df.head())
-    ## Join data and metadata
-    final_df = metadata_df.merge(df, left_on=Names.SAMPLE_ID, right_on=Names.SAMPLE_ID, how='outer')    
-    return final_df
+    for result in results:
+        #print("Processing result: " + str(result))
+        completion_tag = 'UPDATE'
+        output = [ x[completion_tag]['data']['outputs']['output'] for x in result['history'] if completion_tag in x and 'data' in x[completion_tag] and 'outputs' in x[completion_tag]['data'] and 'output' in  x[completion_tag]['data']['outputs']]
+        #print(output)
+        if len(output) == 0:
+            continue
+            
+        output=output[0]    
+        runtime = detect_runtime()
+        if runtime is 'jupyter':
+            myfile = os.path.join('/home/jupyter/sd2e-community', output.split('data-sd2e-community')[1][1:])
+        else:
+            myfile = os.path.join('/work/projects/SD2E-Community/prod/data', output.split('data-sd2e-community')[1][1:])
+        df = pd.read_csv(myfile)   
 
-def get_xplan_mefl_histograms_and_metadata_df(metadata_df, fraction=None, max_records=None):
+        df=df.drop(columns=['strain', 'replicate'])
+        #for col in df.columns[8:]:
+        #    df[col] = df[col].astype(float)
+        #print(df.head())
+        #print(metadata_df.head())
+        ## Join data and metadata
+        final_df = metadata_df.merge(df, left_on=Names.SAMPLE_ID, right_on=Names.SAMPLE_ID, how='outer')    
+        final_df['session'] = result['session']
+        dfs.append(final_df)
+    return dfs
+
+def get_xplan_mefl_histograms_and_metadata_df(metadata_df, results):
     """
     Rename columns from data and metadata to match xplan columns
     """
-    df = get_mefl_histograms_and_metadata_df(metadata_df, fraction=fraction, max_records=max_records)
+    
+    
+
+    dfs = get_mefl_histograms_and_metadata_df(metadata_df, results)
+    #print(dfs)
     rename_map = {
         "experiment_id" : "plan",
         "sample_id" : "id",
@@ -402,14 +414,16 @@ def get_xplan_mefl_histograms_and_metadata_df(metadata_df, fraction=None, max_re
         "strain" : "strain_name",
         "temperature" : 'inc_temp'
     }
-    for col in df.columns:
-        if col not in rename_map:
-            rename_map[col] = sanitize(col)
-    #print("renaming columns as: " + str(rename_map))
-    df = df.rename(index=str, columns=rename_map)
-    
-    df['replicate'] = df['replicate'].fillna(-1).astype(int)
-    return df      
+    for df in dfs:
+        print("Sanitizing result " + str(df))
+        for col in df.columns:
+            if col not in rename_map:
+                rename_map[col] = sanitize(col)
+        #print("renaming columns as: " + str(rename_map))
+        df = df.rename(index=str, columns=rename_map)
+
+        df['replicate'] = df['replicate'].fillna(0).astype(int)
+    return dfs      
     
 ###############################################
 # Helpers for getting sample data to classify #

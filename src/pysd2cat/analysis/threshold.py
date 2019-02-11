@@ -55,7 +55,7 @@ def get_sample_accuracy(data):
                 adf = pd.read_csv(adata, dtype={'od': float, 'input' : object})
                 if 'media' in adf.columns:
                     final_df = get_experiment_accuracy_and_metadata(adf)
-                    all_df = all_df.append(final_df)
+                    all_df = all_df.append(final_df, ignore_index=True)
     all_df['prc_improve'] = all_df['probability_correct_live'] - all_df['probability_correct']
     all_df['live_proportion'] = all_df['count_live'] / all_df['count']
     #all_df['sample_time'] = all_df.apply(pipeline.get_sample_time, axis=1)
