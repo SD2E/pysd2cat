@@ -5,3 +5,5 @@ src/pysd2cat.egg-info
 *csv
 pysd2cat.egg-info
 *json
+build
+dist
