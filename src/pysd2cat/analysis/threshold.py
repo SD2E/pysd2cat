@@ -147,6 +147,9 @@ def compute_accuracy(m_df, channel='BL1_A', thresholds=None, use_log_value=True)
             #print(value_df.shape())
             thold_df = do_threshold_analysis(value_df, thresholds)
             
+            thold_df['mean_log_gfp'] = np.mean(value_df['value'])
+            thold_df['std_log_gfp'] = np.std(value_df['value'])
+            
             thold_df['id'] = sample_id
             for i in ['gate', 'input', 'output', 'od', 'media', 'inc_temp']:
                 if i in sample.columns:
@@ -168,12 +171,18 @@ def compute_accuracy(m_df, channel='BL1_A', thresholds=None, use_log_value=True)
                 thold_df['probability_correct_live'] = thold_live_df['probability_correct']
                 thold_df['standard_error_correct_live'] = thold_live_df['standard_error_correct']
                 thold_df['count_live'] = thold_live_df['count']
+                thold_df['mean_log_gfp_live'] = np.mean(value_df['value'])
+                thold_df['std_log_gfp_live'] = np.std(value_df['value'])
             else:
                 thold_df['probability_correct_live'] = None #thold_df['probability_correct']
                 thold_df['standard_error_correct_live'] = None #thold_df['standard_error_correct']
                 thold_df['count_live'] = None #thold_df['count']
+                thold_df['mean_log_gfp_live'] = None
+                thold_df['std_log_gfp_live'] = None
 
 
+
+                
             #print(thold_df)
             plot_df = plot_df.append(thold_df, ignore_index=True)
     return plot_df 

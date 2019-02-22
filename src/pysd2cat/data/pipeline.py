@@ -33,6 +33,28 @@ def get_dataframe_for_live_dead_classifier(data_dir,control_type=[Names.WT_DEAD_
     da = da.drop(columns=[Names.FILENAME, 'Time'])
     return da
 
+def get_calibration_samples(experiment_id, calibration_type=[Names.LUDOX]):
+    query={}
+    query[Names.CHALLENGE_PROBLEM] = Names.YEAST_STATES
+    query[Names.FILE_TYPE] = Names.CSV
+    query[Names.STANDARD_TYPE] = {"$in": calibration_type}
+    #print("Query:")
+    #print(query)
+    results = []
+    #print("Printing results of query...")
+    for match in science_table.find(query):
+        #print(match)
+        match.pop('_id')
+        results.append(match)
+    #print("Printing length of results...")
+    #print(len(results))
+    return results
+
+
+    samples = pipeline.get_experiment_samples(experiment_id,file_type='CSV')
+    calibration_samples = [x for x in samples if 'calibration' in x['filename']]
+    return calibration_samples
+
 
 
 def get_live_dead_controls(control_type=[Names.WT_DEAD_CONTROL, Names.WT_LIVE_CONTROL]):
@@ -56,14 +78,14 @@ def get_live_dead_controls(control_type=[Names.WT_DEAD_CONTROL, Names.WT_LIVE_CO
     print(len(results))
     return results
 
-def get_experiment_jobs(experiment_id, gating = 'auto'):
+def get_experiment_jobs(experiment_id, gating = 'auto', status='FINISHED'):
     """
     Get job info related to experiment
     """
     query={}
     query['data.sample_id']=experiment_id
     query['data.message.gating'] = gating
-    query['status']="VALIDATED"
+    query['status']={"$in" : ["FINISHED", "VALIDATED"]}
     matches=list(jobs_table.find(query))
     return matches
 
@@ -414,8 +436,9 @@ def get_xplan_mefl_histograms_and_metadata_df(metadata_df, results):
         "strain" : "strain_name",
         "temperature" : 'inc_temp'
     }
+    my_dfs = []
     for df in dfs:
-        print("Sanitizing result " + str(df))
+        #print("Sanitizing result " + str(df))
         for col in df.columns:
             if col not in rename_map:
                 rename_map[col] = sanitize(col)
@@ -423,7 +446,8 @@ def get_xplan_mefl_histograms_and_metadata_df(metadata_df, results):
         df = df.rename(index=str, columns=rename_map)
 
         df['replicate'] = df['replicate'].fillna(0).astype(int)
-    return dfs      
+        my_dfs.append(df)
+    return my_dfs      
     
 ###############################################
 # Helpers for getting sample data to classify #

@@ -11,10 +11,15 @@ class Names:
     STRAIN = 'strain'
     WT_DEAD_CONTROL='WT-Dead-Control'
     WT_LIVE_CONTROL = 'WT-Live-Control'
+    
+    #Calibration
+    LUDOX = 'LUDOX'
+    STANDARD_TYPE = 'standard_type'
 
     # Dataype
     FILE_TYPE = 'file_type'
     FCS = 'FCS'
+    CSV = 'CSV'
     INOCULATION_DENSITY = 'inoculation_density'
     INOCULATION_DENSITY_VALUE = INOCULATION_DENSITY + '.value'
 
