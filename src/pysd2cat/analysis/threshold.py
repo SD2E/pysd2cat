@@ -3,6 +3,36 @@ import math
 import numpy as np
 import os
 from pysd2cat.data import pipeline
+    
+
+def write_accuracy(data_file, overwrite):
+    try:
+        data_dir = "/".join(data_file.split('/')[0:-1])
+        out_path = os.path.join(data_dir, 'accuracy')
+        out_file = os.path.join(out_path, data_file.split('/')[-1])
+        if overwrite or not os.path.isfile(out_file):
+            print("Computing accuracy file: " + out_file)
+            data_df = pd.read_csv(data_file,memory_map=True,dtype={'od': float, 'input' : str, 'output' : str}, index_col=0 )
+            accuracy_df = compute_accuracy(data_df)
+            print("Writing accuracy file: " + out_file)
+            accuracy_df.to_csv(out_file)
+    except Exception as e:
+        print("File failed: " + data_file + " with: " + str(e))
+        pass
+
+
+def write_accuracy_files(data, overwrite=False):
+    import multiprocessing
+    pool = multiprocessing.Pool(int(multiprocessing.cpu_count()))
+    multiprocessing.cpu_count()
+    tasks = []
+    for d in data:
+        tasks.append((d, overwrite))
+    results = [pool.apply_async(write_accuracy, t) for t in tasks]
+
+    for result in results:
+        data_list = result.get()
+ 
 
 def get_experiment_accuracy_and_metadata(adf):
     """
@@ -13,6 +43,7 @@ def get_experiment_accuracy_and_metadata(adf):
             "SC Media" : "SC Media",
             "SC+Oleate+Adenine" : "SC Media",
             "standard_media" : "SC Media",
+            "Synthetic_Complete" : "SC Media",
 
             "Synthetic_Complete_2%Glycerol_2%Ethanol" : "SC Slow",
             "SC Slow" : "SC Slow",
@@ -52,7 +83,7 @@ def get_sample_accuracy(data):
             #df = pd.read_csv(d)
             adata = os.path.join("/".join(d.split('/')[0:-1]), 'accuracy', d.split('/')[-1])
             if os.path.isfile(adata):
-                adf = pd.read_csv(adata, dtype={'od': float, 'input' : object})
+                adf = pd.read_csv(adata, dtype={'od': float, 'input' : object}, index_col=0)
                 if 'media' in adf.columns:
                     final_df = get_experiment_accuracy_and_metadata(adf)
                     all_df = all_df.append(final_df, ignore_index=True)
@@ -68,17 +99,21 @@ def get_threshold(df, channel='BL1_A'):
 
     ## Prepare the data for high and low controls
     high_df = df.loc[( df['strain_name'] == 'NOR-00-Control')]
-    high_df['output'] = 1
+    high_df.loc[:,'output'] = high_df.apply(lambda x: 1, axis=1)
     low_df = df.loc[(df['strain_name'] == 'WT-Live-Control') ]
-    low_df['output'] = 0
+    low_df.loc[:,'output'] = low_df.apply(lambda x: 0, axis=1)
     high_low_df = high_df.append(low_df)
     high_low_df = high_low_df.loc[high_low_df[channel] > 0]
     high_low_df[channel] = np.log(high_low_df[channel]).replace([np.inf, -np.inf], np.nan).dropna()
     high_low_df[channel]
+    
+    if len(high_df) == 0 or len(low_df) == 0:
+        raise Exception("Cannot compute threshold if do not have both low and high control")
 
     ## Setup Gradient Descent Paramters
 
     cur_x = high_low_df[channel].mean() # The algorithm starts at mean
+    print("Starting theshold = " + str(cur_x))
     rate = 0.00001 # Learning rate
     precision = 0.0001 #This tells us when to stop the algorithm
     previous_step_size = 1 #
@@ -127,8 +162,9 @@ def compute_accuracy(m_df, channel='BL1_A', thresholds=None, use_log_value=True)
             threshold, threshold_quality = get_threshold(m_df, channel)
             thresholds = [threshold]
         except Exception as e:
-            print("Could not find controls to auto-set threshold")
-            thresholds = [np.log(10000)]
+            #print(e)
+            raise Exception("Could not find controls to auto-set threshold: " + str(e))
+            #thresholds = [np.log(10000)]
       
     print("Threshold  = " + str(thresholds[0]))
     samples = m_df['id'].unique()
@@ -151,7 +187,7 @@ def compute_accuracy(m_df, channel='BL1_A', thresholds=None, use_log_value=True)
             thold_df['std_log_gfp'] = np.std(value_df['value'])
             
             thold_df['id'] = sample_id
-            for i in ['gate', 'input', 'output', 'od', 'media', 'inc_temp']:
+            for i in ['gate', 'input', 'output', 'od', 'media', 'inc_temp', 'replicate']:
                 if i in sample.columns:
                     thold_df[i] = sample[i].unique()[0]
                 elif i == 'inc_temp':
