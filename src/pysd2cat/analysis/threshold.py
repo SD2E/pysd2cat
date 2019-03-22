@@ -113,7 +113,7 @@ def get_threshold(df, channel='BL1_A'):
     ## Setup Gradient Descent Paramters
 
     cur_x = high_low_df[channel].mean() # The algorithm starts at mean
-    print("Starting theshold = " + str(cur_x))
+    #print("Starting theshold = " + str(cur_x))
     rate = 0.00001 # Learning rate
     precision = 0.0001 #This tells us when to stop the algorithm
     previous_step_size = 1 #
@@ -141,7 +141,7 @@ def get_threshold(df, channel='BL1_A'):
             print(sum(correct))
             print(sum(correctp))
             print(e)
-        print("Gradient at: " + str(x) + " is " + str(grad))
+        #print("Gradient at: " + str(x) + " is " + str(grad))
         return grad
 
     while previous_step_size > precision and iters < max_iters:
@@ -166,7 +166,7 @@ def compute_accuracy(m_df, channel='BL1_A', thresholds=None, use_log_value=True)
             raise Exception("Could not find controls to auto-set threshold: " + str(e))
             #thresholds = [np.log(10000)]
       
-    print("Threshold  = " + str(thresholds[0]))
+    #print("Threshold  = " + str(thresholds[0]))
     samples = m_df['id'].unique()
     plot_df = pd.DataFrame()
     for sample_id in samples:
@@ -175,12 +175,11 @@ def compute_accuracy(m_df, channel='BL1_A', thresholds=None, use_log_value=True)
         #print(sample.head())
         circuit = sample['gate'].unique()[0]
         if type(circuit) is str:
-            #print(output)
             value_df = sample[[channel, 'output']].rename(index=str, columns={channel: "value"})          
             if use_log_value:
                 value_df = value_df.loc[value_df['value'] > 0]
                 value_df['value'] = np.log(value_df['value']).replace([np.inf, -np.inf], np.nan).dropna()
-            #print(value_df.shape())
+            #print(value_df.head())
             thold_df = do_threshold_analysis(value_df, thresholds)
             
             thold_df['mean_log_gfp'] = np.mean(value_df['value'])
@@ -233,8 +232,8 @@ def do_threshold_analysis(df, thresholds):
         correct.append(0)
         
     for idx, row in df.iterrows():
-        true_gate_output = row['output']
-        measured_gate_output = row['value']
+        true_gate_output = int(row['output'])
+        measured_gate_output = float(row['value'])
         count = count + 1
         for idx, threshold in enumerate(thresholds):
             #print(str(true_gate_output) + " " + str(measured_gate_output))
@@ -243,7 +242,6 @@ def do_threshold_analysis(df, thresholds):
                 correct[idx] = correct[idx] + 1
             
     results = pd.DataFrame()
-    
     for idx, threshold in enumerate(thresholds):
         if count > 0:
             pr = correct[idx] / count

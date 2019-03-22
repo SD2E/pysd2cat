@@ -6,6 +6,15 @@ from os.path import expanduser
 import transcriptic
 import csv
 import logging
+import json
+    
+import transcriptic 
+from transcriptic import commands, Container
+from transcriptic.jupyter import objects
+
+from pysd2cat.xplan import experiment_request
+
+    
     
 ############################################################################
 ## ETL related data functions available from pipeline
@@ -74,7 +83,41 @@ def well_idx_to_well_id(idx):
     row, col = divmod(idx, 12)
     return '{}{}'.format(chars[row], col + 1)
 
-def create_od_csv(run_id, path):
+
+
+
+
+def get_stocks(run_obj):
+    
+    def get_stock_from_str(st):
+        # Strip prefix
+        sp = "-".join(st.split('-')[1:])
+
+        #Convert '_' to '-'
+        sp = sp.replace('_', '-')
+
+        stock_plate = "-".join(sp.split('-')[:-1])
+        glycerol_plate_index = sp.split('-')[-1]
+
+        return stock_plate, glycerol_plate_index
+
+
+    container_names = run_obj.containers.Name
+    #print(container_names)
+    stock_plates = [x for x in container_names if "YeastGatesStockPlate" in x]
+    #print(stock_plates)
+    if len(stock_plates) == 1:
+        glycerol_stock, glycerol_plate_index = get_stock_from_str(stock_plates[0])
+    else:
+        glycerol_stock = None
+        glycerol_plate_index = None
+        
+    #print(glycerol_stock)
+    #print(plate_index)
+    return glycerol_stock, glycerol_plate_index
+
+
+def create_od_csv(run_id, csv_path='tmp.csv'):
     """
     Write a CSV file at path for OD data associated with run_id. 
     The OD data is uncorrected and adds some minimal amount of metadata
@@ -82,6 +125,9 @@ def create_od_csv(run_id, path):
     """
     run_obj = get_tx_run(run_id)
     d = run_obj.data
+        
+
+    glycerol_stock, glycerol_plate_index = get_stocks(run_obj)    
         
     is_calibration = False    
     measurements = {}
@@ -109,6 +155,9 @@ def create_od_csv(run_id, path):
                     if is_calibration:
                         measurements[well]['sample'] = alq['name'] + "_" + str(alq['volume_ul'])
                     else:
+                        if glycerol_stock and glycerol_plate_index:
+                            measurements[well]['glycerol_stock'] = glycerol_stock
+                            measurements[well]['glycerol_plate_index'] = glycerol_plate_index
                         #print(alq)
                         if 'control' in alq['properties']:
                             measurements[well]['sample'] = alq['properties']['control']
@@ -136,6 +185,10 @@ def create_od_csv(run_id, path):
                     if is_calibration:
                         measurements[well]['sample'] = alq['name'] + "_" + str(alq['volume_ul'])
                     else:
+                        if glycerol_stock and glycerol_plate_index:
+                            measurements[well]['glycerol_stock'] = glycerol_stock
+                            measurements[well]['glycerol_plate_index'] = glycerol_plate_index
+                        
                         if 'control' in alq['properties']:
                             measurements[well]['sample'] = alq['properties']['control']
                         elif 'Sample_ID' in alq['properties']:
@@ -148,11 +201,12 @@ def create_od_csv(run_id, path):
                     raise KeyError('Found sample for well which did not have Fluorescence measurement')
 
 
+    with open(csv_path, 'w+') as csvfile:
+        if glycerol_stock and glycerol_plate_index:
+            writer = csv.DictWriter(csvfile, fieldnames=['well', 'od', 'gfp', 'sample', 'SynBioHub URI', 'glycerol_stock', 'glycerol_plate_index'])
+        else:
+            writer = csv.DictWriter(csvfile, fieldnames=['well', 'od', 'gfp', 'sample', 'SynBioHub URI'])
 
-
-    
-    with open(path, 'w+') as csvfile:
-        writer = csv.DictWriter(csvfile, fieldnames=['well', 'od', 'gfp', 'sample', 'SynBioHub URI'])
 
         writer.writeheader()
         writer.writerows((_measurement_to_csv_dict(well, data)
@@ -237,28 +291,32 @@ def make_experiment_corrected_df(calibration_df, part_1_df, part_2_df):
     
     return experiment_df
 
-def get_experiment_data(experiment, out_dir):
+def get_experiment_data(experiment, out_dir, overwrite=False):
     """
     For a triple of runs (part 1, part 2, and calibration), generate a
     dataframe with OD data for all wells.
     """
     
-    #print(experiment)
     if not pd.isna(experiment['calibration_id']):
+        
         calibration_file = os.path.join(out_dir, experiment['calibration_id'] + '.csv')
         part_1_file = os.path.join(out_dir, experiment['part_1_id'] + '.csv')
         part_2_file = os.path.join(out_dir, experiment['part_2_id'] + '.csv')
         
-        if not os.path.exists(calibration_file):
+        if overwrite or not os.path.exists(calibration_file):
             create_od_csv(experiment['calibration_id'], csv_path=calibration_file)
-        if not os.path.exists(part_1_file):
+        if overwrite or not os.path.exists(part_1_file):
             create_od_csv(experiment['part_1_id'], csv_path=part_1_file)
-        if not os.path.exists(part_2_file):
+        if overwrite or not os.path.exists(part_2_file):
             create_od_csv(experiment['part_2_id'], csv_path=part_2_file)
-        
+
         calibration_df = pd.read_csv(calibration_file, index_col = False)
         part_1_df = pd.read_csv(part_1_file, index_col = False)
         part_2_df = pd.read_csv(part_2_file, index_col = False)
+        
+        #print(part_1_df.head())
+        #print(part_2_df.head())
+
         
         experiment_df = make_experiment_corrected_df(calibration_df, part_1_df, part_2_df)
         return experiment_df
@@ -284,29 +342,33 @@ def get_meta(experiment):
     #print(experiment)
     request_file = os.path.join(expanduser("~"), 'tacc-work/xplan-reactor/experiments/', xplan_experiment['experiment_id'], 'request_' + xplan_experiment['experiment_id'] + ".json")
     request = experiment_request.ExperimentRequest(**json.load(open(request_file, 'r')))
+    #print("Got request")
     meta = request.pd_metadata(logger, plates=[xplan_experiment['plate_id']])
     meta = meta.rename(columns={'gate' : 'strain_circuit'})
 
     return meta
 
-def get_data_and_metadata_df(experiment, out_dir):
+def get_data_and_metadata_df(experiment, out_dir, overwrite=False):
     """
     Get all metadata and data for an experiment (run triple),
     cache a copy in out_dir, and return it.
     """
     
     experiment_od_file = os.path.join(out_dir, experiment['part_1_id'] + "_" + experiment['part_2_id'] + '.csv')
-    if not os.path.exists(experiment_od_file):
+    if overwrite or not os.path.exists(experiment_od_file):
         try:
-            data = get_experiment_data(experiment, out_dir) 
+            data = get_experiment_data(experiment, out_dir, overwrite=overwrite) 
+            #print(data.head())
+            
             meta = get_meta(experiment)
+            #print(meta.head())
             meta_and_data_df = meta.merge(data,  left_on='well', right_on='post_well')
             meta_and_data_df.to_csv(experiment_od_file)
         except Exception as e:
-            print("Could not generate dataframe for experiment: " + str(experiment) + " because " + str(e))
+            #print("Could not generate dataframe for experiment: " + str(experiment) + " because " + str(e))
             return pd.DataFrame()
     else: 
-        meta_and_data_df = pd.read_csv(experiment_od_file)
+        meta_and_data_df = pd.read_csv(experiment_od_file, dtype={'input': object})
 
     return meta_and_data_df
 

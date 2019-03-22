@@ -9,11 +9,12 @@ def get_strain_growth_plot(df):
     fig_size[0] = 40
     fig_size[1] = 30
     plt.rcParams["figure.figsize"] = fig_size
-    columns = [x for x in df.columns if 'strain' not in x]
+    columns = df.columns[1:] #[x for x in df.columns if 'strain' not in x]
 
     for i, row in df.iterrows():
         data = row[columns]
         ax.plot(row.keys()[1:].astype(float),data, label = row['strain'])
+        ax.scatter(row.keys()[1:].astype(float),data, label=None)
     plt.ylabel("Post OD")
     plt.xscale("log", nonposx='clip')
     plt.xlabel("Inoculation OD")
