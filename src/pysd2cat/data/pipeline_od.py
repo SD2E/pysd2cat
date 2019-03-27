@@ -250,7 +250,7 @@ def get_calibration_df(calibration_file):
 
 
 
-def get_experiment_od_data(experiment_id):
+def get_strain_growth_plot(experiment_id):
     samples = pipeline.get_experiment_samples(experiment_id,file_type='CSV')
     calibration_samples = [x for x in samples if 'calibration' in x['filename']]
     ## Drop calibration_samples for now
