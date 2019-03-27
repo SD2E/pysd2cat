@@ -22,7 +22,7 @@ def add_live_dead(df):
     Build a live dead classifier from controls.
     Apply classifier to each event to create 'live' column
     """
-    data_columns = ['FSC_A', 'SSC_A', 'BL1_A', 'RL1_A', 'FSC_H', 'SSC_H', 'BL1_H', 'RL1_H', 'FSC_W', 'SSC_W', 'BL1_W', 'RL1_W']
+    data_columns = ['FSC-A', 'SSC-A', 'BL1-A', 'RL1-A', 'FSC-H', 'SSC-H', 'BL1-H', 'RL1-H', 'FSC-W', 'SSC-W', 'BL1-W', 'RL1-W']
     def strain_to_class(x):
         if x['strain_name'] == Names.WT_LIVE_CONTROL:
             return "1"
@@ -47,12 +47,16 @@ def add_live_dead(df):
 
     (model, mean_absolute_error, test_X, test_y, scaler) = ldc.build_model(live_dead_df)
     pred_df = df[data_columns]
+    print("pred_df")
+    print(pred_df.columns.tolist())
+    print(pred_df.head(5))
     #print(pred_df)
     pred_df = ldc.predict_live_dead(pred_df, model, scaler)
     #print(pred_df.dtypes)
     df.loc[:,'live'] = pred_df['class_label'].astype(int)
-    print(df)
-    return df
+    ouput_columns = ['sample_id', 'Time'] + data_columns + ['live']
+    result_df = df[ouput_columns]
+    return result_df
 
 
 def compute_sytox_threshold_accuracy(live_dead_df, thresholds=[2000], sytox_channel='RL1-A'):
@@ -70,16 +74,15 @@ def compute_model_predictions(model, scaler, circuits, inputs, ods, media, fract
             for od in ods:
                 for m in media:
                     m_df = pipeline.get_strain_dataframe_for_classifier(circuit, input, od=od, media=m, data_dir=data_dir, fraction=fraction)
-                    #print(circuit + " " + input + " " + str(od))
-                    pred_df = ldc.predict_live_dead(m_df.drop(columns=['output']), model, scaler)
-                    m_df['class_label'] = pred_df['class_label']
-                    m_df['circuit'] = circuit
-                    m_df['input'] = input
-                    m_df['media'] = m
-                    m_df['od'] = od
-
-
-                    predictions = predictions.append(m_df, ignore_index=True)
+                    if m_df is not None:
+                        #print(circuit + " " + input + " " + str(od))
+                        pred_df = ldc.predict_live_dead(m_df.drop(columns=['output']), model, scaler)
+                        m_df['class_label'] = pred_df['class_label']
+                        m_df['circuit'] = circuit
+                        m_df['input'] = input
+                        m_df['media'] = m
+                        m_df['od'] = od
+                        predictions = predictions.append(m_df, ignore_index=True)
     return predictions
 
 def compare_accuracy_of_gating(model, scaler, circuits, inputs, ods, media, fraction=0.06, data_dir='.', channel='BL1-A', thresholds=[10000]):
@@ -90,32 +93,32 @@ def compare_accuracy_of_gating(model, scaler, circuits, inputs, ods, media, frac
             for od in ods:
                 for m in media:
                     m_df = pipeline.get_strain_dataframe_for_classifier(circuit, input, od=od, media=m, data_dir=data_dir, fraction=fraction)
-                    #print(m_df.head())
-                    pred_df = ldc.predict_live_dead(m_df.drop(columns=['output']), model, scaler)
-                    m_df['class_label'] = pred_df['class_label']
-                    gated_df = m_df.loc[m_df['class_label'] == 1] # live cells
-                    num_gated = len(m_df.index) - len(gated_df.index)
-
-                    value_df = m_df[[channel, 'output']].rename(index=str, columns={channel: "value"})
-                    gated_value_df = gated_df[[channel, 'output']].rename(index=str, columns={channel: "value"})
-
-                    thold_df = thold.do_threshold_analysis(value_df, thresholds)
-                    gated_thold_df = thold.do_threshold_analysis(gated_value_df, thresholds)
-
-                    #print(thold_df)
-                    thold_df['circuit'] = circuit
-                    thold_df['input'] = input
-                    thold_df['media'] = m
-                    thold_df['od'] = od
-                    thold_df['num_gated'] = num_gated
-
-                    thold_df['gated_probability_correct'] = gated_thold_df['probability_correct']
-                    thold_df['gated_standard_error_correct'] = gated_thold_df['standard_error_correct']
-                    thold_df['gated_count'] = gated_thold_df['count']
-
-
-                    #print(thold_df)
-                    plot_df = plot_df.append(thold_df, ignore_index=True)
+                    if m_df is not None:
+                        #print(m_df.head())
+                        pred_df = ldc.predict_live_dead(m_df.drop(columns=['output']), model, scaler)
+                        m_df['class_label'] = pred_df['class_label']
+                        gated_df = m_df.loc[m_df['class_label'] == 1] # live cells
+                        num_gated = len(m_df.index) - len(gated_df.index)
+    
+                        value_df = m_df[[channel, 'output']].rename(index=str, columns={channel: "value"})
+                        gated_value_df = gated_df[[channel, 'output']].rename(index=str, columns={channel: "value"})
+    
+                        thold_df = thold.do_threshold_analysis(value_df, thresholds)
+                        gated_thold_df = thold.do_threshold_analysis(gated_value_df, thresholds)
+    
+                        #print(thold_df)
+                        thold_df['circuit'] = circuit
+                        thold_df['input'] = input
+                        thold_df['media'] = m
+                        thold_df['od'] = od
+                        thold_df['num_gated'] = num_gated
+    
+                        thold_df['gated_probability_correct'] = gated_thold_df['probability_correct']
+                        thold_df['gated_standard_error_correct'] = gated_thold_df['standard_error_correct']
+                        thold_df['gated_count'] = gated_thold_df['count']
+    
+                        #print(thold_df)
+                        plot_df = plot_df.append(thold_df, ignore_index=True)
     return plot_df
 
 def plot_strain_live_dead_predictions(predictions, circuits, inputs, ods, media, filename='live_dead_predictions.pdf'):
@@ -147,6 +150,8 @@ def main():
 
     print("Building Live/Dead Control Dataframe...")
     live_dead_df = pipeline.get_dataframe_for_live_dead_classifier(data_dir)
+    print(live_dead_df.columns.tolist())
+    print(live_dead_df.head(5))
 
     print("Training Live/Dead Classifier...")
     (model, mean_absolute_error, test_X, test_y, scaler) = ldc.build_model(live_dead_df)
@@ -168,13 +173,13 @@ def main():
     print("Computing mean number of live cells per sample (comparing threshold to classifier)...")
     mean_live = ldc.compute_mean_live(model,
                                       scaler,
-                      data_dir,
-                      threshold=2000,
-                      ods=ods,
-                      media=media,
-                      circuits=circuits,
-                      inputs=inputs,
-                      fraction=data_fraction)
+                                      data_dir,
+                                      threshold=2000,
+                                      ods=ods,
+                                      media=media,
+                                      circuits=circuits,
+                                      inputs=inputs,
+                                      fraction=data_fraction)
     mean_live.to_csv('mean_live.csv')
 
 
