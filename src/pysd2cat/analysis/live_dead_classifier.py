@@ -114,17 +114,23 @@ def compute_mean_live(model,
             for od in ods:
                 for m in media:
                     c_df = pipeline.get_strain_dataframe_for_classifier(circuit, input, od=od, media=m, data_dir=data_dir)
-                    c_df = c_df.sample(frac=0.1, replace=True)
-                    c_df_norm = scaler.transform(c_df.drop(columns=['output']))
-                    c_df_y = model.predict(c_df_norm)
-                    pr_live = get_threshold_pr(c_df, threshold)
-                    record = {'circuit' : circuit,
-                              'input' : input,
-                              'od' : od,
-                              'media' : m,
-                              'classifier' : c_df_y.mean(), 
-                              'threshold' : pr_live}
-                    mean_live = mean_live.append(record, ignore_index=True)
+                    print("c_df")
+                    print(c_df.columns.tolist())
+                    print(c_df.head(5))
+                    if c_df is not None:
+                        c_df = c_df.sample(frac=0.1, replace=True)
+                        c_df_norm = scaler.transform(c_df.drop(columns=['output']))
+                        c_df_y = model.predict(c_df_norm)
+                        #print("c_df_y: {}".format(c_df_y.type()))
+                        #print(c_df_y)
+                        pr_live = get_threshold_pr(c_df, threshold)
+                        record = {'circuit' : circuit,
+                                  'input' : input,
+                                  'od' : od,
+                                  'media' : m,
+                                  'classifier' : c_df_y.mean(), 
+                                  'threshold' : pr_live}
+                        mean_live = mean_live.append(record, ignore_index=True)
     return mean_live
 
 def predict_live_dead(df, model, scaler):
