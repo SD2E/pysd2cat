@@ -4,24 +4,34 @@ from pathlib import Path
 from sklearn.model_selection import train_test_split
 from harness.test_harness_class import TestHarness
 from harness.th_model_instances.hamed_models.random_forest_regression import random_forest_regression
+from harness.utils.names import Names
 
 def main():
     # Reading in data from versioned-datasets repo.
     # Using the versioned-datasets repo is probably what most people want to do, but you can read in your data however you like.
-    df = pd.read_csv('/Users/meslami/Documents/GitRepos/pysd2cat/src/data/tx_od_2.csv')
+    df = pd.read_csv('/Users/meslami/Documents/GitRepos/pysd2cat/src/data/tx_od-5.csv')
 
     # list of feature columns to use and/or normalize:
-    sparse_cols = ['growth_media_1', 'growth_media_2', \
-                    'inc_temp', 'inc_time_1', 'inc_time_2',  \
-                     'strain']
-
-    continuous_cols = ['od']
+    #Do these columns form a a unique entity? If not, we need to define a grouping.
+    sparse_cols = ['glycerol_stock','growth_media_1', 'growth_media_2', \
+                    'inc_temp', 'inc_time_1', 'inc_time_2', 'post_well', 'pre_well','source_container',\
+                     'SynBioHub URI']
+    df['glycerol_stock'].fillna('blank',inplace=True)
+    continuous_cols = ['od','post_gfp_raw','pre_gfp_raw','pre_od_raw']
     feature_cols = sparse_cols + continuous_cols
     print(feature_cols)
     cols_to_predict = ['post_od_raw']
 
     train1, test1 = train_test_split(df, test_size=0.2, random_state=5)
 
+
+    '''
+    sub_df = df[feature_cols]
+    print(len(sub_df))
+    sub_df['cnt']=1
+    sub_df_grouped = sub_df.groupby(feature_cols).sum()
+    sub_df_grouped.to_csv("/Users/meslami/Documents/GitRepos/pysd2cat/src/data/grouped_df.csv")
+    print(len(sub_df_grouped))
 
     media_options = [ 
         "standard_media",
@@ -69,7 +79,7 @@ def main():
     print("complete columns")
     print(df_test_complete.head(5))
 
-
+    '''
 
 
 
@@ -86,10 +96,10 @@ def main():
     th = TestHarness(output_location=examples_folder_path)
 
     th.run_custom(function_that_returns_TH_model=random_forest_regression, dict_of_function_parameters={}, training_data=train1,
-                  testing_data=test1, data_and_split_description="od functions with glycerol stock now",
-                  cols_to_predict=cols_to_predict,index_cols=['id','od','strain'],
+                  testing_data=test1, data_and_split_description="Using tx_od-5.csv where Dan fixed a bunch of issues. testing again.",
+                  cols_to_predict=cols_to_predict,index_cols=feature_cols+cols_to_predict,
                   feature_cols_to_use=feature_cols, normalize=True, feature_cols_to_normalize=continuous_cols,
-                  feature_extraction=False, predict_untested_data=df_test_complete,sparse_cols_to_use=sparse_cols)
+                  feature_extraction=Names.RFPIMP_PERMUTATION, predict_untested_data=False,sparse_cols_to_use=sparse_cols)
 
 
 
