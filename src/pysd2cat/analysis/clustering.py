@@ -55,7 +55,7 @@ def compare_two_labelings(df, entity_col, clust_col_1, clust_col_2):
                 jaccard_list[z].append(analysis.Jaccard_total(set(a), set(b)))
     return jaccard_list
 
-def ms_cluster(df, cols, bandwidth=None,iter):
+def ms_cluster(df, cols, bandwidth=None):
     X = df[cols].values
     if bandwidth == None:
         bandwidth = estimate_bandwidth(X)
