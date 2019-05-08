@@ -16,6 +16,40 @@ from pysd2cat.analysis.Names import Names
 from pysd2cat.plot import plot
 
 
+def write_live_dead_column(data_file, foo):
+    try:
+        #data_dir = "/".join(data_file.split('/')[0:-1])
+        #out_path = os.path.join(data_dir, 'accuracy')
+        #out_file = os.path.join(out_path, data_file.split('/')[-1])
+        df = pd.read_csv(data_file)
+        if 'live' in df.columns:
+            print("Already done: " + data_file)
+        else:
+            strains = df['strain_name'].unique()
+            if Names.WT_DEAD_CONTROL in strains and Names.WT_LIVE_CONTROL in strains:
+
+                print("Computing live/dead for: " + data_file)
+                df = live_dead_analysis.add_live_dead(df)
+                print("Writing live/dead for: " + data_file)
+                df.to_csv(data_file)
+    except Exception as e:
+        print("File failed: " + data_file + " with: " + str(e))
+
+
+
+def write_live_dead_columns(data):
+    import multiprocessing
+    pool = multiprocessing.Pool(int(multiprocessing.cpu_count()))
+    multiprocessing.cpu_count()
+    tasks = []
+    for d in data:
+        tasks.append((d, True))
+    results = [pool.apply_async(write_live_dead_column, t) for t in tasks]
+
+    for result in results:
+        data_list = result.get()
+ 
+
 def add_live_dead(df):
     """
     Take an input_df corresponding to one plate.

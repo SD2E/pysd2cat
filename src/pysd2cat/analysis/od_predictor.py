@@ -11,6 +11,8 @@ def main():
     # Using the versioned-datasets repo is probably what most people want to do, but you can read in your data however you like.
     df = pd.read_csv('/Users/meslami/Documents/GitRepos/pysd2cat/src/data/tx_od-5.csv')
 
+    
+def predict(df):
     # list of feature columns to use and/or normalize:
     #Do these columns form a a unique entity? If not, we need to define a grouping.
     sparse_cols = ['glycerol_stock','growth_media_1', 'growth_media_2', \
@@ -20,7 +22,8 @@ def main():
     continuous_cols = ['od','post_gfp_raw','pre_gfp_raw','pre_od_raw']
     feature_cols = sparse_cols + continuous_cols
     print(feature_cols)
-    cols_to_predict = ['post_od_raw']
+    #cols_to_predict = ['post_od_raw']
+    cols_to_predict = ['od']
 
     train1, test1 = train_test_split(df, test_size=0.2, random_state=5)
 
@@ -63,8 +66,9 @@ def main():
     df_test_all = []
     for strain in df["strain"].unique():
         df_test = pd.DataFrame()
-        df_test['od'] = [0.002, 0.001, 0.005, 0.0025, 0.00125, 0.000625, 0.0003125, 0.00015625, 0.000078125,
-                         0.0000390625, 0.00001953125]
+#        df_test['od'] = [0.002, 0.001, 0.005, 0.0025, 0.00125, 0.000625, 0.0003125, 0.00015625, 0.000078125,
+#                         0.0000390625, 0.00001953125]
+        df_test['post_od_raw'] = df.post_od_raw.unique()
         df_test["growth_media_1"]=gen_exp_msg["defaults"]["growth_media_1"]
         df_test["growth_media_2"]=gen_exp_msg["defaults"]["growth_media_2"]
         df_test["inc_temp"]=gen_exp_msg["defaults"]["inc_temp"]

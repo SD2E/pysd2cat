@@ -1,3 +1,4 @@
+notebooks/.ipynb_checkpoints
 **/__pycache__/**
 src/pysd2cat.egg-info
 .eggs
