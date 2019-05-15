@@ -122,7 +122,7 @@ def get_sample_accuracy(data):
 def get_threshold(df, channel='BL1_A'):
 
     ## Prepare the data for high and low controls
-    high_df = df.loc[( df['strain_name'] == 'NOR-00-Control')]
+    high_df = df.loc[( df['strain_name'] == 'NOR-00-Control') | ( df['strain_name'] == 'NOR 00 Control')]
     high_df.loc[:,'output'] = high_df.apply(lambda x: 1, axis=1)
     low_df = df.loc[(df['strain_name'] == 'WT-Live-Control') ]
     low_df.loc[:,'output'] = low_df.apply(lambda x: 0, axis=1)
