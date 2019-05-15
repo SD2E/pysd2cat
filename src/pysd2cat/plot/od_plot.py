@@ -172,6 +172,38 @@ def get_pre_post_od_by_target_od(df, pre='pre_OD600', post='OD600', color='od'):
 
     return ax
 
+
+def get_od_post_od_scatter(df, od='od', post='post_od_raw', color='part_2_id'):
+    ax = plt.axes()
+    fig_size = plt.rcParams["figure.figsize"]
+    # Set figure width to 12 and height to 9
+    fig_size[0] = 16
+    fig_size[1] = 12
+
+    plt.rcParams["figure.figsize"] = fig_size
+    colored_vals = np.sort(df[color].astype(str).dropna().unique())
+    colors = cm.rainbow(np.linspace(0, 1, len(colored_vals)))
+    colordict = dict(zip(colored_vals, colors))  
+
+    df["Color"] = df[color].apply(lambda x: colordict[str(x)])
+
+    exp = df[color].astype(str).unique()
+    exp.sort()
+    for ex in exp:
+        ax.scatter(df[od], df[post], label=str(ex), c=df['Color'], alpha=0.5)
+    plt.ylabel("Post OD")
+    plt.xlabel("Inoculation OD")
+    plt.title("Inoculation OD vs Post OD")
+    plt.legend()
+    legend = ax.get_legend()
+#    if color == 'part_2_id':
+    for i, ex in enumerate(exp):
+        legend.legendHandles[i].set_color(colordict[str(ex)])
+
+    return ax
+
+
+
 def get_strain_inoculation_to_final_od(df, pre='pre_OD600', post='OD600', color='od'):
     ax = plt.axes()
     #fig_size = plt.rcParams["figure.figsize"]

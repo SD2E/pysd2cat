@@ -11,6 +11,7 @@ class Names:
     STRAIN = 'strain'
     WT_DEAD_CONTROL='WT-Dead-Control'
     WT_LIVE_CONTROL = 'WT-Live-Control'
+    NOR_00_CONTROL = "NOR-00-Control"
     
     #Calibration
     LUDOX = 'LUDOX'

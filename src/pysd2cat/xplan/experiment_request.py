@@ -144,8 +144,8 @@ class ExperimentRequest(dict):
         exp_param1_dtypes = [str]
         tx_plate_params_columns = ["growth_media_1", "growth_media_2", "od_cutoff", 'source_container', 'lab_id']
         tx_plate_params_dtypes = [str, str, float, str, str]
-        well_columns = ['id', 'strain', 'gate', 'input', 'od', 'filename', 'replicate', 'output', 'media', 'well']
-        well_dtypes = [str, str, str, str, float, str, int, str, str, str]
+        well_columns = ['id', 'strain', 'gate', 'input', 'od', 'filename', 'replicate', 'output', 'media']
+        well_dtypes = [str, str, str, str, float, str, int, str, str]
         
         columns = exp_param_columns + exp_param1_columns + tx_plate_params_columns + well_columns
         dtypes = exp_param_dtypes + exp_param1_dtypes + tx_plate_params_dtypes + well_dtypes
@@ -175,10 +175,13 @@ class ExperimentRequest(dict):
                 if 'measurements' in well and well['measurements'] is not None:
                     well_params = {}
                     well_params['id'] = exp_params['experiment_id'] + "_" + plate_id + "_" + well_id
-                    if type(well['strain']) is str:
+                    if 'strain' not in well or well['strain'] is None:
+                        continue
+                    elif type(well['strain']) is str:
                         well_params['strain'] = well['strain']
-                    else:
+                    elif 'gate' in well['strain']:
                         well_params['strain'] = well['strain']['gate']
+                    
                     if 'source' in well:
                         well_index = well['source']['index']
                         well_index_s = str(well['source']['index'])
@@ -201,7 +204,7 @@ class ExperimentRequest(dict):
                     if 'replicate' in well:
                         well_params['replicate'] = int(well['replicate'])
                     well_params['output'] = handle_missing_data(well_params, Names.OUTPUT)
-                    well_params['well'] = well_id.lower()
+                    well_params['well'] = well_id.lower()    
 
                     plate_params['media'] = plate_params['growth_media_2']
                     sample_record = {}
@@ -239,12 +242,31 @@ class ExperimentRequest(dict):
 
  
 
-    def generate_well_parameters_from_tx(self, source_container, aliquot, tx_properties):        
-        strain = { 'gate' : tx_properties['SynBioHub URI'], 'role' : get_role(tx_properties['Gate'])}
-        od = tx_properties['TargetOD']
-        source = get_source_for_strain(source_container.aliquots, strain)
-        src_well = source_container.container_type.humanize(source['index'])
-        replicate = int(tx_properties['replicate'])
+    def generate_well_parameters_from_tx(self, source_container, aliquot, tx_properties):
+        print(tx_properties)
+        if 'SynBioHub URI' in tx_properties and 'Gate' in tx_properties:
+            strain = { 'gate' : tx_properties['SynBioHub URI'], 'role' : get_role(tx_properties['Gate'])}
+        else:
+            strain = None
+        if 'TargetOD' in tx_properties:
+            od = tx_properties['TargetOD']
+        else:
+            od = None
+
+        if strain is not None:
+            source = get_source_for_strain(source_container.aliquots, strain)
+        else:
+            source = None
+        if source is not None:
+            src_well = source_container.container_type.humanize(source['index'])
+        else:
+            src_well = None
+        
+        if 'replicate' in tx_properties:
+            replicate = int(tx_properties['replicate'])
+        else:
+            replicate = None
+            
         return generate_well_parameters(strain, od, source, src_well, replicate)
 
 
@@ -277,22 +299,25 @@ class ExperimentRequest(dict):
                 continue
             
             if laliquot in measurement_files.keys():
-
+                logger.info("handling " + str(laliquot))
                 if overwrite_request:
                     plate['wells'][aliquot] = self.generate_well_parameters_from_tx(measurement_files['source_container'], laliquot, measurement_files[laliquot]['properties'])
                     aliquot_properties = plate['wells'][aliquot]
                     plate['source_container'] = measurement_files['source_container'].id
                     plate['source_container_aliquots'] = get_container_aliquots(measurement_files['source_container'].aliquots)
-                #print("adding measurement: " + measurement_files[laliquot]['file'])
-                #print("to " + laliquot)
-                #print(measurement_files[laliquot])
+                logger.info("adding measurement: " + measurement_files[laliquot]['file'])
+                logger.info("to " + laliquot)
+                logger.info(measurement_files[laliquot])
                 if 'measurements' in aliquot:
                     aliquot_properties['measurements'].append(measurement_files[laliquot]['file'])
                 else:
                     aliquot_properties['measurements'] = [measurement_files[laliquot]['file']]
-                #print(aliquot_properties)
+                logger.info(aliquot_properties)
 
-                aliquot_properties['replicate'] = self.assign_replicate(aliquot_properties['strain']['gate'], aliquot_properties['od'], replicates)
+                if aliquot_properties['strain'] is not None and aliquot_properties['od'] is not None:
+                    aliquot_properties['replicate'] = self.assign_replicate(aliquot_properties['strain']['gate'], aliquot_properties['od'], replicates)
+                else:
+                    aliquot_properties['replicate'] = None
                 
         ## Get control measurements
         logger.info("adding controls")

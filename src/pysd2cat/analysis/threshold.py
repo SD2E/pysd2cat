@@ -12,7 +12,7 @@ def write_accuracy(data_file, overwrite):
         out_file = os.path.join(out_path, data_file.split('/')[-1])
         if overwrite or not os.path.isfile(out_file):
             print("Computing accuracy file: " + out_file)
-            data_df = pd.read_csv(data_file,memory_map=True,dtype={'od': float, 'input' : str, 'output' : str}, index_col=0 )
+            data_df = pd.read_csv(data_file,memory_map=True,dtype={'od': float, 'input' : object, 'output' : object}, index_col=0 )
             accuracy_df = compute_accuracy(data_df)
             print("Writing accuracy file: " + out_file)
             accuracy_df.to_csv(out_file)
@@ -55,20 +55,44 @@ def get_experiment_accuracy_and_metadata(adf):
             "SC High Osm" : "SC High Osm",    
             'high_osm_media' : "SC High Osm",    
 
-            "YPAD" : "YPAD",
-            "Yeast_Extract_Peptone_Adenine_Dextrose (a.k.a. YPAD Media)" : "YPAD",
-            "rich_media" : "YPAD",
+            "YPAD" : "SC Rich",
+            "Yeast_Extract_Peptone_Adenine_Dextrose (a.k.a. YPAD Media)" : "SC Rich",
+            "rich_media" : "SC Rich",
         }
         if type(x) is str:
             return media_map[x]
         else:
             return x
+        
+    def fix_temp(x):
+        if type(x['inc_temp']) is str:
+            x['inc_temp'] = float(x['inc_temp'].split("_")[1])
+        return x
 
+    def fix_time(x):
+        if 'inc_time_2' not in x or x['inc_time_2'] is None:
+            x['inc_time_2'] = 18
+        elif type(x['inc_time_2']) is str:
+            x['inc_time_2'] = float(x['inc_time_2'].split(":")[0])
+
+        return x
+
+
+    
     drop_list = ['Unnamed: 0', 'FSC_A',
            'SSC_A', 'BL1_A', 'RL1_A', 'FSC_H', 'SSC_H', 'BL1_H', 'RL1_H', 'FSC_W',
            'SSC_W', 'BL1_W', 'RL1_W', 'Time']
     final_df = adf
+    #print(final_df['media'])
     final_df['media'] = final_df['media'].apply(media_fix)
+    final_df = final_df.apply(fix_input, axis=1)            
+    final_df = final_df.apply(fix_output, axis=1)
+    final_df = final_df.apply(fix_temp, axis=1)
+    final_df = final_df.apply(fix_time, axis=1)
+
+
+    #print(final_df['media'])
+    
     return final_df
 
 def get_sample_accuracy(data):
@@ -156,6 +180,25 @@ def get_threshold(df, channel='BL1_A'):
     # print("Value at Max: " + str(max_value))
     return cur_x, max_value
 
+
+def fix_input(row):
+    if row['input'] == '1.0':
+        row['input'] = '01'
+    elif row['input'] == '0.0':
+        row['input'] = '00'
+    elif row['input'] == '10.0':
+        row['input'] = '10'
+    elif row['input'] == '11.0':
+        row['input'] = '11'
+    return row
+
+def fix_output(row):
+    if row['output'] == '1.0':
+        row['output'] = '1'
+    elif row['output'] == '0.0':
+        row['output'] = '0'
+    return row
+
 def compute_accuracy(m_df, channel='BL1_A', thresholds=None, use_log_value=True):
     if thresholds is None:
         try:
@@ -186,13 +229,17 @@ def compute_accuracy(m_df, channel='BL1_A', thresholds=None, use_log_value=True)
             thold_df['std_log_gfp'] = np.std(value_df['value'])
             
             thold_df['id'] = sample_id
-            for i in ['gate', 'input', 'output', 'od', 'media', 'inc_temp', 'replicate']:
+            for i in ['gate', 'input', 'output', 'od', 'media', 'inc_temp', 'replicate', 'inc_time_1', 'inc_time_2']:
+                
+                
                 if i in sample.columns:
                     thold_df[i] = sample[i].unique()[0]
                 elif i == 'inc_temp':
                     thold_df[i] = 'warm_30'
                 else:
                     thold_df[i] = None
+            thold_df = thold_df.apply(fix_input, axis=1)            
+            thold_df = thold_df.apply(fix_output, axis=1)
             
             if 'live' in m_df.columns:
                 sample_live = sample.loc[sample['live'] == 1]

@@ -48,7 +48,7 @@ def write_live_dead_columns(data):
     tasks = []
     for d in data:
         tasks.append((d, True))
-    results = [pool.apply_async(write_live_dead, t) for t in tasks]
+    results = [pool.apply_async(write_live_dead_column, t) for t in tasks]
 
     for result in results:
         data_list = result.get()
