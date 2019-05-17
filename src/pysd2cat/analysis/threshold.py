@@ -229,9 +229,9 @@ def compute_accuracy(m_df, channel='BL1_A', thresholds=None, use_log_value=True)
             thold_df['std_log_gfp'] = np.std(value_df['value'])
             
             thold_df['id'] = sample_id
-            for i in ['gate', 'input', 'output', 'od', 'media', 'inc_temp', 'replicate', 'inc_time_1', 'inc_time_2']:
-                
-                
+            for i in ['gate', 'input', 'output', 'od', 'media',
+                      'inc_temp', 'replicate', 'inc_time_1',
+                      'inc_time_2', 'strain_name']:
                 if i in sample.columns:
                     thold_df[i] = sample[i].unique()[0]
                 elif i == 'inc_temp':
