@@ -279,7 +279,7 @@ def do_threshold_analysis(df, thresholds):
     for idx, threshold in enumerate(thresholds):
         correct.append(0)
 
-    print("df columns: {}".format(df.columns))
+    #print("df columns: {}".format(df.columns))
     for idx, row in df.iterrows():
         true_gate_output = int(row['output'])
         measured_gate_output = float(row['value'])
@@ -291,7 +291,7 @@ def do_threshold_analysis(df, thresholds):
                (true_gate_output == 0 and measured_gate_output < threshold) :
                 correct[idx] = correct[idx] + 1
 
-    print("correct length: {} correct[0]: {} count: {}".format(len(correct), correct[0], count))
+    #print("correct length: {} correct[0]: {} count: {}".format(len(correct), correct[0], count))
     results = pd.DataFrame()
     for idx, threshold in enumerate(thresholds):
         if count > 0:
@@ -301,7 +301,7 @@ def do_threshold_analysis(df, thresholds):
             pr = 0
             se = 0
 
-        print("count: {} idx: {} threshold: {} pr: {}".format(count, idx, threshold, pr))
+        #print("count: {} idx: {} threshold: {} pr: {}".format(count, idx, threshold, pr))
         results= results.append({
             'probability_correct' : pr,
             'standard_error_correct' : se,
