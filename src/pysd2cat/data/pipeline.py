@@ -318,6 +318,12 @@ def get_data_and_metadata_df(metadata_df, data_dir, fraction=None, max_records=N
         all_data_df = all_data_df.append(data_df)
 
     ## Join data and metadata
+    print("metadata_df")
+    print(metadata_df.columns.tolist())
+    print(metadata_df.head(5))
+    print("all_data_df")
+    print(all_data_df.columns.tolist())
+    print(all_data_df.head(5))
     final_df = metadata_df.merge(all_data_df, left_on='filename', right_on='filename', how='inner')
     return final_df
 
