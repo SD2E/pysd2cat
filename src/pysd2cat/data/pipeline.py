@@ -274,8 +274,7 @@ def detect_runtime():
         raise Exception('Not a known runtime')
 
 def get_flow_dataframe(data_dir,filename):
-    df = FCT.FCMeasurement(ID=filename,
-                                    datafile=os.path.join(data_dir, filename)).read_data()
+    df = FCT.FCMeasurement(ID=filename, datafile=os.path.join(data_dir, filename)).read_data()
 
     return df
 
@@ -290,7 +289,7 @@ def get_data_and_metadata_df(metadata_df, data_dir, fraction=None, max_records=N
         ## Substitute local file for SD2 URI to agave file 
         #record['fcs_files'] = local_datafile(record['fcs_files'][0], data_dir)
         #dataset_local_df = dataset_local_df.append(record)
-        
+        print("record[{}]: {}".format(Names.FILENAME, record[Names.FILENAME]))
         if not os.path.exists(record[Names.FILENAME]):
             # Fix error where wrong path exists with `uploads`
             if 'uploads' in record[Names.FILENAME]:
@@ -299,6 +298,8 @@ def get_data_and_metadata_df(metadata_df, data_dir, fraction=None, max_records=N
                     continue
             else:
                 continue
+        else:
+            print("file not found")
     
         ## Create a data frame out of FCS file
         #print("data dir",data_dir)
