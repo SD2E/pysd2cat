@@ -232,7 +232,6 @@ def compute_correctness(m_df,
                 value_df = value_df.loc[value_df['value'] > 0]
                 value_df.loc[:,'value'] = np.log(value_df['value']).replace([np.inf, -np.inf], np.nan).dropna()
             #print(value_df.head())
-<<<<<<< HEAD
             thold_df = do_threshold_analysis(value_df,
                                              thresholds,
                                              mean_correct_name=mean_correct_name,
@@ -317,7 +316,7 @@ def do_threshold_analysis(df,
         low.append(0)
         high.append(0)
 
-    print("df columns: {}".format(df.columns))
+    #print("df columns: {}".format(df.columns))
     for idx, row in df.iterrows():
         true_gate_output = int(row['output'])
         measured_gate_output = float(row['value'])
@@ -334,7 +333,7 @@ def do_threshold_analysis(df,
                 low[idx] = low[idx] + 1
 
 
-            
+    #print("correct length: {} correct[0]: {} count: {}".format(len(correct), correct[0], count))
     results = pd.DataFrame()
     for idx, threshold in enumerate(thresholds):
         if count > 0:
@@ -352,7 +351,7 @@ def do_threshold_analysis(df,
             high_pr = 0
             high_se = 0
 
-        print("count: {} idx: {} threshold: {} pr: {}".format(count, idx, threshold, pr))
+        #print("count: {} idx: {} threshold: {} pr: {}".format(count, idx, threshold, pr))
         results= results.append({
             mean_correct_name : pr, 
             std_correct_name : se,
