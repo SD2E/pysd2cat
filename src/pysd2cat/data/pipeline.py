@@ -199,6 +199,7 @@ def get_metadata_dataframe(results):
     Convert science table results into metadata dataframe.
     """
     runtime = detect_runtime()
+    print("runtime: {}".format(runtime))    
     meta_df = pd.DataFrame()
     for result in results:
                
@@ -298,12 +299,10 @@ def get_data_and_metadata_df(metadata_df, data_dir, fraction=None, max_records=N
                     continue
             else:
                 continue
-        else:
-            print("file not found")
     
         ## Create a data frame out of FCS file
-        #print("data dir",data_dir)
-        #print("Filename",record[Names.FILENAME])
+        print("data dir: {}".format(data_dir))
+        print("Filename: {}".format(record[Names.FILENAME]))
 
         data_df = get_flow_dataframe(data_dir,record[Names.FILENAME])
         print("data_df")
