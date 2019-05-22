@@ -306,6 +306,9 @@ def get_data_and_metadata_df(metadata_df, data_dir, fraction=None, max_records=N
         #print("Filename",record[Names.FILENAME])
 
         data_df = get_flow_dataframe(data_dir,record[Names.FILENAME])
+        print("data_df")
+        print(data_df.columns.tolist())
+        print(data_df.head(5))
 
         if max_records is not None:
             data_df = data_df[0:min(len(data_df), max_records)]
