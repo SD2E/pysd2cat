@@ -217,18 +217,14 @@ def get_metadata_dataframe(results):
             result_df['filename'] = result['jupyter_path']
         else:
             result_df['filename'] = result['hpc_path']
-        
-        print("result: {} {}".format(result['jupyter_path'], result['hpc_path']))
-        print("result_df['filename']: {}".format(result_df['filename']))
-        if not os.path.exists(result_df[Names.FILENAME]):
-            # Fix error where wrong path exists with `uploads`
-            if 'uploads' in result_df[Names.FILENAME]:
-                result_df[Names.FILENAME] = result_df[Names.FILENAME].replace('uploads/', '')               
-            else:
-                continue
 
-            
-                
+#        if not os.path.exists(result_df[Names.FILENAME]):
+#            # Fix error where wrong path exists with `uploads`
+#            if 'uploads' in result_df[Names.FILENAME]:
+#                result_df[Names.FILENAME] = result_df[Names.FILENAME].replace('uploads/', '')               
+#            else:
+#                continue
+
         ## Other values (not at top level)
         if Names.INOCULATION_DENSITY in result:
             result_df['od'] = result[Names.INOCULATION_DENSITY]['value']
