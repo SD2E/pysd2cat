@@ -218,6 +218,8 @@ def get_metadata_dataframe(results):
         else:
             result_df['filename'] = result['hpc_path']
         
+        print("result: {} {}".format(result['jupyter_path'], result['hpc_path']))
+        print("result_df['filename']: {}".format(result_df['filename']))
         if not os.path.exists(result_df[Names.FILENAME]):
             # Fix error where wrong path exists with `uploads`
             if 'uploads' in result_df[Names.FILENAME]:
