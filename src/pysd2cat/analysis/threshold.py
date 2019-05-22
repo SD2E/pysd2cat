@@ -199,7 +199,7 @@ def fix_output(row):
         row['output'] = '0'
     return row
 
-def compute_accuracy(m_df, channel='BL1_A', thresholds=None, use_log_value=True):
+def compute_accuracy(m_df, id_name="id", channel='BL1_A', thresholds=None, use_log_value=True):
     if thresholds is None:
         try:
             threshold, threshold_quality = get_threshold(m_df, channel)
@@ -208,39 +208,41 @@ def compute_accuracy(m_df, channel='BL1_A', thresholds=None, use_log_value=True)
             #print(e)
             raise Exception("Could not find controls to auto-set threshold: " + str(e))
             #thresholds = [np.log(10000)]
-      
+
     #print("Threshold  = " + str(thresholds[0]))
-    samples = m_df['id'].unique()
+    samples = m_df[id_name].unique()
+    print("samples length: {}".format(len(samples)))
     plot_df = pd.DataFrame()
     for sample_id in samples:
-        #print(sample_id)
-        sample = m_df.loc[m_df['id'] == sample_id]
-        #print(sample.head())
+        #print("sample_id: {}".format(sample_id))
+        sample = m_df.loc[m_df[id_name] == sample_id]
+        #print("sample.head(): {}".format(sample.head()))
         circuit = sample['gate'].unique()[0]
-        if type(circuit) is str:
-            value_df = sample[[channel, 'output']].rename(index=str, columns={channel: "value"})          
+        #print("circuit: {} type: {}".format(circuit, type(circuit)))
+        if circuit:
+            value_df = sample[[channel, 'output']].rename(index=str, columns={channel: "value"})
             if use_log_value:
                 value_df = value_df.loc[value_df['value'] > 0]
                 value_df['value'] = np.log(value_df['value']).replace([np.inf, -np.inf], np.nan).dropna()
             #print(value_df.head())
             thold_df = do_threshold_analysis(value_df, thresholds)
-            
+
             thold_df['mean_log_gfp'] = np.mean(value_df['value'])
             thold_df['std_log_gfp'] = np.std(value_df['value'])
-            
-            thold_df['id'] = sample_id
+
+            thold_df[id_name] = sample_id
             for i in ['gate', 'input', 'output', 'od', 'media', 'inc_temp', 'replicate', 'inc_time_1', 'inc_time_2']:
-                
-                
+
+
                 if i in sample.columns:
                     thold_df[i] = sample[i].unique()[0]
                 elif i == 'inc_temp':
                     thold_df[i] = 'warm_30'
                 else:
                     thold_df[i] = None
-            thold_df = thold_df.apply(fix_input, axis=1)            
+            thold_df = thold_df.apply(fix_input, axis=1)
             thold_df = thold_df.apply(fix_output, axis=1)
-            
+
             if 'live' in m_df.columns:
                 sample_live = sample.loc[sample['live'] == 1]
                 value_df = sample_live[[channel, 'output']].rename(index=str, columns={channel: "value"})
@@ -248,7 +250,7 @@ def compute_accuracy(m_df, channel='BL1_A', thresholds=None, use_log_value=True)
                     value_df = value_df.loc[value_df['value'] > 0]
                     value_df['value'] = np.log(value_df['value']).replace([np.inf, -np.inf], np.nan).dropna()
 
-                #print(value_df.shape())
+                #print("valud_df: {}".format(value_df.shape()))
                 thold_live_df = do_threshold_analysis(value_df, thresholds)
                 thold_df['probability_correct_live'] = thold_live_df['probability_correct']
                 thold_df['standard_error_correct_live'] = thold_live_df['standard_error_correct']
@@ -264,10 +266,9 @@ def compute_accuracy(m_df, channel='BL1_A', thresholds=None, use_log_value=True)
 
 
 
-                
-            #print(thold_df)
+            #print("thold_df: {}".format(thold_df))
             plot_df = plot_df.append(thold_df, ignore_index=True)
-    return plot_df 
+    return plot_df
 
 def do_threshold_analysis(df, thresholds):
     """
@@ -277,28 +278,32 @@ def do_threshold_analysis(df, thresholds):
     correct = []
     for idx, threshold in enumerate(thresholds):
         correct.append(0)
-        
+
+    print("df columns: {}".format(df.columns))
     for idx, row in df.iterrows():
         true_gate_output = int(row['output'])
         measured_gate_output = float(row['value'])
         count = count + 1
+        #print("count: {} true_gate_output: {} measured_gate_output: {} threshold: {}".format(count, true_gate_output, measured_gate_output, threshold))
         for idx, threshold in enumerate(thresholds):
             #print(str(true_gate_output) + " " + str(measured_gate_output))
             if (true_gate_output == 1 and measured_gate_output >= threshold) or \
                (true_gate_output == 0 and measured_gate_output < threshold) :
                 correct[idx] = correct[idx] + 1
-            
+
+    print("correct length: {} correct[0]: {} count: {}".format(len(correct), correct[0], count))
     results = pd.DataFrame()
     for idx, threshold in enumerate(thresholds):
         if count > 0:
-            pr = correct[idx] / count
-            se = math.sqrt(pr*(1-pr)/count)
+            pr = correct[idx] / float(count)
+            se = math.sqrt(pr*(1-pr)/float(count))
         else:
             pr = 0
             se = 0
 
+        print("count: {} idx: {} threshold: {} pr: {}".format(count, idx, threshold, pr))
         results= results.append({
-            'probability_correct' : pr, 
+            'probability_correct' : pr,
             'standard_error_correct' : se,
             'count' : count,
             'threshold' : threshold}, ignore_index=True)
