@@ -187,7 +187,9 @@ def fix_output(row):
         row['output'] = '0'
     return row
 
+
 def compute_correctness(m_df,
+                        id_name="id",
                      channel='BL1_A',
                      thresholds=None,
                      use_log_value=True,
@@ -213,21 +215,24 @@ def compute_correctness(m_df,
             #print(e)
             raise Exception("Could not find controls to auto-set threshold: " + str(e))
             #thresholds = [np.log(10000)]
-      
+
     #print("Threshold  = " + str(thresholds[0]))
-    samples = m_df.groupby(['id'])
+    samples = m_df[id_name].unique()
+    print("samples length: {}".format(len(samples)))
     plot_df = pd.DataFrame()
-    for sid, sample in samples:
-        #print(sid)
-        #sample = m_df.loc[m_df['id'] == sample_id]
-        #print(sample.head())
-        circuit = sample['gate'].dropna().unique()
-        if len(circuit) == 1:
-            value_df = sample[[channel, 'output']].rename(index=str, columns={channel: "value"})          
+    for sample_id in samples:
+        #print("sample_id: {}".format(sample_id))
+        sample = m_df.loc[m_df[id_name] == sample_id]
+        #print("sample.head(): {}".format(sample.head()))
+        circuit = sample['gate'].unique()[0]
+        #print("circuit: {} type: {}".format(circuit, type(circuit)))
+        if circuit:
+            value_df = sample[[channel, 'output']].rename(index=str, columns={channel: "value"})
             if use_log_value:
                 value_df = value_df.loc[value_df['value'] > 0]
                 value_df.loc[:,'value'] = np.log(value_df['value']).replace([np.inf, -np.inf], np.nan).dropna()
             #print(value_df.head())
+<<<<<<< HEAD
             thold_df = do_threshold_analysis(value_df,
                                              thresholds,
                                              mean_correct_name=mean_correct_name,
@@ -245,7 +250,7 @@ def compute_correctness(m_df,
         else:
             thold_df = {}
             
-        thold_df['id'] = sid
+        thold_df[id_name] = sample_id
         
 #            for i in ['gate', 'input', 'output', 'od', 'media',
 #                      'inc_temp', 'replicate', 'inc_time_1',
@@ -288,6 +293,7 @@ def compute_correctness(m_df,
     #plot_df = plot_df.rename(columns={mean_correct_name : output_label})
     return plot_df 
 
+
 def do_threshold_analysis(df,
                           thresholds,
                           mean_correct_name='probability_correct',
@@ -310,11 +316,13 @@ def do_threshold_analysis(df,
         correct.append(0)
         low.append(0)
         high.append(0)
-        
+
+    print("df columns: {}".format(df.columns))
     for idx, row in df.iterrows():
         true_gate_output = int(row['output'])
         measured_gate_output = float(row['value'])
         count = count + 1
+        #print("count: {} true_gate_output: {} measured_gate_output: {} threshold: {}".format(count, true_gate_output, measured_gate_output, threshold))
         for idx, threshold in enumerate(thresholds):
             #print(str(true_gate_output) + " " + str(measured_gate_output))
             if (true_gate_output == 1 and measured_gate_output >= threshold) or \
@@ -330,12 +338,12 @@ def do_threshold_analysis(df,
     results = pd.DataFrame()
     for idx, threshold in enumerate(thresholds):
         if count > 0:
-            pr = correct[idx] / count
-            se = math.sqrt(pr*(1-pr)/count)
-            low_pr = low[idx] /count
-            low_se = math.sqrt(low_pr*(1-low_pr)/count)
-            high_pr = high[idx] /count
-            high_se = math.sqrt(high_pr*(1-low_pr)/count)
+            pr = correct[idx] / float(count)
+            se = math.sqrt(pr*(1-pr)/float(count))
+            low_pr = low[idx] /float(count)
+            low_se = math.sqrt(low_pr*(1-low_pr)/float(count))
+            high_pr = high[idx] /float(count)
+            high_se = math.sqrt(high_pr*(1-low_pr)/float(count))
         else:
             pr = 0
             se = 0
@@ -344,6 +352,7 @@ def do_threshold_analysis(df,
             high_pr = 0
             high_se = 0
 
+        print("count: {} idx: {} threshold: {} pr: {}".format(count, idx, threshold, pr))
         results= results.append({
             mean_correct_name : pr, 
             std_correct_name : se,
