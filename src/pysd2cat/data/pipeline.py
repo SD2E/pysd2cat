@@ -7,7 +7,7 @@ from pysd2cat.analysis.Names import Names
 
 ***REMOVED***
 client = pymongo.MongoClient(dbURI)
-db = client.catalog
+db = client.catalog_staging
 science_table=db.science_table
 jobs_table=db.jobs
 
@@ -334,7 +334,7 @@ def get_xplan_data_and_metadata_df(metadata_df, data_dir, fraction=None, max_rec
 #        "experiment_id" : "plan",
 #        "sample_id" : "id",
         "strain_input_state" : "input_state",
-#        "strain_circuit" : "gate",
+        "strain_circuit" : "gate",
 #        "strain_sbh_uri" : "strain",
         "strain" : "strain_name"
 #        "temperature" : 'inc_temp'
