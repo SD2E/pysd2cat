@@ -110,7 +110,7 @@ def add_live_dead(df, data_columns = ['FSC_A', 'SSC_A', 'BL1_A', 'RL1_A', 'FSC_H
     c_df = get_classifier_dataframe(df, data_columns = data_columns)
     
     ## Build the classifier
-    (model, mean_absolute_error, test_X, test_y, scaler) = ldc.build_model(live_dead_df)
+    (model, mean_absolute_error, test_X, test_y, scaler) = ldc.build_model(c_df)
 
     ## Predict label for unseen data
     pred_df = df[data_columns]
