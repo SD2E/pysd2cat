@@ -28,7 +28,11 @@ def get_project_run_groups(project_id):
     """
     
     project = transcriptic.project(project_id)
-    project_runs = project.runs()
+    try:
+        project_runs = project.runs()
+    except Exception as e:
+        return pd.DataFrame()
+        
     
     #print(project_runs)
     
@@ -351,7 +355,7 @@ def get_experiment_data(experiment, out_dir, overwrite=False):
     return experiment_df
    
 
-def get_meta(experiment):
+def get_meta(experiment, xplan_base='sd2e-projects/sd2e-project-14/'):
     """
     Get metadata for an experiment from the xplan-reactor state.
     """
@@ -359,7 +363,7 @@ def get_meta(experiment):
     logging.basicConfig(level=logging.DEBUG)
     logger = logging.getLogger('main')
 
-    xplan_state_file = os.path.join(expanduser("~"), 'tacc-work/xplan-reactor/state.json')
+    xplan_state_file = os.path.join(expanduser("~"), xplan_base, 'xplan-reactor/state.json')
     state = json.load(open(xplan_state_file, 'r'))
 
     part_1_id = experiment['part_1_id'] #'r1c5vaeb8vbt9'
@@ -367,7 +371,7 @@ def get_meta(experiment):
 
     xplan_experiment = state['runs'][part_1_id]
     #print(experiment)
-    request_file = os.path.join(expanduser("~"), 'tacc-work/xplan-reactor/experiments/', xplan_experiment['experiment_id'], 'request_' + xplan_experiment['experiment_id'] + ".json")
+    request_file = os.path.join(expanduser("~"), xplan_base, 'xplan-reactor/experiments/', xplan_experiment['experiment_id'], 'request_' + xplan_experiment['experiment_id'] + ".json")
     request = experiment_request.ExperimentRequest(**json.load(open(request_file, 'r')))
     #print("Got request")
     meta = request.pd_metadata(logger, plates=[xplan_experiment['plate_id']])

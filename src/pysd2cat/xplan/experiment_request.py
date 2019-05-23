@@ -166,53 +166,63 @@ class ExperimentRequest(dict):
            
             for param in tx_plate_params_columns:
                 plate_params.update({param : plate[param]})
+            
+            
+            if type(plate_params['source_container']) is dict:
+                plate_params['source_container'] = plate_params['source_container']['id']
+             
+                
+               
             plate_params['plate_id'] = plate_id
             logger.debug(plate_params)
             for well_id, well in plate['wells'].items():
                 #logger.debug(well_id)
                 #logger.debug(well)
                  
-                if 'measurements' in well and well['measurements'] is not None:
-                    well_params = {}
-                    well_params['id'] = exp_params['experiment_id'] + "_" + plate_id + "_" + well_id
-                    if 'strain' not in well or well['strain'] is None:
-                        continue
-                    elif type(well['strain']) is str:
-                        well_params['strain'] = well['strain']
-                    elif 'gate' in well['strain']:
-                        well_params['strain'] = well['strain']['gate']
-                    
-                    if 'source' in well:
-                        well_index = well['source']['index']
-                        well_index_s = str(well['source']['index'])
+                
+                well_params = {}
+                well_params['id'] = exp_params['experiment_id'] + "_" + plate_id + "_" + well_id
+                if 'strain' not in well or well['strain'] is None:
+                    continue
+                elif type(well['strain']) is str:
+                    well_params['strain'] = well['strain']
+                elif 'gate' in well['strain'] and 'value' in well['strain']['gate']:
+                    well_params['strain'] = well['strain']['gate']['value']
+                elif 'gate' in well['strain']:
+                    well_params['strain'] = well['strain']['gate']
 
-                        ## Sometimes indices and keys don't have same type :(
-                        if well_index in well['source']['Gate']:
-                            well_params['gate'] = well['source']['Gate'][well_index]
-                        elif well_index_s in well['source']['Gate']:
-                            well_params['gate'] = well['source']['Gate'][well_index_s]
-                            
-                        strain_id = well_params['strain'].split("/")[-2:-1]
-                        well_params['input'] = gate_info({ 'gate' : strain_id})['input']
-                        if isinstance(well_params['input'], list):
-                            # Make inputs hashable.
-                            well_params['input'] = "".join([str(s) for s in well_params['input']])
-                        well_params['input'] = str(well_params['input'])
-                    if 'od' in well:
-                        well_params['od'] = well['od']
+                if 'source' in well:
+                    well_index = well['source']['index']
+                    well_index_s = str(well['source']['index'])
+
+                    ## Sometimes indices and keys don't have same type :(
+                    if well_index in well['source']['Gate']:
+                        well_params['gate'] = well['source']['Gate'][well_index]
+                    elif well_index_s in well['source']['Gate']:
+                        well_params['gate'] = well['source']['Gate'][well_index_s]
+
+                    strain_id = well_params['strain'].split("/")[-2:-1]
+                    well_params['input'] = gate_info({ 'gate' : strain_id})['input']
+                    if isinstance(well_params['input'], list):
+                        # Make inputs hashable.
+                        well_params['input'] = "".join([str(s) for s in well_params['input']])
+                    well_params['input'] = str(well_params['input'])
+                if 'od' in well:
+                    well_params['od'] = well['od']
+                if 'measurements' in well and well['measurements'] is not None:    
                     well_params['filename'] = well['measurements'][0]
-                    if 'replicate' in well:
-                        well_params['replicate'] = int(well['replicate'])
-                    well_params['output'] = handle_missing_data(well_params, Names.OUTPUT)
-                    well_params['well'] = well_id.lower()    
+                if 'replicate' in well:
+                    well_params['replicate'] = int(well['replicate'])
+                well_params['output'] = handle_missing_data(well_params, Names.OUTPUT)
+                well_params['well'] = well_id.lower()    
 
-                    plate_params['media'] = plate_params['growth_media_2']
-                    sample_record = {}
-                    for param_list in [ exp_params, plate_params, well_params ]:
-                        #print(param_list)
-                        for k, v in param_list.items():
-                            sample_record[k] = v                        
-                    sample_records = sample_records.append(sample_record, ignore_index=True)
+                plate_params['media'] = plate_params['growth_media_2']
+                sample_record = {}
+                for param_list in [ exp_params, plate_params, well_params ]:
+                    #print(param_list)
+                    for k, v in param_list.items():
+                        sample_record[k] = v                        
+                sample_records = sample_records.append(sample_record, ignore_index=True)
 
         #def zero_index_replicates(row):
         #    row['replicate'] = row['replicate'] - 1

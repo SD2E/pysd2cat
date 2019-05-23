@@ -3,9 +3,9 @@ import math
 import numpy as np
 import os
 from pysd2cat.data import pipeline
-    
+from pysd2cat.analysis.Names import Names    
 
-def write_accuracy(data_file, overwrite):
+def write_accuracy(data_file, overwrite, high_control=Names.NOR_00_CONTROL, low_control=Names.WT_LIVE_CONTROL):
     try:
         data_dir = "/".join(data_file.split('/')[0:-1])
         out_path = os.path.join(data_dir, 'accuracy')
@@ -13,7 +13,7 @@ def write_accuracy(data_file, overwrite):
         if overwrite or not os.path.isfile(out_file):
             print("Computing accuracy file: " + out_file)
             data_df = pd.read_csv(data_file,memory_map=True,dtype={'od': float, 'input' : object, 'output' : object}, index_col=0 )
-            accuracy_df = compute_accuracy(data_df)
+            accuracy_df = compute_accuracy(data_df, high_control=high_control, low_control=low_control)
             print("Writing accuracy file: " + out_file)
             accuracy_df.to_csv(out_file)
     except Exception as e:
@@ -21,12 +21,13 @@ def write_accuracy(data_file, overwrite):
         pass
 
 
-def write_accuracy_files(data, overwrite=False):
+def write_accuracy_files(data, overwrite=False, high_control=Names.NOR_00_CONTROL, low_control=Names.WT_LIVE_CONTROL):
     import multiprocessing
     pool = multiprocessing.Pool(int(multiprocessing.cpu_count()))
     multiprocessing.cpu_count()
     tasks = []
     for d in data:
+#        tasks.append((d, overwrite, high_control=high_control, low_control=low_control))
         tasks.append((d, overwrite))
     results = [pool.apply_async(write_accuracy, t) for t in tasks]
 
@@ -119,12 +120,12 @@ def get_sample_accuracy(data):
 
 
 
-def get_threshold(df, channel='BL1_A'):
+def get_threshold(df, channel='BL1_A', high_control=Names.NOR_00_CONTROL, low_control=Names.WT_LIVE_CONTROL):
 
     ## Prepare the data for high and low controls
-    high_df = df.loc[( df['strain_name'] == 'NOR-00-Control') | ( df['strain_name'] == 'NOR 00 Control')]
+    high_df = df.loc[( df['strain_name'] == high_control)]
     high_df.loc[:,'output'] = high_df.apply(lambda x: 1, axis=1)
-    low_df = df.loc[(df['strain_name'] == 'WT-Live-Control') ]
+    low_df = df.loc[(df['strain_name'] == low_control) ]
     low_df.loc[:,'output'] = low_df.apply(lambda x: 0, axis=1)
     high_low_df = high_df.append(low_df)
     high_low_df = high_low_df.loc[high_low_df[channel] > 0]
@@ -199,10 +200,10 @@ def fix_output(row):
         row['output'] = '0'
     return row
 
-def compute_accuracy(m_df, channel='BL1_A', thresholds=None, use_log_value=True):
+def compute_accuracy(m_df, channel='BL1_A', thresholds=None, use_log_value=True, high_control=Names.NOR_00_CONTROL, low_control=Names.WT_LIVE_CONTROL):
     if thresholds is None:
         try:
-            threshold, threshold_quality = get_threshold(m_df, channel)
+            threshold, threshold_quality = get_threshold(m_df, channel, high_control=high_control, low_control=low_control)
             thresholds = [threshold]
         except Exception as e:
             #print(e)
