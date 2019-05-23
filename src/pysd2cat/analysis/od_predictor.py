@@ -99,11 +99,19 @@ def predict(df):
     print()
     th = TestHarness(output_location=examples_folder_path)
 
-    th.run_custom(function_that_returns_TH_model=random_forest_regression, dict_of_function_parameters={}, training_data=train1,
-                  testing_data=test1, data_and_split_description="Using tx_od-5.csv where Dan fixed a bunch of issues. testing again.",
-                  cols_to_predict=cols_to_predict,index_cols=feature_cols+cols_to_predict,
-                  feature_cols_to_use=feature_cols, normalize=True, feature_cols_to_normalize=continuous_cols,
-                  feature_extraction=Names.RFPIMP_PERMUTATION, predict_untested_data=False,sparse_cols_to_use=sparse_cols)
+    th.run_custom(function_that_returns_TH_model=random_forest_regression,
+                  dict_of_function_parameters={},
+                  training_data=train1,
+                  testing_data=test1,
+                  data_and_split_description="Using tx_od-5.csv where Dan fixed a bunch of issues. testing again.",
+                  cols_to_predict=cols_to_predict,
+                  index_cols=feature_cols+cols_to_predict,
+                  feature_cols_to_use=feature_cols,
+                  normalize=True,
+                  feature_cols_to_normalize=continuous_cols,
+                  feature_extraction=Names.RFPIMP_PERMUTATION,
+                  predict_untested_data=False,
+                  sparse_cols_to_use=sparse_cols)
 
 
 
