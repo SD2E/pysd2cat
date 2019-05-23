@@ -48,44 +48,78 @@ def write_live_dead_columns(data):
 
     for result in results:
         data_list = result.get()
- 
 
-def add_live_dead(df):
+
+def strain_to_class(x):
     """
-    Take an input_df corresponding to one plate.
-    Build a live dead classifier from controls.
-    Apply classifier to each event to create 'live' column
+    Boolean class labels for live/dead classifier
     """
-    data_columns = ['FSC_A', 'SSC_A', 'BL1_A', 'RL1_A', 'FSC_H', 'SSC_H', 'BL1_H', 'RL1_H', 'FSC_W', 'SSC_W', 'BL1_W', 'RL1_W']
-    def strain_to_class(x):
-        if x['strain_name'] == Names.WT_LIVE_CONTROL:
-            return "1"
-        elif x['strain_name'] == Names.WT_DEAD_CONTROL:
-            return "0"
-        else:
-            return None
+    if x['strain_name'] == Names.WT_LIVE_CONTROL:
+        return "1"
+    elif x['strain_name'] == Names.WT_DEAD_CONTROL:
+        return "0"
+    else:
+        return None
+
+def get_classifier_dataframe(df, data_columns = ['FSC_A', 'SSC_A', 'BL1_A', 'RL1_A', 'FSC_H', 'SSC_H', 'BL1_H', 'RL1_H', 'FSC_W', 'SSC_W', 'BL1_W', 'RL1_W']):
+    """
+    Get the classifier data corresponding to controls.
+    """
     live_df = df.loc[df['strain_name'] == Names.WT_LIVE_CONTROL]
     dead_df = df.loc[df['strain_name'] == Names.WT_DEAD_CONTROL]
     live_df.loc[:,'strain_name'] = live_df.apply(strain_to_class, axis=1)
     dead_df.loc[:,'strain_name'] = dead_df.apply(strain_to_class, axis=1)
     live_dead_df = live_df.append(dead_df)
     #print(live_dead_df)
-
-    
-    
-    #live_dead_df = df.loc[(df['strain_name'] == Names.WT_DEAD_CONTROL) | (df['strain_name'] == Names.WT_LIVE_CONTROL)]
-    #live_dead_df['strain_name'] = live_dead_df['strain_name'].mask(live_dead_df['strain_name'] == Names.WT_DEAD_CONTROL,  0)
-    #live_dead_df['strain_name'] = live_dead_df['strain_name'].mask(live_dead_df['strain_name'] == Names.WT_LIVE_CONTROL,  1)
     live_dead_df = live_dead_df.rename(index=str, columns={'strain_name': "class_label"})
     live_dead_df = live_dead_df[data_columns + ['class_label']]
+    return live_dead_df
 
-    (model, mean_absolute_error, test_X, test_y, scaler) = ldc.build_model(live_dead_df)
+
+
+def add_live_dead_test_harness(df, data_columns = ['FSC_A', 'SSC_A', 'BL1_A', 'RL1_A', 'FSC_H', 'SSC_H', 'BL1_H', 'RL1_H', 'FSC_W', 'SSC_W', 'BL1_W', 'RL1_W']):
+    """
+    Same as add_live_dead(), but use test-harness.
+    """
+ 
+    ## Build the training/test input
+    c_df = get_classifier_dataframe(df, data_columns = data_columns)
+    
+    ## Build the classifier
+    ldc.build_model_pd(c_df, input_cols=data_columns)
+
+    ## Predict label for unseen data
     pred_df = df[data_columns]
     #print(pred_df)
     pred_df = ldc.predict_live_dead(pred_df, model, scaler)
     #print(pred_df.dtypes)
     df.loc[:,'live'] = pred_df['class_label'].astype(int)
-    print(df)
+    #print(df)
+    
+    return df
+
+    
+
+def add_live_dead(df, data_columns = ['FSC_A', 'SSC_A', 'BL1_A', 'RL1_A', 'FSC_H', 'SSC_H', 'BL1_H', 'RL1_H', 'FSC_W', 'SSC_W', 'BL1_W', 'RL1_W']):
+    """
+    Take an input_df corresponding to one plate.
+    Build a live dead classifier from controls.
+    Apply classifier to each event to create 'live' column
+    """
+    ## Build the training/test input
+    c_df = get_classifier_dataframe(df, data_columns = data_columns)
+    
+    ## Build the classifier
+    (model, mean_absolute_error, test_X, test_y, scaler) = ldc.build_model(live_dead_df)
+
+    ## Predict label for unseen data
+    pred_df = df[data_columns]
+    #print(pred_df)
+    pred_df = ldc.predict_live_dead(pred_df, model, scaler)
+    #print(pred_df.dtypes)
+    df.loc[:,'live'] = pred_df['class_label'].astype(int)
+    #print(df)
+    
     return df
 
 

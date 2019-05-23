@@ -7,32 +7,38 @@ from sklearn.preprocessing import Binarizer
 import pandas as pd
 from pysd2cat.data import pipeline
 
-#from test_harness.test_harness_class import TestHarness
-#from test_harness.th_model_instances.hamed_models.random_forest_classification import random_forest_classification
+from harness.test_harness_class import TestHarness
+from harness.th_model_instances.hamed_models.random_forest_classification import random_forest_classification
+from harness.utils.names import Names
 
 
 
-def build_model_pd(df):
-    print("Length of full DF", len(df))
-    input_cols = ['FSC-A', 'SSC-A', 'BL1-A', 'RL1-A', 'FSC-H', 'SSC-H', 'BL1-H', 'RL1-H', 'FSC-W', 'SSC-W', 'BL1-W', 'RL1-W']
-    output_cols = ["class_label"]
-    print("Size of filtered data", len(df))
-    train, test = train_test_split(df, stratify=df['class_label'], test_size=0.2, random_state=5)
-    th = TestHarness(output_path='harness_results')
+def build_model_pd(df,
+                   input_cols = ['FSC-A', 'SSC-A', 'BL1-A', 'RL1-A', 'FSC-H', 'SSC-H',
+                                 'BL1-H', 'RL1-H', 'FSC-W', 'SSC-W', 'BL1-W', 'RL1-W'],
+                   output_cols = ["class_label"]
+                                 ):
+    # print("Length of full DF", len(df))
+    train, test = train_test_split(df, #stratify=df['class_label'],
+                                   test_size=0.2, random_state=5)
+    th = TestHarness(output_location='harness_results')
 
-    rf_classification_model = random_forest_classification(n_estimators=500)
-    th.add_custom_runs(test_harness_models=rf_classification_model, 
+    #rf_classification_model = random_forest_classification(n_estimators=500)
+    th.run_custom(#test_harness_models=rf_classification_model,
+                  function_that_returns_TH_model=random_forest_classification,
+                  dict_of_function_parameters={},
                        training_data=train, 
                        testing_data=test,
                        data_and_split_description="yeast_live_dead_dataframe",
                        cols_to_predict=output_cols,
+                       index_cols=input_cols+output_cols,
                        feature_cols_to_use=input_cols, 
                        normalize=True, 
                        feature_cols_to_normalize=input_cols,
-                       feature_extraction='rfpimp_permutation', 
+                    feature_extraction=Names.RFPIMP_PERMUTATION,
                        predict_untested_data=False)
     # Mohammed add end
-    th.execute_runs()
+    #th.execute_runs()
 
 
 def build_model(dataframe):
