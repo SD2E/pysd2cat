@@ -11,18 +11,22 @@ from harness.test_harness_class import TestHarness
 from harness.th_model_instances.hamed_models.random_forest_classification import random_forest_classification
 from harness.utils.names import Names
 
+import os
 
 
-def build_model_pd(df,
+def build_model_pd(classifier_df,
+                   data_df = None,
                    input_cols = ['FSC-A', 'SSC-A', 'BL1-A', 'RL1-A', 'FSC-H', 'SSC-H',
                                  'BL1-H', 'RL1-H', 'FSC-W', 'SSC-W', 'BL1-W', 'RL1-W'],
                    output_cols = ["class_label"]
                                  ):
     # print("Length of full DF", len(df))
-    train, test = train_test_split(df, #stratify=df['class_label'],
+    train, test = train_test_split(classifier_df, stratify=classifier_df['class_label'],
                                    test_size=0.2, random_state=5)
     th = TestHarness(output_location='harness_results')
 
+    data_df.loc[:, 'class_label'] = data_df.index
+    
     #rf_classification_model = random_forest_classification(n_estimators=500)
     th.run_custom(#test_harness_models=rf_classification_model,
                   function_that_returns_TH_model=random_forest_classification,
@@ -36,10 +40,16 @@ def build_model_pd(df,
                        normalize=True, 
                        feature_cols_to_normalize=input_cols,
                     feature_extraction=Names.RFPIMP_PERMUTATION,
-                       predict_untested_data=False)
-    # Mohammed add end
-    #th.execute_runs()
+                       predict_untested_data=data_df)
 
+    leader_board = pd.read_html(os.path.join(os.getcwd(), 'harness_results/test_harness_results/custom_classification_leaderboard.html'))[0]
+    run = leader_board.loc[:,'Run ID'].iloc[-1]
+    print(run)
+    run_path = os.path.join('harness_results/test_harness_results/runs/', "run_" + run)
+    predictions_path = os.path.join(run_path, 'predicted_data.csv')
+
+    predictions_df = pd.read_csv(predictions_path, index_col=None)
+    return predictions_df
 
 def build_model(dataframe):
     #print(c_df_norm[0:5,:])

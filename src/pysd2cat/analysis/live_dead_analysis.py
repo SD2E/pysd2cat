@@ -55,9 +55,9 @@ def strain_to_class(x):
     Boolean class labels for live/dead classifier
     """
     if x['strain_name'] == Names.WT_LIVE_CONTROL:
-        return "1"
+        return 1
     elif x['strain_name'] == Names.WT_DEAD_CONTROL:
-        return "0"
+        return 0
     else:
         return None
 
@@ -86,14 +86,10 @@ def add_live_dead_test_harness(df, data_columns = ['FSC_A', 'SSC_A', 'BL1_A', 'R
     c_df = get_classifier_dataframe(df, data_columns = data_columns)
     
     ## Build the classifier
-    ldc.build_model_pd(c_df, input_cols=data_columns)
-
     ## Predict label for unseen data
-    pred_df = df[data_columns]
-    #print(pred_df)
-    pred_df = ldc.predict_live_dead(pred_df, model, scaler)
-    #print(pred_df.dtypes)
-    df.loc[:,'live'] = pred_df['class_label'].astype(int)
+    pred_df = ldc.build_model_pd(c_df, data_df = df, input_cols=data_columns)
+
+    df.loc[:,'live'] = pred_df['class_label_predictions'].astype(int)
     #print(df)
     
     return df
