@@ -85,7 +85,7 @@ def get_experiment_correctness_and_metadata(adf):
            'SSC_W', 'BL1_W', 'RL1_W', 'Time']
     final_df = adf
     #print(final_df['media'])
-    final_df['media'] = final_df['media'].apply(media_fix)
+    final_df.loc[:, 'media'] = final_df['media'].apply(media_fix)
     final_df = final_df.apply(fix_input, axis=1)            
     final_df = final_df.apply(fix_output, axis=1)
     final_df = final_df.apply(fix_temp, axis=1)
@@ -112,8 +112,8 @@ def get_sample_correctness(data):
                 if 'media' in adf.columns:
                     final_df = get_experiment_correctness_and_metadata(adf)
                     all_df = all_df.append(final_df, ignore_index=True)
-    all_df['prc_improve'] = all_df['probability_correct_live'] - all_df['probability_correct']
-    all_df['live_proportion'] = all_df['count_live'] / all_df['count']
+    all_df.loc[:, 'prc_improve'] = all_df['probability_correct_live'] - all_df['probability_correct']
+    all_df.loc[:, 'live_proportion'] = all_df['count_live'] / all_df['count']
     #all_df['sample_time'] = all_df.apply(pipeline.get_sample_time, axis=1)
     return all_df
 
@@ -129,8 +129,8 @@ def get_threshold(df, channel='BL1_A', high_control=Names.NOR_00_CONTROL, low_co
     low_df.loc[:,'output'] = low_df.apply(lambda x: 0, axis=1)
     high_low_df = high_df.append(low_df)
     high_low_df = high_low_df.loc[high_low_df[channel] > 0]
-    high_low_df[channel] = np.log(high_low_df[channel]).replace([np.inf, -np.inf], np.nan).dropna()
-    high_low_df[channel]
+    high_low_df.loc[:, channel] = np.log(high_low_df[channel]).replace([np.inf, -np.inf], np.nan).dropna()
+    #high_low_df[channel]
     
     if len(high_df) == 0 or len(low_df) == 0:
         raise Exception("Cannot compute threshold if do not have both low and high control")
@@ -235,7 +235,7 @@ def compute_correctness(m_df,
             value_df = sample[[channel, 'output']].rename(index=str, columns={channel: "value"})          
             if use_log_value:
                 value_df = value_df.loc[value_df['value'] > 0]
-                value_df['value'] = np.log(value_df['value']).replace([np.inf, -np.inf], np.nan).dropna()
+                value_df.loc[:,'value'] = np.log(value_df['value']).replace([np.inf, -np.inf], np.nan).dropna()
             #print(value_df.head())
             thold_df = do_threshold_analysis(value_df,
                                              thresholds,
@@ -290,12 +290,13 @@ def compute_correctness(m_df,
     #plot_df = plot_df.rename(columns={mean_correct_name : output_label})
     return plot_df 
 
-def do_threshold_analysis(df, thresholds,
-                            mean_correct_name='probability_correct',
-                            std_correct_name='std_correct',
-                            count_name='count',
-                            threshold_name='threshold'
-                            ):
+def do_threshold_analysis(df,
+                          thresholds,
+                          mean_correct_name='probability_correct',
+                          std_correct_name='std_correct',
+                          count_name='count',
+                          threshold_name='threshold'
+                          ):
     """
     Get Probability that samples fall on correct side of threshold
     """
