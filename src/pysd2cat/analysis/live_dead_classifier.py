@@ -18,14 +18,18 @@ def build_model_pd(classifier_df,
                    data_df = None,
                    input_cols = ['FSC-A', 'SSC-A', 'BL1-A', 'RL1-A', 'FSC-H', 'SSC-H',
                                  'BL1-H', 'RL1-H', 'FSC-W', 'SSC-W', 'BL1-W', 'RL1-W'],
-                   output_cols = ["class_label"]
+                   output_cols = ["class_label"],
+                   output_location='harness_results',
+                   description="yeast_live_dead_dataframe"
                                  ):
     # print("Length of full DF", len(df))
+    print(classifier_df)
     train, test = train_test_split(classifier_df, stratify=classifier_df['class_label'],
                                    test_size=0.2, random_state=5)
-    th = TestHarness(output_location='harness_results')
+    th = TestHarness(output_location=output_location)
 
-    data_df.loc[:, 'class_label'] = data_df.index
+    data_df = data_df.copy()
+    data_df.loc[:, 'class_label'] = None
     
     #rf_classification_model = random_forest_classification(n_estimators=500)
     th.run_custom(#test_harness_models=rf_classification_model,
@@ -33,7 +37,7 @@ def build_model_pd(classifier_df,
                   dict_of_function_parameters={},
                        training_data=train, 
                        testing_data=test,
-                       data_and_split_description="yeast_live_dead_dataframe",
+                       data_and_split_description=description,
                        cols_to_predict=output_cols,
                        index_cols=input_cols+output_cols,
                        feature_cols_to_use=input_cols, 
@@ -42,10 +46,10 @@ def build_model_pd(classifier_df,
                     feature_extraction=Names.RFPIMP_PERMUTATION,
                        predict_untested_data=data_df)
 
-    leader_board = pd.read_html(os.path.join(os.getcwd(), 'harness_results/test_harness_results/custom_classification_leaderboard.html'))[0]
+    leader_board = pd.read_html(os.path.join(output_location, 'test_harness_results/custom_classification_leaderboard.html'))[0]
     run = leader_board.loc[:,'Run ID'].iloc[-1]
     print(run)
-    run_path = os.path.join('harness_results/test_harness_results/runs/', "run_" + run)
+    run_path = os.path.join(output_location, 'test_harness_results/runs/', "run_" + run)
     predictions_path = os.path.join(run_path, 'predicted_data.csv')
 
     predictions_df = pd.read_csv(predictions_path, index_col=None)
