@@ -10,8 +10,12 @@ from pysd2cat.data import pipeline
 from harness.test_harness_class import TestHarness
 from harness.th_model_instances.hamed_models.random_forest_classification import random_forest_classification
 from harness.utils.names import Names
+import logging
 
 import os
+
+l = logging.getLogger(__file__)
+l.setLevel(logging.DEBUG)
 
 
 def build_model_pd(classifier_df,
@@ -23,14 +27,17 @@ def build_model_pd(classifier_df,
                    description="yeast_live_dead_dataframe"
                                  ):
     # print("Length of full DF", len(df))
-    print(classifier_df)
+    #print(classifier_df)
+    
+    l.debug("Splitting Test Harness Data ...")
     train, test = train_test_split(classifier_df, stratify=classifier_df['class_label'],
                                    test_size=0.2, random_state=5)
     th = TestHarness(output_location=output_location)
 
     data_df = data_df.copy()
-    data_df.loc[:, 'class_label'] = None
-    
+    data_df.loc[:, 'class_label'] = data_df.index
+
+    l.debug("Running Test Harness ...")
     #rf_classification_model = random_forest_classification(n_estimators=500)
     th.run_custom(#test_harness_models=rf_classification_model,
                   function_that_returns_TH_model=random_forest_classification,
@@ -46,9 +53,12 @@ def build_model_pd(classifier_df,
                     feature_extraction=Names.RFPIMP_PERMUTATION,
                        predict_untested_data=data_df)
 
+    l.debug("Extracting Test Harness Predictions ...")
     leader_board = pd.read_html(os.path.join(output_location, 'test_harness_results/custom_classification_leaderboard.html'))[0]
+    leader_board = leader_board.sort_values(by=['Date', 'Time'], ascending=True)
+    l.debug("Selecting run: " + str(leader_board.iloc[-1, :]))
     run = leader_board.loc[:,'Run ID'].iloc[-1]
-    print(run)
+    #print(run)
     run_path = os.path.join(output_location, 'test_harness_results/runs/', "run_" + run)
     predictions_path = os.path.join(run_path, 'predicted_data.csv')
 
