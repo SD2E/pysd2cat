@@ -68,12 +68,28 @@ def compute_correctness_harness(df,
                              std_output_label='probability_correct',                             
                              high_control=Names.NOR_00_CONTROL,
                              low_control=Names.WT_LIVE_CONTROL):
+    df.loc[:,'output'] = pd.to_numeric(df['output'])
     l.debug("Shape at start: " + str(df.shape))
     result_df = compute_predicted_output_harness(df, out_dir=out_dir, high_control=high_control, low_control=low_control)
     l.debug("Shape of result: " + str(result_df.shape) + ", columns= " + str(result_df.columns))
-    result_df.loc[:, 'predicted_correct'] = result_df.apply(lambda x : 1.0 - np.abs(x['output'] - x['predicted_output']), axis=1)
+    result_df.loc[:, 'predicted_correct'] = result_df.apply(lambda x : None if np.isnan(x['output']) or np.isnan(x['predicted_output']) else 1.0 - np.abs(x['output'] - x['predicted_output']), axis=1)
     l.debug(result_df)
-    acc_df = result_df.groupby(['id'])['predicted_correct'].agg([np.mean, np.std]).reset_index()
+    #acc_df = result_df.groupby(['id'])['predicted_correct'].agg([np.nanmean, np.nanstd]).reset_index()
+    
+    def nan_agg(x):
+        res = {}
+        x = x.dropna()
+        if len(x) > 0:
+            res['mean'] = x['predicted_correct'].mean()
+            res['std'] = x['predicted_correct'].std()
+        else:
+            res['mean'] = None
+            res['std'] = None
+
+        return pd.Series(res, index=['mean', 'std'])
+
+    groups = result_df.groupby(['id'])
+    acc_df = groups.apply(nan_agg).reset_index() 
 
     l.debug("Shape of acc: " + str(acc_df.shape))
     #print(acc_df)
@@ -83,9 +99,9 @@ def compute_correctness_harness(df,
     
 
 def compute_correctness_all(df, out_dir = '.', high_control=Names.NOR_00_CONTROL, low_control=Names.WT_LIVE_CONTROL):
-    result = df.drop(['Time', 'FSC_A', 'SSC_A', 'BL1_A', 'RL1_A', 'FSC_H', 'SSC_H',
+    result = df.drop(['index','Time', 'FSC_A', 'SSC_A', 'BL1_A', 'RL1_A', 'FSC_H', 'SSC_H',
                       'BL1_H', 'RL1_H', 'FSC_W', 'SSC_W', 'BL1_W', 'RL1_W', 'live'],
-                      axis=1).drop_duplicates()
+                      axis=1).drop_duplicates().reset_index()
 
     results = []
     # Get correctness w/o dead cells gated
@@ -132,8 +148,8 @@ def compute_correctness_all(df, out_dir = '.', high_control=Names.NOR_00_CONTROL
                                                 high_control=high_control,
                                                 low_control=low_control))
 
-
+    #print(len(result))
     for r in results:
         result = result.merge(r, on='id')
-        
+        #print(len(result))
     return result

@@ -87,9 +87,13 @@ def add_live_dead_test_harness(df, data_columns = ['FSC_A', 'SSC_A', 'BL1_A', 'R
     
     ## Build the classifier
     ## Predict label for unseen data
-    pred_df = ldc.build_model_pd(c_df, data_df = df, input_cols=data_columns)
-
-    df.loc[:,'live'] = pred_df['class_label_predictions'].astype(int)
+    pred_df = ldc.build_model_pd(c_df, data_df = df, input_cols=data_columns).reset_index()
+    #print(pred_df)
+    if 'live' in df.columns:
+        df=df.drop(['live'], axis=1)
+    df=df.reset_index()
+    live_col = pred_df['class_label_predictions']
+    df.loc[:,'live'] = live_col
     #print(df)
     
     return df

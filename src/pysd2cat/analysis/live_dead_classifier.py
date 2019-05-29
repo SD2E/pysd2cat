@@ -50,7 +50,8 @@ def build_model_pd(classifier_df,
                        feature_cols_to_use=input_cols, 
                        normalize=True, 
                        feature_cols_to_normalize=input_cols,
-                    feature_extraction=Names.RFPIMP_PERMUTATION,
+#                    feature_extraction=Names.RFPIMP_PERMUTATION,
+                            feature_extraction=False,
                        predict_untested_data=data_df)
 
     l.debug("Extracting Test Harness Predictions ...")
