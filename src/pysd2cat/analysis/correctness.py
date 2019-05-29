@@ -99,9 +99,13 @@ def compute_correctness_harness(df,
     
 
 def compute_correctness_all(df, out_dir = '.', high_control=Names.NOR_00_CONTROL, low_control=Names.WT_LIVE_CONTROL):
-    result = df.drop(['index','Time', 'FSC_A', 'SSC_A', 'BL1_A', 'RL1_A', 'FSC_H', 'SSC_H',
-                      'BL1_H', 'RL1_H', 'FSC_W', 'SSC_W', 'BL1_W', 'RL1_W', 'live'],
+    drop_list = ['Time', 'FSC_A', 'SSC_A', 'BL1_A', 'RL1_A', 'FSC_H', 'SSC_H',
+                      'BL1_H', 'RL1_H', 'FSC_W', 'SSC_W', 'BL1_W', 'RL1_W', 'live']
+    if 'index' in df.columns:
+        drop_list.append('index')
+    result = df.drop(drop_list,
                       axis=1).drop_duplicates().reset_index()
+
 
     results = []
     # Get correctness w/o dead cells gated
