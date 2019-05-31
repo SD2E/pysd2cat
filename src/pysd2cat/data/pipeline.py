@@ -7,7 +7,7 @@ from pysd2cat.analysis.Names import Names
 
 ***REMOVED***
 client = pymongo.MongoClient(dbURI)
-db = client.catalog_staging
+db = client.catalog
 science_table=db.science_table
 jobs_table=db.jobs
 

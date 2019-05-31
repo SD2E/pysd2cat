@@ -41,7 +41,7 @@ def compute_predicted_output_harness(df, data_columns = ['FSC_A', 'SSC_A', 'BL1_
     ## Build the training/test input
     l.debug("Building Train/Test data from controls ...")
     c_df = get_classifier_dataframe(df, data_columns = data_columns, high_control=high_control, low_control=low_control)
-    
+    print(c_df)
     ## Build the classifier
     ## Predict label for unseen data
     l.debug("Building Classifier ...")
@@ -62,10 +62,33 @@ def compute_predicted_output_harness(df, data_columns = ['FSC_A', 'SSC_A', 'BL1_
     
     return result_df
 
+def compute_predicted_output_noharness(df, data_columns = ['FSC_A', 'SSC_A', 'BL1_A', 'RL1_A', 'FSC_H', 'SSC_H', 'BL1_H', 'RL1_H', 'FSC_W', 'SSC_W', 'BL1_W', 'RL1_W'], out_dir='.',
+                                     high_control=Names.NOR_00_CONTROL, low_control=Names.WT_LIVE_CONTROL):
+    ## Build the training/test input
+    c_df = get_classifier_dataframe(df, data_columns = data_columns, high_control=high_control, low_control=low_control)
+    
+    ## Build the classifier
+    (model, mean_absolute_error, test_X, test_y, scaler) = ldc.build_model(c_df)
+
+    ## Predict label for unseen data
+    pred_df = df[data_columns]
+    #print(pred_df)
+    pred_df = ldc.predict_live_dead(pred_df, model, scaler)
+    #print(pred_df.dtypes)    
+    result_df = df[['output', 'id']]
+    #l.debug("Predictions: " + str(pred_df['class_label_predictions']))
+    #print(result_df)
+    result_df.loc[:,'predicted_output'] = pred_df['class_label'].astype(int)
+    #print(df)
+    
+    return result_df
+
+
+
 def compute_correctness_harness(df,
                              out_dir = '.',
                              mean_output_label='probability_correct',
-                             std_output_label='probability_correct',                             
+                             std_output_label='std_probability_correct',                             
                              high_control=Names.NOR_00_CONTROL,
                              low_control=Names.WT_LIVE_CONTROL):
     df.loc[:,'output'] = pd.to_numeric(df['output'])
@@ -80,13 +103,16 @@ def compute_correctness_harness(df,
         res = {}
         x = x.dropna()
         if len(x) > 0:
+#            print(x['predicted_correct'].value_counts())
             res['mean'] = x['predicted_correct'].mean()
             res['std'] = x['predicted_correct'].std()
+            res['count'] = len(x['predicted_correct'])
         else:
             res['mean'] = None
             res['std'] = None
+            res['count'] = 0
 
-        return pd.Series(res, index=['mean', 'std'])
+        return pd.Series(res, index=['mean', 'std', 'count'])
 
     groups = result_df.groupby(['id'])
     acc_df = groups.apply(nan_agg).reset_index() 
@@ -97,7 +123,45 @@ def compute_correctness_harness(df,
     #print(acc_df)
     return acc_df
     
+def compute_correctness_noharness(df,
+                             out_dir = '.',
+                             mean_output_label='probability_correct',
+                             std_output_label='std_probability_correct',                             
+                             high_control=Names.NOR_00_CONTROL,
+                             low_control=Names.WT_LIVE_CONTROL):
+    df.loc[:,'output'] = pd.to_numeric(df['output'])
+    l.debug("Shape at start: " + str(df.shape))
+    result_df = compute_predicted_output_noharness(df, out_dir=out_dir, high_control=high_control, low_control=low_control)
+    l.debug("Shape of result: " + str(result_df.shape) + ", columns= " + str(result_df.columns))
+    result_df.loc[:, 'predicted_correct'] = result_df.apply(lambda x : None if np.isnan(x['output']) or np.isnan(x['predicted_output']) else 1.0 - np.abs(x['output'] - x['predicted_output']), axis=1)
+    l.debug(result_df)
+    #acc_df = result_df.groupby(['id'])['predicted_correct'].agg([np.nanmean, np.nanstd]).reset_index()
+    
+    def nan_agg(x):
+        res = {}
+        x = x.dropna()
+        if len(x) > 0:
+#            print(x['predicted_correct'].value_counts())
+            res['mean'] = x['predicted_correct'].mean()
+            res['std'] = x['predicted_correct'].std()
+            res['count'] = len(x['predicted_correct'])
+        else:
+            res['mean'] = None
+            res['std'] = None
+            res['count'] = 0
 
+        return pd.Series(res, index=['mean', 'std', 'count'])
+
+    groups = result_df.groupby(['id'])
+    acc_df = groups.apply(nan_agg).reset_index() 
+
+    l.debug("Shape of acc: " + str(acc_df.shape))
+    #print(acc_df)
+    acc_df = acc_df.rename(columns={'mean' : mean_output_label, 'std' : std_output_label })
+    #print(acc_df)
+    return acc_df
+    
+    
 def compute_correctness_all(df, out_dir = '.', high_control=Names.NOR_00_CONTROL, low_control=Names.WT_LIVE_CONTROL):
     drop_list = ['Time', 'FSC_A', 'SSC_A', 'BL1_A', 'RL1_A', 'FSC_H', 'SSC_H',
                       'BL1_H', 'RL1_H', 'FSC_W', 'SSC_W', 'BL1_W', 'RL1_W', 'live']
@@ -122,7 +186,7 @@ def compute_correctness_all(df, out_dir = '.', high_control=Names.NOR_00_CONTROL
                                     threshold_name='threshold'))
 
     l.debug("Computing Random Forest, no gating ...")
-    results.append(compute_correctness_harness(df,
+    results.append(compute_correctness_noharness(df,
                                             out_dir = out_dir,
                                             mean_output_label='mean_correct_classifier',
                                             std_output_label='std_correct_classifier',                                            
@@ -145,10 +209,10 @@ def compute_correctness_all(df, out_dir = '.', high_control=Names.NOR_00_CONTROL
                                         threshold_name='threshold_live'))
 
         l.debug("Computing Random Forest, with gating ...")
-        results.append(compute_correctness_harness(gated_df,
+        results.append(compute_correctness_noharness(gated_df,
                                                 out_dir = out_dir,
                                                 mean_output_label='mean_correct_classifier_live',
-                                                std_output_label='std_correct_classifier_live',                                            
+                                                std_output_label='std_correct_classifier_live',
                                                 high_control=high_control,
                                                 low_control=low_control))
 
@@ -157,3 +221,57 @@ def compute_correctness_all(df, out_dir = '.', high_control=Names.NOR_00_CONTROL
         result = result.merge(r, on='id')
         #print(len(result))
     return result
+
+def compute_correctness_harness_test(df, out_dir = '.', high_control=Names.NOR_00_CONTROL, low_control=Names.WT_LIVE_CONTROL):
+    drop_list = ['Time', 'FSC_A', 'SSC_A', 'BL1_A', 'RL1_A', 'FSC_H', 'SSC_H',
+                      'BL1_H', 'RL1_H', 'FSC_W', 'SSC_W', 'BL1_W', 'RL1_W', 'live']
+    if 'index' in df.columns:
+        drop_list.append('index')
+    result = df.drop(drop_list,
+                      axis=1).drop_duplicates().reset_index()
+
+
+    results = []
+
+    l.debug("Computing Random Forest, no gating ...")
+    results.append(compute_correctness_harness(df,
+                                            out_dir = out_dir,
+                                            mean_output_label='mean_correct_classifier',
+                                            std_output_label='std_correct_classifier',                                            
+                                            high_control=high_control,
+                                            low_control=low_control))
+    
+
+    #print(len(result))
+    for r in results:
+        result = result.merge(r, on='id')
+        #print(len(result))
+    return result
+
+def compute_correctness_noharness_test(df, out_dir = '.', high_control=Names.NOR_00_CONTROL, low_control=Names.WT_LIVE_CONTROL):
+    drop_list = ['Time', 'FSC_A', 'SSC_A', 'BL1_A', 'RL1_A', 'FSC_H', 'SSC_H',
+                      'BL1_H', 'RL1_H', 'FSC_W', 'SSC_W', 'BL1_W', 'RL1_W', 'live']
+    if 'index' in df.columns:
+        drop_list.append('index')
+    result = df.drop(drop_list,
+                      axis=1).drop_duplicates().reset_index()
+
+
+    results = []
+
+    l.debug("Computing Random Forest, no gating ...")
+    results.append(compute_correctness_noharness(df,
+                                            out_dir = out_dir,
+                                            mean_output_label='mean_correct_classifier',
+                                            std_output_label='std_correct_classifier',                                            
+                                            high_control=high_control,
+                                            low_control=low_control))
+    
+
+    #print(len(result))
+    for r in results:
+        result = result.merge(r, on='id')
+        #print(len(result))
+    return result
+
+

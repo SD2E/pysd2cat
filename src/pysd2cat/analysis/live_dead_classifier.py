@@ -89,7 +89,8 @@ def build_model(dataframe):
 
     # Define model
     #logreg = LogisticRegression()
-    rf_model = RandomForestClassifier(random_state=1, class_weight = 'balanced')
+    rf_model = RandomForestClassifier(random_state=1, #class_weight = 'balanced',
+                                     n_estimators=361,  criterion='entropy', min_samples_leaf=13, n_jobs=-1)
 
     # Fit model
     #logreg.fit(train_X, train_y)
