@@ -3,6 +3,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import mean_absolute_error
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import Normalizer
+from sklearn.preprocessing import StandardScaler
 from sklearn.preprocessing import Binarizer
 import pandas as pd
 from pysd2cat.data import pipeline
@@ -76,9 +77,13 @@ def build_model(dataframe):
     #binarizer = Binarizer(threshold=0.0).fit(y)
     #y = binarizer.transform(y)[:,0]
 
-    train_X, val_X, train_y, val_y = train_test_split(X, y, random_state = 0)
+    #train_X, val_X, train_y, val_y = train_test_split(X, y, random_state = 0)
+    train_X, val_X, train_y, val_y = train_test_split(X, y, stratify=y,
+                                   test_size=0.2, random_state=5)
 
-    scaler = Normalizer().fit(train_X)
+
+    #scaler = Normalizer().fit(train_X)
+    scaler = StandardScaler().fit(train_X)
     train_X_norm = scaler.transform(train_X)
 
 
@@ -89,15 +94,16 @@ def build_model(dataframe):
 
     # Define model
     #logreg = LogisticRegression()
-    rf_model = RandomForestClassifier(random_state=1, #class_weight = 'balanced',
+    rf_model = RandomForestClassifier(random_state=1, class_weight = 'balanced',
                                      n_estimators=361,  criterion='entropy', min_samples_leaf=13, n_jobs=-1)
 
     # Fit model
     #logreg.fit(train_X, train_y)
     rf_model.fit(train_X_norm, train_y)
 
-    test_scaler = Normalizer().fit(train_X)
-    val_X_norm = test_scaler.transform(val_X)
+    #test_scaler = Normalizer().fit(train_X)
+    #test_scaler = StandardScaler().fit(train_X)
+    val_X_norm = scaler.transform(val_X)
     val_p = pd.DataFrame(rf_model.predict(val_X_norm), columns=['class_label'])
     error = mean_absolute_error(val_y, val_p)
     
