@@ -77,24 +77,45 @@ def get_classifier_dataframe(df, data_columns = ['FSC_A', 'SSC_A', 'BL1_A', 'RL1
 
 
 
-def add_live_dead_test_harness(df, data_columns = ['FSC_A', 'SSC_A', 'BL1_A', 'RL1_A', 'FSC_H', 'SSC_H', 'BL1_H', 'RL1_H', 'FSC_W', 'SSC_W', 'BL1_W', 'RL1_W']):
+def add_live_dead_test_harness(df, 
+                               data_columns = ['FSC_A', 'SSC_A', 'BL1_A', 'RL1_A', 'FSC_H', 
+                                               'SSC_H', 'BL1_H', 'RL1_H', 'FSC_W', 'SSC_W', 
+                                               'BL1_W', 'RL1_W'],                               
+                               out_dir='.'):
     """
     Same as add_live_dead(), but use test-harness.
     """
  
+    experiment = df.plan.unique()[0]
+
     ## Build the training/test input
     c_df = get_classifier_dataframe(df, data_columns = data_columns)
-    
+    #print(c_df.head())
+    c_df.loc[:, 'index'] = c_df.index
+    #c_df.loc[:, 'id'] = df['id']
+    df.loc[:, 'index'] = df.index
+
+
     ## Build the classifier
     ## Predict label for unseen data
-    pred_df = ldc.build_model_pd(c_df, data_df = df, input_cols=data_columns).reset_index()
-    #print(pred_df)
+    pred_df = ldc.build_model_pd(c_df, 
+                                 data_df = df, 
+                                 input_cols=data_columns,
+                                 index_cols=['index'],
+                                 output_location=out_dir,
+                                 description=experiment+"_live"
+                                )
+    #print(pred_df.head())
     if 'live' in df.columns:
         df=df.drop(['live'], axis=1)
-    df=df.reset_index()
-    live_col = pred_df['class_label_predictions']
-    df.loc[:,'live'] = live_col
-    #print(df)
+    #df=df.reset_index()
+    live_col = pred_df.rename(columns={'class_label_predictions': 'live'})[['live']]
+    live_col.index = live_col.index.astype(str)
+
+    #print(live_col.head())
+#    print(df.dtypes)
+    df = df.join(live_col, how='left')
+    #print(df.head())
     
     return df
 

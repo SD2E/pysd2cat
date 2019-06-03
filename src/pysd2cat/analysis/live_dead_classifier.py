@@ -21,6 +21,7 @@ l.setLevel(logging.DEBUG)
 
 def build_model_pd(classifier_df,
                    data_df = None,
+                   index_cols = ['index'],
                    input_cols = ['FSC-A', 'SSC-A', 'BL1-A', 'RL1-A', 'FSC-H', 'SSC-H',
                                  'BL1-H', 'RL1-H', 'FSC-W', 'SSC-W', 'BL1-W', 'RL1-W'],
                    output_cols = ["class_label"],
@@ -36,7 +37,7 @@ def build_model_pd(classifier_df,
     th = TestHarness(output_location=output_location)
 
     data_df = data_df.copy()
-    data_df.loc[:, 'class_label'] = data_df.index
+    #data_df.loc[:, 'class_label'] = data_df.index
 
     l.debug("Running Test Harness ...")
     #rf_classification_model = random_forest_classification(n_estimators=500)
@@ -47,7 +48,7 @@ def build_model_pd(classifier_df,
                        testing_data=test,
                        data_and_split_description=description,
                        cols_to_predict=output_cols,
-                       index_cols=input_cols+output_cols,
+                       index_cols=index_cols,
                        feature_cols_to_use=input_cols, 
                        normalize=True, 
                        feature_cols_to_normalize=input_cols,
@@ -63,51 +64,34 @@ def build_model_pd(classifier_df,
     #print(run)
     run_path = os.path.join(output_location, 'test_harness_results/runs/', "run_" + run)
     predictions_path = os.path.join(run_path, 'predicted_data.csv')
-
-    predictions_df = pd.read_csv(predictions_path, index_col=None)
+    
+    predictions_df = pd.read_csv(predictions_path, index_col=0, dtype={"index" : object})
+    #predictions_df = predictions_df.set_index('class_label')
     return predictions_df
 
-def build_model(dataframe):
-    #print(c_df_norm[0:5,:])
-    #df_norm = dataframe
-    
+def build_model(dataframe):   
     X = dataframe.drop(columns=['class_label'])
     y = dataframe['class_label'].astype(int)
-
-    #binarizer = Binarizer(threshold=0.0).fit(y)
-    #y = binarizer.transform(y)[:,0]
 
     #train_X, val_X, train_y, val_y = train_test_split(X, y, random_state = 0)
     train_X, val_X, train_y, val_y = train_test_split(X, y, stratify=y,
                                    test_size=0.2, random_state=5)
 
-
-    #scaler = Normalizer().fit(train_X)
     scaler = StandardScaler().fit(train_X)
     train_X_norm = scaler.transform(train_X)
 
-
-    
-    #print(c_df.columns[1:12])
-    #val_X = pd.DataFrame(val_X, columns = dataframe.columns[1:13])
-    #val_y = pd.DataFrame(val_y, columns = [dataframe.columns[0]])
-
     # Define model
-    #logreg = LogisticRegression()
     rf_model = RandomForestClassifier(random_state=1, class_weight = 'balanced',
                                      n_estimators=361,  criterion='entropy', min_samples_leaf=13, n_jobs=-1)
 
     # Fit model
-    #logreg.fit(train_X, train_y)
     rf_model.fit(train_X_norm, train_y)
 
-    #test_scaler = Normalizer().fit(train_X)
-    #test_scaler = StandardScaler().fit(train_X)
     val_X_norm = scaler.transform(val_X)
     val_p = pd.DataFrame(rf_model.predict(val_X_norm), columns=['class_label'])
     error = mean_absolute_error(val_y, val_p)
-    
-    val_X_norm = pd.DataFrame(val_X_norm, columns=dataframe.columns[1:])
+    #print(dataframe.columns)
+    #val_X_norm = pd.DataFrame(val_X_norm, columns=dataframe.columns[1:])
     
     return (rf_model, error, val_X_norm, val_p, scaler)
 

@@ -5,34 +5,6 @@ import os
 from pysd2cat.data import pipeline
 from pysd2cat.analysis.Names import Names    
 
-def write_correctness(data_file, overwrite, high_control=Names.NOR_00_CONTROL, low_control=Names.WT_LIVE_CONTROL):
-    try:
-        data_dir = "/".join(data_file.split('/')[0:-1])
-        out_path = os.path.join(data_dir, 'accuracy')
-        out_file = os.path.join(out_path, data_file.split('/')[-1])
-        if overwrite or not os.path.isfile(out_file):
-            print("Computing correctness file: " + out_file)
-            data_df = pd.read_csv(data_file,memory_map=True,dtype={'od': float, 'input' : object, 'output' : object}, index_col=0 )
-            correctness_df = compute_correctness(data_df, high_control=high_control, low_control=low_control)
-            print("Writing correctness file: " + out_file)
-            correctness_df.to_csv(out_file)
-    except Exception as e:
-        print("File failed: " + data_file + " with: " + str(e))
-        pass
-
-
-def write_correctness_files(data, overwrite=False, high_control=Names.NOR_00_CONTROL, low_control=Names.WT_LIVE_CONTROL):
-    import multiprocessing
-    pool = multiprocessing.Pool(int(multiprocessing.cpu_count()))
-    multiprocessing.cpu_count()
-    tasks = []
-    for d in data:
-#        tasks.append((d, overwrite, high_control=high_control, low_control=low_control))
-        tasks.append((d, overwrite))
-    results = [pool.apply_async(write_correctness, t) for t in tasks]
-
-    for result in results:
-        data_list = result.get()
  
 
 def get_experiment_correctness_and_metadata(adf):

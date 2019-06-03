@@ -5,6 +5,8 @@ from pysd2cat.analysis import live_dead_classifier as ldc
 import numpy as np
 from pysd2cat.analysis.threshold import compute_correctness
 import pandas as pd
+import os
+
 import logging
 
 l = logging.getLogger(__file__)
@@ -44,19 +46,26 @@ def compute_predicted_output(df,
                              out_dir='.',
                              high_control=Names.NOR_00_CONTROL, 
                              low_control=Names.WT_LIVE_CONTROL,
-                             use_harness=False):
+                             use_harness=False,
+                             description=None):
     ## Build the training/test input
     c_df = get_classifier_dataframe(df, data_columns = data_columns, high_control=high_control, low_control=low_control)
-    result_df = df[['output', 'id']]
+    
 
     if use_harness:
+        c_df.loc[:, 'output'] = df['output']
+        c_df.loc[:, 'id'] = df['id']
+        c_df.loc[:, 'index'] = c_df.index
+        df.loc[:,'index'] = df.index
         pred_df = ldc.build_model_pd(c_df,
                                      data_df = df,
+                                     index_cols=['index', 'output', 'id'],
                                      input_cols=data_columns,
                                      output_cols=['class_label'],
                                      output_location=out_dir,
-                                     description="circuit output prediction")
-        result_df.loc[:,'predicted_output'] = pred_df['class_label_predictions'].astype(int)        
+                                     description=description)
+        #result_df.loc[:,'predicted_output'] = pred_df['class_label_predictions'].astype(int)        
+        result_df = pred_df.rename(columns={'class_label_predictions' : 'predicted_output'})
     else:
         ## Build the classifier
         (model, mean_absolute_error, test_X, test_y, scaler) = ldc.build_model(c_df)
@@ -64,6 +73,7 @@ def compute_predicted_output(df,
         ## Predict label for unseen data
         pred_df = df[data_columns]
         pred_df = ldc.predict_live_dead(pred_df, model, scaler)
+        result_df = df[['output', 'id']]
         result_df.loc[:,'predicted_output'] = pred_df['class_label'].astype(int)
     
     return result_df
@@ -75,15 +85,17 @@ def compute_correctness_classifier(df,
                              std_output_label='std_probability_correct',                             
                              high_control=Names.NOR_00_CONTROL,
                              low_control=Names.WT_LIVE_CONTROL,
-                                 add_predictions = False,
-                                  use_harness = False):
+                             description=None,
+                             add_predictions = False,
+                             use_harness = False):
     df.loc[:,'output'] = pd.to_numeric(df['output'])
     l.debug("Shape at start: " + str(df.shape))
     result_df = compute_predicted_output(df, 
                                          out_dir=out_dir, 
                                          high_control=high_control, 
                                          low_control=low_control, 
-                                         use_harness=use_harness)
+                                         use_harness=use_harness,
+                                         description=description)
     l.debug("Shape of result: " + str(result_df.shape) + ", columns= " + str(result_df.columns))
     result_df.loc[:, 'predicted_correct'] = result_df.apply(lambda x : None if np.isnan(x['output']) or np.isnan(x['predicted_output']) else 1.0 - np.abs(x['output'] - x['predicted_output']), axis=1)
     l.debug(result_df)
@@ -102,13 +114,11 @@ def compute_correctness_classifier(df,
 #            print(x['predicted_correct'].value_counts())
             res['mean'] = x['predicted_correct'].mean()
             res['std'] = x['predicted_correct'].std()
-            res['count'] = len(x['predicted_correct'])
         else:
             res['mean'] = None
             res['std'] = None
-            res['count'] = 0
         #print(res['count'])
-        return pd.Series(res, index=['mean', 'std', 'count'])
+        return pd.Series(res, index=['mean', 'std'])
 
     groups = result_df.groupby(['id'])
     acc_df = groups.apply(nan_agg).reset_index() 
@@ -128,6 +138,7 @@ def compute_correctness_all(df, out_dir = '.', high_control=Names.NOR_00_CONTROL
     result = df.drop(drop_list,
                       axis=1).drop_duplicates().reset_index()
 
+    experiment = df['plan'].unique()[0]
 
     results = []
     # Get correctness w/o dead cells gated
@@ -144,12 +155,14 @@ def compute_correctness_all(df, out_dir = '.', high_control=Names.NOR_00_CONTROL
                                     threshold_name='threshold'))
 
     l.debug("Computing Random Forest, no gating ...")
-    results.append(compute_correctness_noharness(df,
+    results.append(compute_correctness_classifier(df,
                                             out_dir = out_dir,
                                             mean_output_label='mean_correct_classifier',
-                                            std_output_label='std_correct_classifier',                                            
+                                            std_output_label='std_correct_classifier',
+                                            description = experiment+"_correctness",
                                             high_control=high_control,
-                                            low_control=low_control))
+                                            low_control=low_control,
+                                            use_harness=True))
     
     # Get correctness w/ dead cells gated
     if 'live' in df.columns:
@@ -167,18 +180,53 @@ def compute_correctness_all(df, out_dir = '.', high_control=Names.NOR_00_CONTROL
                                         threshold_name='threshold_live'))
 
         l.debug("Computing Random Forest, with gating ...")
-        results.append(compute_correctness_noharness(gated_df,
+        results.append(compute_correctness_classifier(gated_df,
                                                 out_dir = out_dir,
                                                 mean_output_label='mean_correct_classifier_live',
                                                 std_output_label='std_correct_classifier_live',
+                                                description = experiment + "_correctness_live",
                                                 high_control=high_control,
-                                                low_control=low_control))
+                                                low_control=low_control,
+                                                use_harness=True))
 
     #print(len(result))
     for r in results:
         result = result.merge(r, on='id')
         #print(len(result))
     return result
+
+def write_correctness(data_file, overwrite, high_control=Names.NOR_00_CONTROL, low_control=Names.WT_LIVE_CONTROL):
+    try:
+        data_dir = "/".join(data_file.split('/')[0:-1])
+        out_path = os.path.join(data_dir, 'correctness')
+        out_file = os.path.join(out_path, data_file.split('/')[-1])
+        if overwrite or not os.path.isfile(out_file):
+            print("Computing correctness file: " + out_file)
+            data_df = pd.read_csv(data_file,dtype={'od': float, 'input' : object, 'output' : object}, index_col=0 )
+            correctness_df = compute_correctness_all(data_df, out_dir=out_path, 
+                                                     high_control=high_control, low_control=low_control)
+            print("Writing correctness file: " + out_file)
+            correctness_df.to_csv(out_file)
+    except Exception as e:
+        print("File failed: " + data_file + " with: " + str(e))
+        pass
+
+
+def write_correctness_files(data, overwrite=False, high_control=Names.NOR_00_CONTROL, low_control=Names.WT_LIVE_CONTROL):
+    import multiprocessing
+#    pool = multiprocessing.Pool(int(multiprocessing.cpu_count()))
+    pool = multiprocessing.Pool(4)
+    multiprocessing.cpu_count()
+    tasks = []
+    for d in data:
+#        tasks.append((d, overwrite, high_control=high_control, low_control=low_control))
+        tasks.append((d, overwrite))
+    results = [pool.apply_async(write_correctness, t) for t in tasks]
+
+    for result in results:
+        data_list = result.get()
+
+
 
 def compute_correctness_with_classifier(df, 
                                      out_dir = '.', 
@@ -193,6 +241,8 @@ def compute_correctness_with_classifier(df,
     result = df.drop(drop_list,
                       axis=1).drop_duplicates().reset_index()
 
+    experiment = df['plan'].unique()[0]
+
 
     results = []
 
@@ -200,7 +250,8 @@ def compute_correctness_with_classifier(df,
     results.append(compute_correctness_classifier(df,
                                             out_dir = out_dir,
                                             mean_output_label='mean_correct_classifier',
-                                            std_output_label='std_correct_classifier',                                            
+                                            std_output_label='std_correct_classifier',
+                                            description = experiment+"_correctness",
                                             high_control=high_control,
                                             low_control=low_control,
                                              add_predictions = add_predictions,
