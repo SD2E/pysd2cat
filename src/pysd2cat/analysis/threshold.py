@@ -5,39 +5,11 @@ import os
 from pysd2cat.data import pipeline
 from pysd2cat.analysis.Names import Names    
 
-def write_accuracy(data_file, overwrite, high_control=Names.NOR_00_CONTROL, low_control=Names.WT_LIVE_CONTROL):
-    try:
-        data_dir = "/".join(data_file.split('/')[0:-1])
-        out_path = os.path.join(data_dir, 'accuracy')
-        out_file = os.path.join(out_path, data_file.split('/')[-1])
-        if overwrite or not os.path.isfile(out_file):
-            print("Computing accuracy file: " + out_file)
-            data_df = pd.read_csv(data_file,memory_map=True,dtype={'od': float, 'input' : object, 'output' : object}, index_col=0 )
-            accuracy_df = compute_accuracy(data_df, high_control=high_control, low_control=low_control)
-            print("Writing accuracy file: " + out_file)
-            accuracy_df.to_csv(out_file)
-    except Exception as e:
-        print("File failed: " + data_file + " with: " + str(e))
-        pass
-
-
-def write_accuracy_files(data, overwrite=False, high_control=Names.NOR_00_CONTROL, low_control=Names.WT_LIVE_CONTROL):
-    import multiprocessing
-    pool = multiprocessing.Pool(int(multiprocessing.cpu_count()))
-    multiprocessing.cpu_count()
-    tasks = []
-    for d in data:
-#        tasks.append((d, overwrite, high_control=high_control, low_control=low_control))
-        tasks.append((d, overwrite))
-    results = [pool.apply_async(write_accuracy, t) for t in tasks]
-
-    for result in results:
-        data_list = result.get()
  
 
-def get_experiment_accuracy_and_metadata(adf):
+def get_experiment_correctness_and_metadata(adf):
     """
-    Cleanup the accuracy dataframe from an experiment.
+    Cleanup the correctness dataframe from an experiment.
     """
     def media_fix(x):
         media_map = {
@@ -85,7 +57,7 @@ def get_experiment_accuracy_and_metadata(adf):
            'SSC_W', 'BL1_W', 'RL1_W', 'Time']
     final_df = adf
     #print(final_df['media'])
-    final_df['media'] = final_df['media'].apply(media_fix)
+    final_df.loc[:, 'media'] = final_df['media'].apply(media_fix)
     final_df = final_df.apply(fix_input, axis=1)            
     final_df = final_df.apply(fix_output, axis=1)
     final_df = final_df.apply(fix_temp, axis=1)
@@ -96,24 +68,24 @@ def get_experiment_accuracy_and_metadata(adf):
     
     return final_df
 
-def get_sample_accuracy(data):
+def get_sample_correctness(data):
     """
-    Get a dataframe that includes the accuracy of all samples and condition sets.
-    Requires dataframes for accuracy are present in paths listed in 'data' parameter.
+    Get a dataframe that includes the correctness of all samples and condition sets.
+    Requires dataframes for correctness are present in paths listed in 'data' parameter.
     """
     all_df = pd.DataFrame()
     for d in data:
         if os.path.isfile(d):
-            #print("Getting Accuracy for: " + str(d))
+            #print("Getting Correctness for: " + str(d))
             #df = pd.read_csv(d)
             adata = os.path.join("/".join(d.split('/')[0:-1]), 'accuracy', d.split('/')[-1])
             if os.path.isfile(adata):
                 adf = pd.read_csv(adata, dtype={'od': float, 'input' : object}, index_col=0)
                 if 'media' in adf.columns:
-                    final_df = get_experiment_accuracy_and_metadata(adf)
+                    final_df = get_experiment_correctness_and_metadata(adf)
                     all_df = all_df.append(final_df, ignore_index=True)
-    all_df['prc_improve'] = all_df['probability_correct_live'] - all_df['probability_correct']
-    all_df['live_proportion'] = all_df['count_live'] / all_df['count']
+    all_df.loc[:, 'prc_improve'] = all_df['probability_correct_live'] - all_df['probability_correct']
+    all_df.loc[:, 'live_proportion'] = all_df['count_live'] / all_df['count']
     #all_df['sample_time'] = all_df.apply(pipeline.get_sample_time, axis=1)
     return all_df
 
@@ -129,8 +101,8 @@ def get_threshold(df, channel='BL1_A', high_control=Names.NOR_00_CONTROL, low_co
     low_df.loc[:,'output'] = low_df.apply(lambda x: 0, axis=1)
     high_low_df = high_df.append(low_df)
     high_low_df = high_low_df.loc[high_low_df[channel] > 0]
-    high_low_df[channel] = np.log(high_low_df[channel]).replace([np.inf, -np.inf], np.nan).dropna()
-    high_low_df[channel]
+    high_low_df.loc[:, channel] = np.log(high_low_df[channel]).replace([np.inf, -np.inf], np.nan).dropna()
+    #high_low_df[channel]
     
     if len(high_df) == 0 or len(low_df) == 0:
         raise Exception("Cannot compute threshold if do not have both low and high control")
@@ -200,7 +172,20 @@ def fix_output(row):
         row['output'] = '0'
     return row
 
-def compute_accuracy(m_df, channel='BL1_A', thresholds=None, use_log_value=True, high_control=Names.NOR_00_CONTROL, low_control=Names.WT_LIVE_CONTROL):
+def compute_correctness(m_df,
+                     channel='BL1_A',
+                     thresholds=None,
+                     use_log_value=True,
+                     high_control=Names.NOR_00_CONTROL,
+                     low_control=Names.WT_LIVE_CONTROL,
+                     output_label='probability_correct',
+                     mean_name='mean_log_gfp',
+                     std_name='std_log_gfp',
+                     mean_correct_name='probability_correct',
+                     std_correct_name='std_correct',
+                     count_name='count',
+                     threshold_name='threshold'
+                     ):
     if thresholds is None:
         try:
             threshold, threshold_quality = get_threshold(m_df, channel, high_control=high_control, low_control=low_control)
@@ -211,66 +196,79 @@ def compute_accuracy(m_df, channel='BL1_A', thresholds=None, use_log_value=True,
             #thresholds = [np.log(10000)]
       
     #print("Threshold  = " + str(thresholds[0]))
-    samples = m_df['id'].unique()
+    samples = m_df.groupby(['id'])
     plot_df = pd.DataFrame()
-    for sample_id in samples:
+    for id, sample in samples:
         #print(sample_id)
-        sample = m_df.loc[m_df['id'] == sample_id]
+        #sample = m_df.loc[m_df['id'] == sample_id]
         #print(sample.head())
-        circuit = sample['gate'].unique()[0]
-        if type(circuit) is str:
+        circuit = sample['gate'].dropna().unique()
+        if len(circuit) == 1:
             value_df = sample[[channel, 'output']].rename(index=str, columns={channel: "value"})          
             if use_log_value:
                 value_df = value_df.loc[value_df['value'] > 0]
-                value_df['value'] = np.log(value_df['value']).replace([np.inf, -np.inf], np.nan).dropna()
+                value_df.loc[:,'value'] = np.log(value_df['value']).replace([np.inf, -np.inf], np.nan).dropna()
             #print(value_df.head())
-            thold_df = do_threshold_analysis(value_df, thresholds)
-            
-            thold_df['mean_log_gfp'] = np.mean(value_df['value'])
-            thold_df['std_log_gfp'] = np.std(value_df['value'])
-            
-            thold_df['id'] = sample_id
-            for i in ['gate', 'input', 'output', 'od', 'media',
-                      'inc_temp', 'replicate', 'inc_time_1',
-                      'inc_time_2', 'strain_name']:
-                if i in sample.columns:
-                    thold_df[i] = sample[i].unique()[0]
-                elif i == 'inc_temp':
-                    thold_df[i] = 'warm_30'
-                else:
-                    thold_df[i] = None
-            thold_df = thold_df.apply(fix_input, axis=1)            
-            thold_df = thold_df.apply(fix_output, axis=1)
-            
-            if 'live' in m_df.columns:
-                sample_live = sample.loc[sample['live'] == 1]
-                value_df = sample_live[[channel, 'output']].rename(index=str, columns={channel: "value"})
-                if use_log_value:
-                    value_df = value_df.loc[value_df['value'] > 0]
-                    value_df['value'] = np.log(value_df['value']).replace([np.inf, -np.inf], np.nan).dropna()
+            thold_df = do_threshold_analysis(value_df,
+                                             thresholds,
+                                             mean_correct_name=mean_correct_name,
+                                             std_correct_name=std_correct_name,
+                                             count_name=count_name,
+                                             threshold_name=threshold_name)
 
-                #print(value_df.shape())
-                thold_live_df = do_threshold_analysis(value_df, thresholds)
-                thold_df['probability_correct_live'] = thold_live_df['probability_correct']
-                thold_df['standard_error_correct_live'] = thold_live_df['standard_error_correct']
-                thold_df['count_live'] = thold_live_df['count']
-                thold_df['mean_log_gfp_live'] = np.mean(value_df['value'])
-                thold_df['std_log_gfp_live'] = np.std(value_df['value'])
-            else:
-                thold_df['probability_correct_live'] = None #thold_df['probability_correct']
-                thold_df['standard_error_correct_live'] = None #thold_df['standard_error_correct']
-                thold_df['count_live'] = None #thold_df['count']
-                thold_df['mean_log_gfp_live'] = None
-                thold_df['std_log_gfp_live'] = None
+            
+            thold_df[mean_name] = np.mean(value_df['value'])
+            thold_df[std_name] = np.std(value_df['value'])
+            
+            thold_df['id'] = id
+#            for i in ['gate', 'input', 'output', 'od', 'media',
+#                      'inc_temp', 'replicate', 'inc_time_1',
+#                      'inc_time_2', 'strain_name']:
+#                if i in sample.columns:
+#                    thold_df[i] = sample[i].unique()[0]
+#                elif i == 'inc_temp':
+#                    thold_df[i] = 'warm_30'
+#                else:
+#                    thold_df[i] = None
+#            thold_df = thold_df.apply(fix_input, axis=1)            
+#            thold_df = thold_df.apply(fix_output, axis=1)
+            
+            ## if 'live' in m_df.columns:
+            ##     sample_live = sample.loc[sample['live'] == 1]
+            ##     value_df = sample_live[[channel, 'output']].rename(index=str, columns={channel: "value"})
+            ##     if use_log_value:
+            ##         value_df = value_df.loc[value_df['value'] > 0]
+            ##         value_df['value'] = np.log(value_df['value']).replace([np.inf, -np.inf], np.nan).dropna()
+
+            ##     #print(value_df.shape())
+            ##     thold_live_df = do_threshold_analysis(value_df, thresholds)
+            ##     thold_df['probability_correct_live'] = thold_live_df['probability_correct']
+            ##     thold_df['standard_error_correct_live'] = thold_live_df['standard_error_correct']
+            ##     thold_df['count_live'] = thold_live_df['count']
+            ##     thold_df['mean_log_gfp_live'] = np.mean(value_df['value'])
+            ##     thold_df['std_log_gfp_live'] = np.std(value_df['value'])
+            ## else:
+            ##     thold_df['probability_correct_live'] = None #thold_df['probability_correct']
+            ##     thold_df['standard_error_correct_live'] = None #thold_df['standard_error_correct']
+            ##     thold_df['count_live'] = None #thold_df['count']
+            ##     thold_df['mean_log_gfp_live'] = None
+            ##     thold_df['std_log_gfp_live'] = None
 
 
 
                 
             #print(thold_df)
             plot_df = plot_df.append(thold_df, ignore_index=True)
+    #plot_df = plot_df.rename(columns={mean_correct_name : output_label})
     return plot_df 
 
-def do_threshold_analysis(df, thresholds):
+def do_threshold_analysis(df,
+                          thresholds,
+                          mean_correct_name='probability_correct',
+                          std_correct_name='std_correct',
+                          count_name='count',
+                          threshold_name='threshold'
+                          ):
     """
     Get Probability that samples fall on correct side of threshold
     """
@@ -299,10 +297,10 @@ def do_threshold_analysis(df, thresholds):
             se = 0
 
         results= results.append({
-            'probability_correct' : pr, 
-            'standard_error_correct' : se,
-            'count' : count,
-            'threshold' : threshold}, ignore_index=True)
+            mean_correct_name : pr, 
+            std_correct_name : se,
+            count_name : count,
+            threshold_name : threshold}, ignore_index=True)
     return results
     
 
