@@ -1,6 +1,5 @@
 from pysd2cat.data import pipeline
 from pysd2cat.analysis import threshold
-from pysd2cat.analysis.Names import Names
 
 def main():
     ex_id = 'experiment.transcriptic.r1c5va879uaex_r1c639xp952g4'
