@@ -270,7 +270,9 @@ def detect_runtime():
     elif 'TACC_DOMAIN' in os.environ:
         return 'hpc'
     else:
-        raise Exception('Not a known runtime')
+#        raise Exception('Not a known runtime')
+        print("os.environ: {}".format(os.environ))
+        return 'cli'
 
 def get_flow_dataframe(data_dir,filename):
     df = FCT.FCMeasurement(ID=filename, datafile=os.path.join(data_dir, filename)).read_data()
