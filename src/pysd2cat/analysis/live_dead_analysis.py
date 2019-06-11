@@ -41,6 +41,7 @@ def write_live_dead_column(data_file, strain_column_name, live_strain_name, dead
         
     return df
 
+
 def write_live_dead_columns(data):
     import multiprocessing
     pool = multiprocessing.Pool(int(multiprocessing.cpu_count()))
@@ -52,7 +53,82 @@ def write_live_dead_columns(data):
 
     for result in results:
         data_list = result.get()
+
+def strain_to_class(x):
+    """
+    Boolean class labels for live/dead classifier
+    """
+    if x['strain_name'] == Names.WT_LIVE_CONTROL:
+        return 1
+    elif x['strain_name'] == Names.WT_DEAD_CONTROL:
+        return 0
+    else:
+        return None
+
+def get_classifier_dataframe(df, strain_column_name, live_strain_name, dead_strain_name):
+    """
+    Get the classifier data corresponding to controls.
+    """
+    df_columns = df.columns.tolist()
+    print("data_columns: {}".format(df_columns))
+    live_df = df.loc[df[strain_column_name] == live_strain_name]
+    dead_df = df.loc[df[strain_column_name] == dead_strain_name]
+    live_df.loc[:,strain_column_name] = live_df.apply(strain_to_class, axis=1)
+    dead_df.loc[:,strain_column_name] = dead_df.apply(strain_to_class, axis=1)
+    live_dead_df = live_df.append(dead_df)
+    print(live_dead_df.head(5))
+    live_dead_df = live_dead_df.rename(index=str, columns={strain_column_name: "class_label"})
+    print("after renaming {} to class_label".format(strain_column_name))
+    print(live_dead_df.head(5))
+    data_columns = list(set(df_columns) - {'sample_id', 'replicate', 'temperature', strain_column_name, 'input_state', 'timepoint', 'file_id'})
+    live_dead_df = live_dead_df[data_columns + ['class_label']]
+    return live_dead_df
+
+
+
+def add_live_dead_test_harness(df, 
+                               data_columns = ['FSC_A', 'SSC_A', 'BL1_A', 'RL1_A', 'FSC_H', 
+                                               'SSC_H', 'BL1_H', 'RL1_H', 'FSC_W', 'SSC_W', 
+                                               'BL1_W', 'RL1_W'],                               
+                               out_dir='.'):
+    """
+    Same as add_live_dead(), but use test-harness.
+    """
  
+    experiment = df.plan.unique()[0]
+
+    ## Build the training/test input
+    c_df = get_classifier_dataframe(df, data_columns = data_columns)
+    #print(c_df.head())
+    c_df.loc[:, 'index'] = c_df.index
+    #c_df.loc[:, 'id'] = df['id']
+    df.loc[:, 'index'] = df.index
+
+
+    ## Build the classifier
+    ## Predict label for unseen data
+    pred_df = ldc.build_model_pd(c_df, 
+                                 data_df = df, 
+                                 input_cols=data_columns,
+                                 index_cols=['index'],
+                                 output_location=out_dir,
+                                 description=experiment+"_live"
+                                )
+    #print(pred_df.head())
+    if 'live' in df.columns:
+        df=df.drop(['live'], axis=1)
+    #df=df.reset_index()
+    live_col = pred_df.rename(columns={'class_label_predictions': 'live'})[['live']]
+    live_col.index = live_col.index.astype(str)
+
+    #print(live_col.head())
+#    print(df.dtypes)
+    df = df.join(live_col, how='left')
+    #print(df.head())
+    
+    return df
+
+
 
 def add_live_dead(df, strain_column_name, live_strain_name, dead_strain_name):
     """
@@ -60,34 +136,7 @@ def add_live_dead(df, strain_column_name, live_strain_name, dead_strain_name):
     Build a live dead classifier from controls.
     Apply classifier to each event to create 'live' column
     """
-    #data_columns = ['FSC-A', 'SSC-A', 'BL1-A', 'RL1-A', 'FSC-H', 'SSC-H', 'BL1-H', 'RL1-H', 'FSC-W', 'SSC-W', 'BL1-W', 'RL1-W']
-    df_columns = df.columns.tolist()
-    print("data_columns: {}".format(df_columns))
-    def strain_to_class(x):
-        if x[strain_column_name] == live_strain_name:
-            return "1"
-        elif x[strain_column_name] == dead_strain_name:
-            return "0"
-        else:
-            return None
-    live_df = df.loc[df[strain_column_name] == live_strain_name]
-    dead_df = df.loc[df[strain_column_name] == dead_strain_name]
-    live_df.loc[:,strain_column_name] = live_df.apply(strain_to_class, axis=1)
-    dead_df.loc[:,strain_column_name] = dead_df.apply(strain_to_class, axis=1)
-    live_dead_df = live_df.append(dead_df)
-    #print(live_dead_df)
-
-    #live_dead_df = df.loc[(df['strain_name'] == Names.WT_DEAD_CONTROL) | (df['strain_name'] == Names.WT_LIVE_CONTROL)]
-    #live_dead_df['strain_name'] = live_dead_df['strain_name'].mask(live_dead_df['strain_name'] == Names.WT_DEAD_CONTROL,  0)
-    #live_dead_df['strain_name'] = live_dead_df['strain_name'].mask(live_dead_df['strain_name'] == Names.WT_LIVE_CONTROL,  1)
-    print(live_dead_df.head(5))
-    live_dead_df = live_dead_df.rename(index=str, columns={strain_column_name: "class_label"})
-    print("after renaming {} to class_label".format(strain_column_name))
-    print(live_dead_df.head(5))
-    data_columns = list(set(df_columns) - {'sample_id', 'replicate', 'temperature', strain_column_name, 'input_state', 'timepoint', 'file_id'})
-    live_dead_df = live_dead_df[data_columns + ['class_label']]
-    print("live_dead_df before build_model")
-    print(live_dead_df.head(5))
+    live_dead_df = get_classifier_dataframe(df, strain_column_name, live_strain_name, dead_strain_name)
     (model, mean_absolute_error, test_X, test_y, scaler) = ldc.build_model(live_dead_df)
     pred_df = df[data_columns]
     print("pred_df")

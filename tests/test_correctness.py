@@ -11,11 +11,11 @@ def main():
     print("data_df.columns: {}".format(data_df.columns))
     print(data_df.head(5))
 
-    accuracy_df = threshold.compute_accuracy(data_df, id_name='sample_id')
-    print("accuracy_df")
-    print(accuracy_df.columns.tolist())
-    print(accuracy_df.head(5))
-    accuracy_df.to_csv("samples_labelled.csv")
+    correctness_df = threshold.compute_correctness(data_df, high_control="NOR 00 Control", id_name='sample_id')
+    print("correctness_df")
+    print(correctness_df.columns.tolist())
+    print(correctness_df.head(5))
+    correctness_df.to_csv("samples_labelled.csv")
     
 if __name__ == '__main__':
     main()

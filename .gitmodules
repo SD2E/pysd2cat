@@ -1,0 +1,3 @@
+[submodule "test-harness"]
+	path = test-harness
+	url = https://gitlab.sd2e.org/sd2program/test-harness.git
