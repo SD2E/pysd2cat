@@ -54,25 +54,25 @@ def write_live_dead_columns(data):
     for result in results:
         data_list = result.get()
 
-def strain_to_class(x):
-    """
-    Boolean class labels for live/dead classifier
-    """
-    if x['strain_name'] == Names.WT_LIVE_CONTROL:
-        return 1
-    elif x['strain_name'] == Names.WT_DEAD_CONTROL:
-        return 0
-    else:
-        return None
-
 def get_classifier_dataframe(df, strain_column_name, live_strain_name, dead_strain_name):
     """
     Get the classifier data corresponding to controls.
     """
     df_columns = df.columns.tolist()
     print("data_columns: {}".format(df_columns))
+    def strain_to_class(x):
+        if x[strain_column_name] == live_strain_name:
+            return "1"
+        elif x[strain_column_name] == dead_strain_name:
+            return "0"
+        else:
+            return None
     live_df = df.loc[df[strain_column_name] == live_strain_name]
     dead_df = df.loc[df[strain_column_name] == dead_strain_name]
+    print("live_df")
+    print(live_df.head(5))
+    print("dead_df")
+    print(dead_df.head(5))    
     live_df.loc[:,strain_column_name] = live_df.apply(strain_to_class, axis=1)
     dead_df.loc[:,strain_column_name] = dead_df.apply(strain_to_class, axis=1)
     live_dead_df = live_df.append(dead_df)
