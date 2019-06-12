@@ -57,7 +57,7 @@ def strain_to_class(x,
                     strain_column_name,
                     live_strain_name,
                     dead_strain_name):
-    """
+   """
     Boolean class labels for live/dead classifier
     """
     if x[strain_column_name] == live_strain_name:
@@ -84,12 +84,7 @@ def get_classifier_dataframe(df,
     live_dead_df = live_df.append(dead_df)
     #print(live_dead_df)
     live_dead_df = live_dead_df.rename(index=str, columns={strain_column_name: "class_label"})
-<<<<<<< HEAD
-=======
-    print("after renaming {} to class_label".format(strain_column_name))
-    print(live_dead_df.head(5))
     data_columns = list(set(df_columns) - {'sample_id', strain_column_name, 'file_id'})
->>>>>>> 9c537f9... removed obsolete column names
     live_dead_df = live_dead_df[data_columns + ['class_label']]
     return live_dead_df
 
@@ -168,12 +163,12 @@ def add_live_dead(df,
     (model, mean_absolute_error, test_X, test_y, scaler) = ldc.build_model(c_df)
 
     ## Predict label for unseen data
+    data_columns = list(set(df.columns.tolist()) - {strain_column_name, 'file_id'})
     pred_df = df[data_columns]
-    print("pred_df")
-    print(pred_df.head(5))
+    #print(pred_df)
     pred_df = ldc.predict_live_dead(pred_df, model, scaler)
     df.loc[:,'live'] = pred_df['class_label'].astype(int)
-    ouput_columns = ['sample_id'] + data_columns + ['live']
+    ouput_columns = data_columns + ['live']
     result_df = df[ouput_columns]
     return result_df
 
