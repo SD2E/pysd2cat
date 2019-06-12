@@ -84,6 +84,12 @@ def get_classifier_dataframe(df,
     live_dead_df = live_df.append(dead_df)
     #print(live_dead_df)
     live_dead_df = live_dead_df.rename(index=str, columns={strain_column_name: "class_label"})
+<<<<<<< HEAD
+=======
+    print("after renaming {} to class_label".format(strain_column_name))
+    print(live_dead_df.head(5))
+    data_columns = list(set(df_columns) - {'sample_id', strain_column_name, 'file_id'})
+>>>>>>> 9c537f9... removed obsolete column names
     live_dead_df = live_dead_df[data_columns + ['class_label']]
     return live_dead_df
 
