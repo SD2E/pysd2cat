@@ -139,12 +139,12 @@ def add_live_dead(df, strain_column_name, live_strain_name, dead_strain_name):
     live_dead_df = get_classifier_dataframe(df, strain_column_name, live_strain_name, dead_strain_name)
     (model, mean_absolute_error, test_X, test_y, scaler) = ldc.build_model(live_dead_df)
     ## Predict label for unseen data
-    data_columns = list(set(df.columns.tolist()) - {strain_column_name, 'file_id'})
+    data_columns = list(set(df.columns.tolist()) - {'sample_id', strain_column_name, 'file_id'})
     pred_df = df[data_columns]
     #print(pred_df)
     pred_df = ldc.predict_live_dead(pred_df, model, scaler)
     df.loc[:,'live'] = pred_df['class_label'].astype(int)
-    ouput_columns = data_columns + ['live']
+    ouput_columns = ['sample_id'] + data_columns + ['live']
     result_df = df[ouput_columns]
     return result_df
 
