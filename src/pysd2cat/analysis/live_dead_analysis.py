@@ -57,7 +57,7 @@ def strain_to_class(x,
                     strain_column_name,
                     live_strain_name,
                     dead_strain_name):
-   """
+    """
     Boolean class labels for live/dead classifier
     """
     if x[strain_column_name] == live_strain_name:
