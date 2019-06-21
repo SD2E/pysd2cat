@@ -82,7 +82,11 @@ def compute_predicted_output(df,
 def compute_correctness_classifier(df,
                              out_dir = '.',
                              mean_output_label='probability_correct',
-                             std_output_label='std_probability_correct',                             
+                             std_output_label='std_probability_correct',
+                             mean_correct_high_name='mean_correct_high_classifier',
+                             std_correct_high_name='std_correct_high_classifier',
+                             mean_correct_low_name='mean_correct_low_classifier',
+                             std_correct_low_name='std_correct_low_classifier',
                              high_control=Names.NOR_00_CONTROL,
                              low_control=Names.WT_LIVE_CONTROL,
                              description=None,
@@ -98,10 +102,18 @@ def compute_correctness_classifier(df,
                                          description=description)
     l.debug("Shape of result: " + str(result_df.shape) + ", columns= " + str(result_df.columns))
     result_df.loc[:, 'predicted_correct'] = result_df.apply(lambda x : None if np.isnan(x['output']) or np.isnan(x['predicted_output']) else 1.0 - np.abs(x['output'] - x['predicted_output']), axis=1)
+    result_df.loc[:, 'predicted_high'] = result_df.apply(lambda x : None if np.isnan(x['output']) or np.isnan(x['predicted_output']) else 1.0 - np.abs(1- x['predicted_output']), axis=1)
+    result_df.loc[:, 'predicted_low'] = result_df.apply(lambda x : None if np.isnan(x['output']) or np.isnan(x['predicted_output']) else 1.0 - np.abs(x['predicted_output']), axis=1)
+
+
+
     l.debug(result_df)
     if add_predictions:
         df.loc[:, 'predicted_output'] = result_df['predicted_output']
         df.loc[:, 'predicted_correct'] = result_df['predicted_correct']
+        df.loc[:, 'predicted_high'] = result_df['predicted_high']
+        df.loc[:, 'predicted_low'] = result_df['predicted_low']
+
 
 
 
@@ -114,27 +126,45 @@ def compute_correctness_classifier(df,
 #            print(x['predicted_correct'].value_counts())
             res['mean'] = x['predicted_correct'].mean()
             res['std'] = x['predicted_correct'].std()
+            res['mean_high'] = x['predicted_high'].mean()
+            res['std_high'] = x['predicted_high'].std()
+            res['mean_low'] = x['predicted_low'].mean()
+            res['std_low'] = x['predicted_low'].std()
+
         else:
             res['mean'] = None
             res['std'] = None
+            res['mean_high'] = None
+            res['std_high'] = None
+            res['mean_low'] = None
+            res['std_low'] = None
+
+
         #print(res['count'])
-        return pd.Series(res, index=['mean', 'std'])
+        return pd.Series(res, index=['mean', 'std', 'mean_high', 'std_high', 'mean_low', 'std_low'])
 
     groups = result_df.groupby(['id'])
     acc_df = groups.apply(nan_agg).reset_index() 
 
     l.debug("Shape of acc: " + str(acc_df.shape))
     #print(acc_df)
-    acc_df = acc_df.rename(columns={'mean' : mean_output_label, 'std' : std_output_label })
+    acc_df = acc_df.rename(columns={'mean' : mean_output_label, 
+                                    'std' : std_output_label,
+                                    'mean_high' : mean_correct_high_name, 
+                                    'std_high' : std_correct_high_name, 
+                                    'mean_low' : mean_correct_low_name, 
+                                    'std_low' : std_correct_low_name
+                                   })
     #print(acc_df)
     return acc_df
     
     
 def compute_correctness_all(df, out_dir = '.', high_control=Names.NOR_00_CONTROL, low_control=Names.WT_LIVE_CONTROL):
     drop_list = ['Time', 'FSC_A', 'SSC_A', 'BL1_A', 'RL1_A', 'FSC_H', 'SSC_H',
-                      'BL1_H', 'RL1_H', 'FSC_W', 'SSC_W', 'BL1_W', 'RL1_W', 'live']
-    if 'index' in df.columns:
-        drop_list.append('index')
+                      'BL1_H', 'RL1_H', 'FSC_W', 'SSC_W', 'BL1_W', 'RL1_W', 'live', 'index']
+    drop_list = [x for x in drop_list if x in df.columns]
+    #if 'index' in df.columns:
+    #    drop_list.append('index')
     result = df.drop(drop_list,
                       axis=1).drop_duplicates().reset_index()
 
@@ -151,6 +181,10 @@ def compute_correctness_all(df, out_dir = '.', high_control=Names.NOR_00_CONTROL
                                     std_name='std_log_gfp',
                                     mean_correct_name='mean_correct_threshold',
                                     std_correct_name='std_correct_threshold',
+                                    mean_correct_high_name='mean_correct_high_threshold',
+                                    std_correct_high_name='std_correct_high_threshold',
+                                    mean_correct_low_name='mean_correct_low_threshold',
+                                    std_correct_low_name='std_correct_low_threshold',
                                     count_name='count',
                                     threshold_name='threshold'))
 
@@ -159,6 +193,10 @@ def compute_correctness_all(df, out_dir = '.', high_control=Names.NOR_00_CONTROL
                                             out_dir = out_dir,
                                             mean_output_label='mean_correct_classifier',
                                             std_output_label='std_correct_classifier',
+                                            mean_correct_high_name='mean_correct_high_classifier',
+                                            std_correct_high_name='std_correct_high_classifier',
+                                            mean_correct_low_name='mean_correct_low_classifier',
+                                            std_correct_low_name='std_correct_low_classifier',
                                             description = experiment+"_correctness",
                                             high_control=high_control,
                                             low_control=low_control,
@@ -176,6 +214,10 @@ def compute_correctness_all(df, out_dir = '.', high_control=Names.NOR_00_CONTROL
                                         std_name='std_log_gfp_live',
                                         mean_correct_name='mean_correct_threshold_live',
                                         std_correct_name='std_correct_threshold_live',
+                                        mean_correct_high_name='mean_correct_high_threshold_live',
+                                        std_correct_high_name='std_correct_high_threshold_live',
+                                        mean_correct_low_name='mean_correct_low_threshold_live',
+                                        std_correct_low_name='std_correct_low_threshold_live',
                                         count_name='count_live',
                                         threshold_name='threshold_live'))
 
@@ -185,13 +227,18 @@ def compute_correctness_all(df, out_dir = '.', high_control=Names.NOR_00_CONTROL
                                                 mean_output_label='mean_correct_classifier_live',
                                                 std_output_label='std_correct_classifier_live',
                                                 description = experiment + "_correctness_live",
+                                                mean_correct_high_name='mean_correct_high_classifier_live',
+                                                std_correct_high_name='std_correct_high_classifier_live',
+                                                mean_correct_low_name='mean_correct_low_classifier_live',
+                                                std_correct_low_name='std_correct_low_classifier_live',
                                                 high_control=high_control,
                                                 low_control=low_control,
                                                 use_harness=True))
 
     #print(len(result))
     for r in results:
-        result = result.merge(r, on='id')
+        if 'id' in r.columns:
+            result = result.merge(r, on='id')
         #print(len(result))
     return result
 
@@ -211,17 +258,19 @@ def write_correctness(data_file, overwrite, high_control=Names.NOR_00_CONTROL, l
         print("File failed: " + data_file + " with: " + str(e))
         pass
 
+def write_correctness_job(args, kwargs):
+    write_correctness(*args, *kwargs)
 
 def write_correctness_files(data, overwrite=False, high_control=Names.NOR_00_CONTROL, low_control=Names.WT_LIVE_CONTROL):
     import multiprocessing
-#    pool = multiprocessing.Pool(int(multiprocessing.cpu_count()))
+    #pool = multiprocessing.Pool(int(multiprocessing.cpu_count()))
     pool = multiprocessing.Pool(4)
     multiprocessing.cpu_count()
     tasks = []
-    for d in data:
-#        tasks.append((d, overwrite, high_control=high_control, low_control=low_control))
-        tasks.append((d, overwrite))
-    results = [pool.apply_async(write_correctness, t) for t in tasks]
+    for d in data:       
+        tasks.append(((d, overwrite), {high_control:high_control, low_control:low_control}))
+#        tasks.append((d, overwrite))
+    results = [pool.apply_async(write_correctness_job, t) for t in tasks]
 
     for result in results:
         data_list = result.get()
