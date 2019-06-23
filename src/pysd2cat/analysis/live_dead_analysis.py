@@ -71,12 +71,12 @@ def get_classifier_dataframe(df,
                              strain_column_name,
                              live_strain_name,
                              dead_strain_name,
-                             data_columns = ['FSC_A', 'SSC_A', 'BL1_A', 'RL1_A', 'FSC_H', 'SSC_H',
-                                             'BL1_H', 'RL1_H', 'FSC_W', 'SSC_W', 'BL1_W', 'RL1_W']):
+                             fcs_columns = None):
     """
     Get the classifier data corresponding to controls.
     """
     df_columns = df.columns.tolist()
+    print("data_columns: {}".format(df_columns))
     live_df = df.loc[df[strain_column_name] == live_strain_name]
     dead_df = df.loc[df[strain_column_name] == dead_strain_name]
     live_df.loc[:,strain_column_name] = live_df.apply(lambda x : strain_to_class(x, strain_column_name, live_strain_name, dead_strain_name), axis=1)
@@ -84,7 +84,11 @@ def get_classifier_dataframe(df,
     live_dead_df = live_df.append(dead_df)
     #print(live_dead_df)
     live_dead_df = live_dead_df.rename(index=str, columns={strain_column_name: "class_label"})
-    data_columns = list(set(df_columns) - {'sample_id', strain_column_name, 'file_id'})
+    if fcs_columns:
+        data_columns = fcs_columns
+    else:
+        data_columns = list(set(df_columns) - {'sample_id', strain_column_name, 'file_id'})
+    print(data_columns)
     live_dead_df = live_dead_df[data_columns + ['class_label']]
     return live_dead_df
 
@@ -93,9 +97,7 @@ def add_live_dead_test_harness(df,
                                strain_column_name,
                                live_strain_name,
                                dead_strain_name,
-                               data_columns = ['FSC_A', 'SSC_A', 'BL1_A', 'RL1_A', 'FSC_H', 
-                                               'SSC_H', 'BL1_H', 'RL1_H', 'FSC_W', 'SSC_W', 
-                                               'BL1_W', 'RL1_W'],                               
+                               fcs_columns = None,                               
                                out_dir='.'):
     """
     Same as add_live_dead(), but use test-harness.
@@ -108,7 +110,7 @@ def add_live_dead_test_harness(df,
                                     strain_column_name,
                                     live_strain_name,
                                     dead_strain_name,
-                                    data_columns = data_columns)
+                                    fcs_columns = fcs_columns)
     #print(c_df.head())
     c_df.loc[:, 'index'] = c_df.index
     #c_df.loc[:, 'id'] = df['id']
@@ -138,38 +140,45 @@ def add_live_dead_test_harness(df,
     
     return df
 
+def get_fcs_columns():
+    return ['FSC_A', 'SSC_A', 'BL1_A', 'RL1_A', 'FSC_H', 'SSC_H',
+            'BL1_H', 'RL1_H', 'FSC_W', 'SSC_W', 'BL1_W', 'RL1_W']
 
 def add_live_dead(df,
                   strain_column_name,
                   live_strain_name,
                   dead_strain_name,
-                  data_columns = ['FSC_A', 'SSC_A', 'BL1_A', 'RL1_A', 'FSC_H', 'SSC_H', 'BL1_H', 'RL1_H', 'FSC_W', 'SSC_W', 'BL1_W', 'RL1_W']):
+                  fcs_columns = None):
     """
     Take an input_df corresponding to one plate.
     Build a live dead classifier from controls.
     Apply classifier to each event to create 'live' column
     """
 
-    data_columns = list(set(df_columns) - {'sample_id', 'replicate', 'temperature', strain_column_name, 'input_state', 'timepoint', 'file_id'})
-
     ## Build the training/test input
     c_df = get_classifier_dataframe(df,
                                     strain_column_name,
                                     live_strain_name,
                                     dead_strain_name,
-                                    data_columns = data_columns)
-    
+                                    fcs_columns = fcs_columns)
+    print(c_df)
     ## Build the classifier
     (model, mean_absolute_error, test_X, test_y, scaler) = ldc.build_model(c_df)
-
+    print(df.columns)
     ## Predict label for unseen data
-    data_columns = list(set(df.columns.tolist()) - {'sample_id', strain_column_name, 'file_id'})
+    if fcs_columns:
+        data_columns = fcs_columns
+        ouput_columns = list(df.columns) + ['live']
+    else:
+        data_columns = list(set(df.columns) - {'sample_id', strain_column_name, 'file_id'})
+        ouput_columns = ['sample_id'] + data_columns + ['live']
+    print(data_columns)
     pred_df = df[data_columns]
-    #print(pred_df)
+    print(pred_df)
     pred_df = ldc.predict_live_dead(pred_df, model, scaler)
     df.loc[:,'live'] = pred_df['class_label'].astype(int)
-    ouput_columns = ['sample_id'] + data_columns + ['live']
     result_df = df[ouput_columns]
+    print(result_df)
     return result_df
 
 
