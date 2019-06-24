@@ -21,11 +21,10 @@ def predict(all_data_df,
             output_location='.'):
     # list of feature columns to use and/or normalize:
     #Do these columns form a a unique entity? If not, we need to define a grouping.
-    sparse_cols = ['glycerol_stock','growth_media_1', 'growth_media_2', \
-                    'inc_temp', 'inc_time_1', 'inc_time_2', 'post_well', 'pre_well','source_container',\
+    sparse_cols = ['growth_media_1', 'growth_media_2', \
                      'SynBioHub URI']
-    all_data_df['glycerol_stock'].fillna('blank',inplace=True)
-    continuous_cols = ['post_od_raw','post_gfp_raw','pre_gfp_raw','pre_od_raw']
+    #all_data_df['glycerol_stock'].fillna('blank',inplace=True)
+    continuous_cols = ['post_od_raw', 'inc_temp', 'inc_time_1', 'inc_time_2']
     feature_cols = sparse_cols + continuous_cols
     l.debug(feature_cols)
     #cols_to_predict = []
@@ -41,7 +40,7 @@ def predict(all_data_df,
                   testing_data=test1,
                   data_and_split_description="OD Prediction",
                   cols_to_predict=cols_to_predict,
-                  index_cols=feature_cols+cols_to_predict,
+                  index_cols=['od', 'post_od_raw', 'SynBioHub URI'],
                   feature_cols_to_use=feature_cols,
                   normalize=True,
                   feature_cols_to_normalize=continuous_cols,
