@@ -259,7 +259,7 @@ def write_correctness(data_file, overwrite, high_control=Names.NOR_00_CONTROL, l
         pass
 
 def write_correctness_job(args, kwargs):
-    write_correctness(*args, *kwargs)
+    write_correctness(*args, **kwargs)
 
 def write_correctness_files(data, overwrite=False, high_control=Names.NOR_00_CONTROL, low_control=Names.WT_LIVE_CONTROL):
     import multiprocessing
