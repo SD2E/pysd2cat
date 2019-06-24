@@ -2,12 +2,12 @@ import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import numpy as np
 
-def get_strain_growth_plot(df):
+def get_strain_growth_plot(df, dpi=100):
+    fig = plt.figure(dpi=dpi)
     ax = plt.axes()
     fig_size = plt.rcParams["figure.figsize"]
-    # Set figure width to 12 and height to 9
-    fig_size[0] = 40
-    fig_size[1] = 30
+    fig_size[0] = 12
+    fig_size[1] = 9
     plt.rcParams["figure.figsize"] = fig_size
     columns = df.columns[1:] #[x for x in df.columns if 'strain' not in x]
 

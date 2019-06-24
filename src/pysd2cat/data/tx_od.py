@@ -44,11 +44,22 @@ def get_project_run_groups(project_id):
         calibration_run = None
 
     part_one_runs = project_runs[project_runs['Name'].str.contains('YeastGatesPartI_')]
+    
+    
+    def strip_hr(x):
+        if x['Name'].endswith("hr") or x['Name'].endswith("h"):
+            x['Name'] = "_".join(x['Name'].split("_")[0:-1])
+        return x
+    
+    part_one_runs.loc[:,'id'] = part_one_runs.apply(strip_hr, axis=1)
+    
     part_one_runs.loc[:,'index'] = part_one_runs.apply(lambda x: x['Name'].split('_')[-1], axis=1)
     part_one_runs = part_one_runs.rename(columns={'id' : 'part_1_id'}).drop(columns=['Name'])
     #print(part_one_runs)
 
     part_two_runs = project_runs[project_runs['Name'].str.contains('YeastGatesPartII')]
+    part_two_runs.loc[:,'id'] = part_two_runs.apply(strip_hr, axis=1)
+    
     if len(part_two_runs) > 0:
         part_two_runs.loc[:,'index'] = part_two_runs.apply(lambda x: x['Name'].split('_')[-1], axis=1)
         part_two_runs = part_two_runs.rename(columns={'id' : 'part_2_id'}).drop(columns=['Name'])
@@ -213,7 +224,7 @@ def create_od_csv(run_id, csv_path='tmp.csv'):
                 except KeyError:
                     raise KeyError('Found sample for well which did not have Fluorescence measurement')
 
-
+    print(measurements)
     with open(csv_path, 'w+') as csvfile:
         if glycerol_stock and glycerol_plate_index:
             writer = csv.DictWriter(csvfile, fieldnames=['well', 'od', 'gfp', 'sample', 'SynBioHub URI', 'glycerol_stock', 'glycerol_plate_index'])
@@ -292,8 +303,8 @@ def make_experiment_corrected_df(part_1_df, part_2_df, calibration_df=None):
     
     part_1_df = part_1_df.rename(columns={"od" : "pre_od_raw", "gfp" : "pre_gfp_raw", "well" : "pre_well"})
     part_2_df = part_2_df.rename(columns={"od" : "post_od_raw", "gfp" : "post_gfp_raw", "well" : "post_well"})
-    #print(part_1_df['sample'].value_counts())
-    #print(part_2_df['sample'].value_counts())
+    #print(part_1_df)
+    #print(part_2_df)
     experiment_df = part_1_df.merge(part_2_df, how='inner', on=['sample', 'SynBioHub URI']).drop(columns=['sample']).dropna().reset_index(drop=True)
 
     if calibration_df is not None:
@@ -304,6 +315,7 @@ def make_experiment_corrected_df(part_1_df, part_2_df, calibration_df=None):
         experiment_df.loc[:, 'pre_od_corrected'] = experiment_df.apply(lambda x: x['pre_od_raw'] * od_scaling_factor, axis=1 )
         experiment_df.loc[:, 'post_od_corrected'] = experiment_df.apply(lambda x: x['post_od_raw'] * od_scaling_factor, axis=1 )
     else:
+        #print(experiment_df)
         experiment_df.loc[:, 'pre_od_corrected'] = None
         experiment_df.loc[:, 'post_od_corrected'] = None
         
@@ -393,7 +405,7 @@ def get_data_and_metadata_df(experiment, out_dir, overwrite=False):
     experiment_od_file = os.path.join(out_dir, experiment['part_1_id'] + "_" + experiment['part_2_id'] + '.csv')
     if overwrite or not os.path.exists(experiment_od_file):
         try:
-            print(experiment_od_file)
+            #print(experiment_od_file)
             data = get_experiment_data(experiment, out_dir, overwrite=overwrite) 
             #print(data.head())
             

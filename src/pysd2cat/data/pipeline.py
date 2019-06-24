@@ -7,7 +7,7 @@ from pysd2cat.analysis.Names import Names
 
 ***REMOVED***
 client = pymongo.MongoClient(dbURI)
-db = client.catalog
+db = client.catalog_staging
 science_table=db.science_table
 jobs_table=db.jobs
 
@@ -22,6 +22,9 @@ def get_dataframe_for_live_dead_classifier(data_dir,control_type=[Names.WT_DEAD_
     """
 
     meta_df = get_metadata_dataframe(get_live_dead_controls(control_type))
+    print("meta_df")
+    print(meta_df.columns.tolist())
+    print(meta_df.head(5))
     #meta_df.to_csv("metadata_before_masking.csv")
 
     ##Drop columns that we don't need
@@ -29,7 +32,13 @@ def get_dataframe_for_live_dead_classifier(data_dir,control_type=[Names.WT_DEAD_
     da[Names.STRAIN] = da[Names.STRAIN].mask(da[Names.STRAIN] == Names.WT_DEAD_CONTROL,  0)
     da[Names.STRAIN] = da[Names.STRAIN].mask(da[Names.STRAIN] == Names.WT_LIVE_CONTROL,  1)
     da = da.rename(index=str, columns={Names.STRAIN: "class_label"})
+    print("da before get_data_and_metadata_df")
+    print(da.columns.tolist())
+    print(da.head(5))
     da = get_data_and_metadata_df(da, data_dir,fraction,max_records)
+    print("da after get_data_and_metadata_df")
+    print(da.columns.tolist())
+    print(da.head(5))
     da = da.drop(columns=[Names.FILENAME, 'Time'])
     return da
 
@@ -190,6 +199,7 @@ def get_metadata_dataframe(results):
     Convert science table results into metadata dataframe.
     """
     runtime = detect_runtime()
+    print("runtime: {}".format(runtime))    
     meta_df = pd.DataFrame()
     for result in results:
                
@@ -207,7 +217,7 @@ def get_metadata_dataframe(results):
             result_df['filename'] = result['jupyter_path']
         else:
             result_df['filename'] = result['hpc_path']
-        
+
         if not os.path.exists(result_df[Names.FILENAME]):
             # Fix error where wrong path exists with `uploads`
             if 'uploads' in result_df[Names.FILENAME]:
@@ -215,8 +225,6 @@ def get_metadata_dataframe(results):
             else:
                 continue
 
-            
-                
         ## Other values (not at top level)
         if Names.INOCULATION_DENSITY in result:
             result_df['od'] = result[Names.INOCULATION_DENSITY]['value']
@@ -262,11 +270,12 @@ def detect_runtime():
     elif 'TACC_DOMAIN' in os.environ:
         return 'hpc'
     else:
-        raise Exception('Not a known runtime')
+#        raise Exception('Not a known runtime')
+        print("os.environ: {}".format(os.environ))
+        return 'cli'
 
 def get_flow_dataframe(data_dir,filename):
-    df = FCT.FCMeasurement(ID=filename,
-                                    datafile=os.path.join(data_dir, filename)).read_data()
+    df = FCT.FCMeasurement(ID=filename, datafile=os.path.join(data_dir, filename)).read_data()
 
     return df
 
@@ -281,7 +290,7 @@ def get_data_and_metadata_df(metadata_df, data_dir, fraction=None, max_records=N
         ## Substitute local file for SD2 URI to agave file 
         #record['fcs_files'] = local_datafile(record['fcs_files'][0], data_dir)
         #dataset_local_df = dataset_local_df.append(record)
-        
+        print("record[{}]: {}".format(Names.FILENAME, record[Names.FILENAME]))
         if not os.path.exists(record[Names.FILENAME]):
             # Fix error where wrong path exists with `uploads`
             if 'uploads' in record[Names.FILENAME]:
@@ -292,10 +301,13 @@ def get_data_and_metadata_df(metadata_df, data_dir, fraction=None, max_records=N
                 continue
     
         ## Create a data frame out of FCS file
-        #print("data dir",data_dir)
-        #print("Filename",record[Names.FILENAME])
+        #print("data dir: {}".format(data_dir))
+        #print("Filename: {}".format(record[Names.FILENAME]))
 
         data_df = get_flow_dataframe(data_dir,record[Names.FILENAME])
+        #print("data_df")
+        #print(data_df.columns.tolist())
+        #print(data_df.head(5))
 
         if max_records is not None:
             data_df = data_df[0:min(len(data_df), max_records)]
@@ -309,6 +321,12 @@ def get_data_and_metadata_df(metadata_df, data_dir, fraction=None, max_records=N
         all_data_df = all_data_df.append(data_df)
 
     ## Join data and metadata
+    print("metadata_df")
+    print(metadata_df.columns.tolist())
+    print(metadata_df.head(5))
+    print("all_data_df")
+    print(all_data_df.columns.tolist())
+    print(all_data_df.head(5))
     final_df = metadata_df.merge(all_data_df, left_on='filename', right_on='filename', how='inner')
     return final_df
 
@@ -322,13 +340,13 @@ def get_xplan_data_and_metadata_df(metadata_df, data_dir, fraction=None, max_rec
     print("Getting xplan dataframe for experiment...")
     df = get_data_and_metadata_df(metadata_df, data_dir, fraction=fraction, max_records=max_records)
     rename_map = {
-        "experiment_id" : "plan",
-        "sample_id" : "id",
-        "strain_input_state" : "input",
+#        "experiment_id" : "plan",
+#        "sample_id" : "id",
+        "strain_input_state" : "input_state",
         "strain_circuit" : "gate",
-        "strain_sbh_uri" : "strain",
-        "strain" : "strain_name",
-        "temperature" : 'inc_temp'
+#        "strain_sbh_uri" : "strain",
+        "strain" : "strain_name"
+#        "temperature" : 'inc_temp'
     }
     for col in df.columns:
         if col not in rename_map:
@@ -488,13 +506,22 @@ def gate_output(gate, inputs):
 def get_strain_dataframe_for_classifier(circuit, input, od=0.0003, media='SC Media', experiment='', data_dir='', fraction=None):
     """
     """
-    meta_df = get_metadata_dataframe(get_strain(circuit, input, od=od, media=media, experiment=experiment))
-    da = meta_df[[Names.FILENAME, 'output']].copy()
-    #da['strain'] = da['strain'].mask(da['strain'] == 'WT-Dead-Control',  0)
-    #da['strain'] = da['strain'].mask(da['strain'] == 'WT-Live-Control',  1)
-    da = get_data_and_metadata_df(da, data_dir, fraction=fraction)
-    #da = da.drop(columns=['fcs_files', 'Time', 'RL1-W', 'BL1-W'])
-    da = da.drop(columns=['filename', 'Time'])
+    print("inside get_strain_dataframe_for_classifier")
+    print("circuit: {} input: {} od: {} media: {} experiment: {}".format(circuit, input, od, media, experiment))
+    results = get_strain(circuit, input, od=od, media=media, experiment=experiment)
+    da = None
+    if results:
+        meta_df = get_metadata_dataframe(results)
+        print(meta_df.columns)
+        da = meta_df[[Names.FILENAME, Names.SAMPLE_ID, 'output']].copy()
+        #da['strain'] = da['strain'].mask(da['strain'] == 'WT-Dead-Control',  0)
+        #da['strain'] = da['strain'].mask(da['strain'] == 'WT-Live-Control',  1)
+        da = get_data_and_metadata_df(da, data_dir, fraction=fraction)
+        #da = da.drop(columns=['fcs_files', 'Time', 'RL1-W', 'BL1-W'])
+        da = da.drop(columns=['filename', 'Time'])
+        print("da")
+        print(da.head(5))
+    
     return da
 
 

@@ -16,26 +16,30 @@ from pysd2cat.analysis.Names import Names
 from pysd2cat.plot import plot
 
 
-def write_live_dead_column(data_file, foo):
+def write_live_dead_column(data_file, strain_column_name, live_strain_name, dead_strain_name):
+    df = None
     try:
         #data_dir = "/".join(data_file.split('/')[0:-1])
         #out_path = os.path.join(data_dir, 'accuracy')
         #out_file = os.path.join(out_path, data_file.split('/')[-1])
         df = pd.read_csv(data_file)
+        print(df.head(5))
         if 'live' in df.columns:
             print("Already done: " + data_file)
         else:
-            strains = df['strain_name'].unique()
-            if Names.WT_DEAD_CONTROL in strains and Names.WT_LIVE_CONTROL in strains:
+            strains = df[strain_column_name].unique()
+            print("strains: {}".format(type(strains)))
+            print(strains)
+            if live_strain_name in strains and dead_strain_name in strains:
 
                 print("Computing live/dead for: " + data_file)
-                df = live_dead_analysis.add_live_dead(df)
-                print("Writing live/dead for: " + data_file)
-                df.to_csv(data_file)
+                df = add_live_dead(df, strain_column_name, live_strain_name, dead_strain_name)
+                #print("Writing live/dead for: " + data_file)
+                #df.to_csv(data_file)
     except Exception as e:
         print("File failed: " + data_file + " with: " + str(e))
-
-
+        
+    return df
 
 def write_live_dead_columns(data):
     import multiprocessing
@@ -49,38 +53,51 @@ def write_live_dead_columns(data):
     for result in results:
         data_list = result.get()
 
-
-def strain_to_class(x):
+def strain_to_class(x,
+                    strain_column_name,
+                    live_strain_name,
+                    dead_strain_name):
     """
     Boolean class labels for live/dead classifier
     """
-    if x['strain_name'] == Names.WT_LIVE_CONTROL:
-        return 1
-    elif x['strain_name'] == Names.WT_DEAD_CONTROL:
-        return 0
+    if x[strain_column_name] == live_strain_name:
+        return "1"
+    elif x[strain_column_name] == dead_strain_name:
+        return "0"
     else:
         return None
 
-def get_classifier_dataframe(df, data_columns = ['FSC_A', 'SSC_A', 'BL1_A', 'RL1_A', 'FSC_H', 'SSC_H', 'BL1_H', 'RL1_H', 'FSC_W', 'SSC_W', 'BL1_W', 'RL1_W']):
+def get_classifier_dataframe(df,
+                             strain_column_name,
+                             live_strain_name,
+                             dead_strain_name,
+                             fcs_columns = None):
     """
     Get the classifier data corresponding to controls.
     """
-    live_df = df.loc[df['strain_name'] == Names.WT_LIVE_CONTROL]
-    dead_df = df.loc[df['strain_name'] == Names.WT_DEAD_CONTROL]
-    live_df.loc[:,'strain_name'] = live_df.apply(strain_to_class, axis=1)
-    dead_df.loc[:,'strain_name'] = dead_df.apply(strain_to_class, axis=1)
+    df_columns = df.columns.tolist()
+    print("data_columns: {}".format(df_columns))
+    live_df = df.loc[df[strain_column_name] == live_strain_name]
+    dead_df = df.loc[df[strain_column_name] == dead_strain_name]
+    live_df.loc[:,strain_column_name] = live_df.apply(lambda x : strain_to_class(x, strain_column_name, live_strain_name, dead_strain_name), axis=1)
+    dead_df.loc[:,strain_column_name] = dead_df.apply(lambda x : strain_to_class(x, strain_column_name, live_strain_name, dead_strain_name), axis=1)
     live_dead_df = live_df.append(dead_df)
     #print(live_dead_df)
-    live_dead_df = live_dead_df.rename(index=str, columns={'strain_name': "class_label"})
+    live_dead_df = live_dead_df.rename(index=str, columns={strain_column_name: "class_label"})
+    if fcs_columns:
+        data_columns = fcs_columns
+    else:
+        data_columns = list(set(df_columns) - {'sample_id', strain_column_name, 'file_id'})
+    print(data_columns)
     live_dead_df = live_dead_df[data_columns + ['class_label']]
     return live_dead_df
 
 
-
-def add_live_dead_test_harness(df, 
-                               data_columns = ['FSC_A', 'SSC_A', 'BL1_A', 'RL1_A', 'FSC_H', 
-                                               'SSC_H', 'BL1_H', 'RL1_H', 'FSC_W', 'SSC_W', 
-                                               'BL1_W', 'RL1_W'],                               
+def add_live_dead_test_harness(df,
+                               strain_column_name,
+                               live_strain_name,
+                               dead_strain_name,
+                               fcs_columns = None,                               
                                out_dir='.'):
     """
     Same as add_live_dead(), but use test-harness.
@@ -89,7 +106,11 @@ def add_live_dead_test_harness(df,
     experiment = df.plan.unique()[0]
 
     ## Build the training/test input
-    c_df = get_classifier_dataframe(df, data_columns = data_columns)
+    c_df = get_classifier_dataframe(df,
+                                    strain_column_name,
+                                    live_strain_name,
+                                    dead_strain_name,
+                                    fcs_columns = fcs_columns)
     #print(c_df.head())
     c_df.loc[:, 'index'] = c_df.index
     #c_df.loc[:, 'id'] = df['id']
@@ -119,29 +140,46 @@ def add_live_dead_test_harness(df,
     
     return df
 
-    
+def get_fcs_columns():
+    return ['FSC_A', 'SSC_A', 'BL1_A', 'RL1_A', 'FSC_H', 'SSC_H',
+            'BL1_H', 'RL1_H', 'FSC_W', 'SSC_W', 'BL1_W', 'RL1_W']
 
-def add_live_dead(df, data_columns = ['FSC_A', 'SSC_A', 'BL1_A', 'RL1_A', 'FSC_H', 'SSC_H', 'BL1_H', 'RL1_H', 'FSC_W', 'SSC_W', 'BL1_W', 'RL1_W']):
+def add_live_dead(df,
+                  strain_column_name,
+                  live_strain_name,
+                  dead_strain_name,
+                  fcs_columns = None):
     """
     Take an input_df corresponding to one plate.
     Build a live dead classifier from controls.
     Apply classifier to each event to create 'live' column
     """
+
     ## Build the training/test input
-    c_df = get_classifier_dataframe(df, data_columns = data_columns)
-    
+    c_df = get_classifier_dataframe(df,
+                                    strain_column_name,
+                                    live_strain_name,
+                                    dead_strain_name,
+                                    fcs_columns = fcs_columns)
+    print(c_df)
     ## Build the classifier
     (model, mean_absolute_error, test_X, test_y, scaler) = ldc.build_model(c_df)
-
+    print(df.columns)
     ## Predict label for unseen data
+    if fcs_columns:
+        data_columns = fcs_columns
+        ouput_columns = list(df.columns) + ['live']
+    else:
+        data_columns = list(set(df.columns) - {'sample_id', strain_column_name, 'file_id'})
+        ouput_columns = ['sample_id'] + data_columns + ['live']
+    print(data_columns)
     pred_df = df[data_columns]
-    #print(pred_df)
+    print(pred_df)
     pred_df = ldc.predict_live_dead(pred_df, model, scaler)
-    #print(pred_df.dtypes)
     df.loc[:,'live'] = pred_df['class_label'].astype(int)
-    #print(df)
-    
-    return df
+    result_df = df[ouput_columns]
+    print(result_df)
+    return result_df
 
 
 def compute_sytox_threshold_accuracy(live_dead_df, thresholds=[2000], sytox_channel='RL1-A'):
@@ -159,16 +197,15 @@ def compute_model_predictions(model, scaler, circuits, inputs, ods, media, fract
             for od in ods:
                 for m in media:
                     m_df = pipeline.get_strain_dataframe_for_classifier(circuit, input, od=od, media=m, data_dir=data_dir, fraction=fraction)
-                    #print(circuit + " " + input + " " + str(od))
-                    pred_df = ldc.predict_live_dead(m_df.drop(columns=['output']), model, scaler)
-                    m_df['class_label'] = pred_df['class_label']
-                    m_df['circuit'] = circuit
-                    m_df['input'] = input
-                    m_df['media'] = m
-                    m_df['od'] = od
-
-
-                    predictions = predictions.append(m_df, ignore_index=True)
+                    if m_df is not None:
+                        #print(circuit + " " + input + " " + str(od))
+                        pred_df = ldc.predict_live_dead(m_df.drop(columns=['output']), model, scaler)
+                        m_df['class_label'] = pred_df['class_label']
+                        m_df['circuit'] = circuit
+                        m_df['input'] = input
+                        m_df['media'] = m
+                        m_df['od'] = od
+                        predictions = predictions.append(m_df, ignore_index=True)
     return predictions
 
 def compare_accuracy_of_gating(model, scaler, circuits, inputs, ods, media, fraction=0.06, data_dir='.', channel='BL1-A', thresholds=[10000]):
@@ -179,32 +216,32 @@ def compare_accuracy_of_gating(model, scaler, circuits, inputs, ods, media, frac
             for od in ods:
                 for m in media:
                     m_df = pipeline.get_strain_dataframe_for_classifier(circuit, input, od=od, media=m, data_dir=data_dir, fraction=fraction)
-                    #print(m_df.head())
-                    pred_df = ldc.predict_live_dead(m_df.drop(columns=['output']), model, scaler)
-                    m_df['class_label'] = pred_df['class_label']
-                    gated_df = m_df.loc[m_df['class_label'] == 1] # live cells
-                    num_gated = len(m_df.index) - len(gated_df.index)
-
-                    value_df = m_df[[channel, 'output']].rename(index=str, columns={channel: "value"})
-                    gated_value_df = gated_df[[channel, 'output']].rename(index=str, columns={channel: "value"})
-
-                    thold_df = thold.do_threshold_analysis(value_df, thresholds)
-                    gated_thold_df = thold.do_threshold_analysis(gated_value_df, thresholds)
-
-                    #print(thold_df)
-                    thold_df['circuit'] = circuit
-                    thold_df['input'] = input
-                    thold_df['media'] = m
-                    thold_df['od'] = od
-                    thold_df['num_gated'] = num_gated
-
-                    thold_df['gated_probability_correct'] = gated_thold_df['probability_correct']
-                    thold_df['gated_standard_error_correct'] = gated_thold_df['standard_error_correct']
-                    thold_df['gated_count'] = gated_thold_df['count']
-
-
-                    #print(thold_df)
-                    plot_df = plot_df.append(thold_df, ignore_index=True)
+                    if m_df is not None:
+                        #print(m_df.head())
+                        pred_df = ldc.predict_live_dead(m_df.drop(columns=['output']), model, scaler)
+                        m_df['class_label'] = pred_df['class_label']
+                        gated_df = m_df.loc[m_df['class_label'] == 1] # live cells
+                        num_gated = len(m_df.index) - len(gated_df.index)
+    
+                        value_df = m_df[[channel, 'output']].rename(index=str, columns={channel: "value"})
+                        gated_value_df = gated_df[[channel, 'output']].rename(index=str, columns={channel: "value"})
+    
+                        thold_df = thold.do_threshold_analysis(value_df, thresholds)
+                        gated_thold_df = thold.do_threshold_analysis(gated_value_df, thresholds)
+    
+                        #print(thold_df)
+                        thold_df['circuit'] = circuit
+                        thold_df['input'] = input
+                        thold_df['media'] = m
+                        thold_df['od'] = od
+                        thold_df['num_gated'] = num_gated
+    
+                        thold_df['gated_probability_correct'] = gated_thold_df['probability_correct']
+                        thold_df['gated_standard_error_correct'] = gated_thold_df['standard_error_correct']
+                        thold_df['gated_count'] = gated_thold_df['count']
+    
+                        #print(thold_df)
+                        plot_df = plot_df.append(thold_df, ignore_index=True)
     return plot_df
 
 def plot_strain_live_dead_predictions(predictions, circuits, inputs, ods, media, filename='live_dead_predictions.pdf'):
@@ -236,6 +273,8 @@ def main():
 
     print("Building Live/Dead Control Dataframe...")
     live_dead_df = pipeline.get_dataframe_for_live_dead_classifier(data_dir)
+    print(live_dead_df.columns.tolist())
+    print(live_dead_df.head(5))
 
     print("Training Live/Dead Classifier...")
     (model, mean_absolute_error, test_X, test_y, scaler) = ldc.build_model(live_dead_df)
@@ -257,13 +296,13 @@ def main():
     print("Computing mean number of live cells per sample (comparing threshold to classifier)...")
     mean_live = ldc.compute_mean_live(model,
                                       scaler,
-                      data_dir,
-                      threshold=2000,
-                      ods=ods,
-                      media=media,
-                      circuits=circuits,
-                      inputs=inputs,
-                      fraction=data_fraction)
+                                      data_dir,
+                                      threshold=2000,
+                                      ods=ods,
+                                      media=media,
+                                      circuits=circuits,
+                                      inputs=inputs,
+                                      fraction=data_fraction)
     mean_live.to_csv('mean_live.csv')
 
 
