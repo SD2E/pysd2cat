@@ -78,14 +78,14 @@ def get_sample_correctness(data):
         if os.path.isfile(d):
             #print("Getting Correctness for: " + str(d))
             #df = pd.read_csv(d)
-            adata = os.path.join("/".join(d.split('/')[0:-1]), 'accuracy', d.split('/')[-1])
+            adata = os.path.join("/".join(d.split('/')[0:-1]), 'correctness', d.split('/')[-1])
             if os.path.isfile(adata):
                 adf = pd.read_csv(adata, dtype={'od': float, 'input' : object}, index_col=0)
                 if 'media' in adf.columns:
                     final_df = get_experiment_correctness_and_metadata(adf)
                     all_df = all_df.append(final_df, ignore_index=True)
-    all_df.loc[:, 'prc_improve'] = all_df['probability_correct_live'] - all_df['probability_correct']
-    all_df.loc[:, 'live_proportion'] = all_df['count_live'] / all_df['count']
+    #all_df.loc[:, 'prc_improve'] = all_df['probability_correct_live'] - all_df['probability_correct']
+    #all_df.loc[:, 'live_proportion'] = all_df['count_live'] / all_df['count']
     #all_df['sample_time'] = all_df.apply(pipeline.get_sample_time, axis=1)
     return all_df
 
@@ -94,6 +94,21 @@ def get_sample_correctness(data):
 
 def get_threshold(df, channel='BL1_A', high_control=Names.NOR_00_CONTROL, low_control=Names.WT_LIVE_CONTROL):
 
+    if False and high_control not in df['strain_name'].unique():
+        fixed_high_control = high_control.replace(" ", "-")
+        if fixed_high_control in df['strain_name'].unique():
+            high_control = fixed_high_control
+        else:
+            raise Exception("Cannot compute threshold if do not have both low and high control for high_control=\"" + str(high_control) + "\" low_control = \"" + str(low_control) + "\" Have strain_name's: " + str(df.strain_name.unique()))
+    if False and low_control not in df['strain_name'].unique():
+        fixed_low_control = low_control.replace(" ", "-")
+        if fixed_low_control in df['strain_name'].unique():
+            low_control = fixed_low_control
+        else:
+            raise Exception("Cannot compute threshold if do not have both low and high control for high_control=\"" + str(high_control) + "\" low_control = \"" + str(low_control) + "\" Have strain_name's: " + str(df.strain_name.unique()))
+
+
+           
     ## Prepare the data for high and low controls
     high_df = df.loc[( df['strain_name'] == high_control)]
     high_df.loc[:,'output'] = high_df.apply(lambda x: 1, axis=1)
@@ -105,7 +120,7 @@ def get_threshold(df, channel='BL1_A', high_control=Names.NOR_00_CONTROL, low_co
     #high_low_df[channel]
     
     if len(high_df) == 0 or len(low_df) == 0:
-        raise Exception("Cannot compute threshold if do not have both low and high control")
+        raise Exception("Cannot compute threshold if do not have both low and high control for high_control=\"" + str(high_control) + "\" low_control = \"" + str(low_control) + "\" Have strain_name's: " + str(df.strain_name.unique()))
 
     ## Setup Gradient Descent Paramters
 
@@ -172,8 +187,9 @@ def fix_output(row):
         row['output'] = '0'
     return row
 
+
 def compute_correctness(m_df,
-                     id_name='id',
+                        id_name="id",
                      channel='BL1_A',
                      thresholds=None,
                      use_log_value=True,
@@ -184,6 +200,10 @@ def compute_correctness(m_df,
                      std_name='std_log_gfp',
                      mean_correct_name='probability_correct',
                      std_correct_name='std_correct',
+                     mean_correct_high_name='mean_correct_high_threshold',
+                     std_correct_high_name='std_correct_high_threshold',
+                     mean_correct_low_name='mean_correct_low_threshold',
+                     std_correct_low_name='std_correct_low_threshold',
                      count_name='count',
                      threshold_name='threshold'
                      ):
@@ -195,17 +215,19 @@ def compute_correctness(m_df,
             #print(e)
             raise Exception("Could not find controls to auto-set threshold: " + str(e))
             #thresholds = [np.log(10000)]
-      
+
     #print("Threshold  = " + str(thresholds[0]))
-    samples = m_df.groupby([id_name])
+    samples = m_df[id_name].unique()
+    print("samples length: {}".format(len(samples)))
     plot_df = pd.DataFrame()
-    for id, sample in samples:
-        #print(sample_id)
-        #sample = m_df.loc[m_df['id'] == sample_id]
-        #print(sample.head())
-        circuit = sample['gate'].dropna().unique()
-        if len(circuit) == 1:
-            value_df = sample[[channel, 'output']].rename(index=str, columns={channel: "value"})          
+    for sample_id in samples:
+        #print("sample_id: {}".format(sample_id))
+        sample = m_df.loc[m_df[id_name] == sample_id]
+        #print("sample.head(): {}".format(sample.head()))
+        circuit = sample['gate'].unique()[0]
+        #print("circuit: {} type: {}".format(circuit, type(circuit)))
+        if circuit:
+            value_df = sample[[channel, 'output']].rename(index=str, columns={channel: "value"})
             if use_log_value:
                 value_df = value_df.loc[value_df['value'] > 0]
                 value_df.loc[:,'value'] = np.log(value_df['value']).replace([np.inf, -np.inf], np.nan).dropna()
@@ -214,14 +236,21 @@ def compute_correctness(m_df,
                                              thresholds,
                                              mean_correct_name=mean_correct_name,
                                              std_correct_name=std_correct_name,
+                                             mean_correct_high_name=mean_correct_high_name,
+                                             std_correct_high_name=std_correct_high_name,
+                                             mean_correct_low_name=mean_correct_low_name,
+                                             std_correct_low_name=std_correct_low_name,
                                              count_name=count_name,
                                              threshold_name=threshold_name)
 
             
             thold_df[mean_name] = np.mean(value_df['value'])
             thold_df[std_name] = np.std(value_df['value'])
+        else:
+            thold_df = {}
             
-            thold_df[id_name] = id
+        thold_df[id_name] = sample_id
+        
 #            for i in ['gate', 'input', 'output', 'od', 'media',
 #                      'inc_temp', 'replicate', 'inc_time_1',
 #                      'inc_time_2', 'strain_name']:
@@ -259,14 +288,19 @@ def compute_correctness(m_df,
 
                 
             #print(thold_df)
-            plot_df = plot_df.append(thold_df, ignore_index=True)
+        plot_df = plot_df.append(thold_df, ignore_index=True)
     #plot_df = plot_df.rename(columns={mean_correct_name : output_label})
     return plot_df 
+
 
 def do_threshold_analysis(df,
                           thresholds,
                           mean_correct_name='probability_correct',
                           std_correct_name='std_correct',
+                          mean_correct_high_name='mean_correct_high_threshold',
+                          std_correct_high_name='std_correct_high_threshold',
+                          mean_correct_low_name='mean_correct_low_threshold',
+                          std_correct_low_name='std_correct_low_threshold',
                           count_name='count',
                           threshold_name='threshold'
                           ):
@@ -275,31 +309,60 @@ def do_threshold_analysis(df,
     """
     count = 0
     correct = []
+    low = []
+    high = []
     for idx, threshold in enumerate(thresholds):
         correct.append(0)
-        
+        low.append(0)
+        high.append(0)
+
+    #print("df columns: {}".format(df.columns))
     for idx, row in df.iterrows():
         true_gate_output = int(row['output'])
         measured_gate_output = float(row['value'])
         count = count + 1
+        #print("count: {} true_gate_output: {} measured_gate_output: {} threshold: {}".format(count, true_gate_output, measured_gate_output, threshold))
         for idx, threshold in enumerate(thresholds):
             #print(str(true_gate_output) + " " + str(measured_gate_output))
             if (true_gate_output == 1 and measured_gate_output >= threshold) or \
                (true_gate_output == 0 and measured_gate_output < threshold) :
                 correct[idx] = correct[idx] + 1
-            
+            if measured_gate_output >= threshold:
+                high[idx] = high[idx] + 1
+            if measured_gate_output < threshold:
+                low[idx] = low[idx] + 1
+
+
+    #print("correct length: {} correct[0]: {} count: {}".format(len(correct), correct[0], count))
     results = pd.DataFrame()
     for idx, threshold in enumerate(thresholds):
         if count > 0:
             pr = correct[idx] / float(count)
             se = math.sqrt(pr*(1-pr)/float(count))
+            low_pr = low[idx] /float(count)
+            low_se = math.sqrt(low_pr*(1-low_pr)/float(count))
+            high_pr = high[idx] /float(count)
+            high_se = math.sqrt(high_pr*(1-low_pr)/float(count))
         else:
             pr = 0
             se = 0
+            low_pr = 0
+            low_se = 0
+            high_pr = 0
+            high_se = 0
 
+        #print("count: {} idx: {} threshold: {} pr: {}".format(count, idx, threshold, pr))
         results= results.append({
             mean_correct_name : pr, 
             std_correct_name : se,
+            mean_correct_high_name : high_pr,
+            std_correct_high_name : high_se,
+            mean_correct_low_name : low_pr,
+            std_correct_low_name : low_se,
             count_name : count,
             threshold_name : threshold}, ignore_index=True)
     return results
+    
+
+    
+
