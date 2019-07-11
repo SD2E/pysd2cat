@@ -13,6 +13,8 @@ class Names:
     WT_LIVE_CONTROL = 'WT-Live-Control'
     NOR_00_CONTROL = "NOR-00-Control"
     STRAIN_NAME = 'strain_name'
+
+    TIME = "Time"
     
     #Calibration
     LUDOX = 'LUDOX'

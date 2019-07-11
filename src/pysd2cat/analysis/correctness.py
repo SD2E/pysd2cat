@@ -168,8 +168,11 @@ def compute_correctness_all(df, out_dir = '.', high_control=Names.NOR_00_CONTROL
     result = df.drop(drop_list,
                       axis=1).drop_duplicates().reset_index()
 
-    experiment = df['plan'].unique()[0]
-
+    if 'plan' in df.columns:
+        experiment = df['plan'].unique()[0]
+    elif 'experiment_id' in df.columns:
+        experiment = df['experiment_id'].unique()[0]
+        
     results = []
     # Get correctness w/o dead cells gated
     l.debug("Computing Threhold, no gating ...")

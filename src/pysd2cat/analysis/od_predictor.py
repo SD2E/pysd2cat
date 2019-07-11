@@ -22,9 +22,10 @@ def predict(all_data_df,
     # list of feature columns to use and/or normalize:
     #Do these columns form a a unique entity? If not, we need to define a grouping.
     sparse_cols = ['growth_media_1', 'growth_media_2', \
+                    'inc_temp', 'inc_time_1', 'inc_time_2',
                      'SynBioHub URI']
     #all_data_df['glycerol_stock'].fillna('blank',inplace=True)
-    continuous_cols = ['post_od_raw', 'inc_temp', 'inc_time_1', 'inc_time_2']
+    continuous_cols = ['post_od_raw']
     feature_cols = sparse_cols + continuous_cols
     l.debug(feature_cols)
     #cols_to_predict = []
