@@ -271,7 +271,7 @@ def write_correctness_files(data, overwrite=False, high_control=Names.NOR_00_CON
     multiprocessing.cpu_count()
     tasks = []
     for d in data:       
-        tasks.append(((d, overwrite), {high_control:high_control, low_control:low_control}))
+        tasks.append(((d, overwrite), {'high_control':high_control, 'low_control':low_control}))
 #        tasks.append((d, overwrite))
     results = [pool.apply_async(write_correctness_job, t) for t in tasks]
 

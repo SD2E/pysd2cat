@@ -13,24 +13,22 @@ def get_experiment_correctness_and_metadata(adf):
     """
     def media_fix(x):
         media_map = {
-            "SC Media" : "SC Media",
-            "SC+Oleate+Adenine" : "SC Media",
-            "standard_media" : "SC Media",
-            "Synthetic_Complete" : "SC Media",
+            "SC Media" : "standard_media",
+            "SC+Oleate+Adenine" : "standard_media",
+            "Synthetic_Complete" : "standard_media",
+            "standard_media" : "standard_media",
 
-            "Synthetic_Complete_2%Glycerol_2%Ethanol" : "SC Slow",
-            "SC Slow" : "SC Slow",
-            "slow_media" : "SC Slow",
-
-
-
-            "Synthetic_Complete_1%Sorbitol" : "SC High Osm",
-            "SC High Osm" : "SC High Osm",    
-            'high_osm_media' : "SC High Osm",    
-
-            "YPAD" : "SC Rich",
-            "Yeast_Extract_Peptone_Adenine_Dextrose (a.k.a. YPAD Media)" : "SC Rich",
-            "rich_media" : "SC Rich",
+            "Synthetic_Complete_2%Glycerol_2%Ethanol" : "slow_media",
+            "SC Slow" : "slow_media",
+            "slow_media" : "slow_media",
+            
+            "Synthetic_Complete_1%Sorbitol" : "high_osm_media",
+            "SC High Osm" : "high_osm_media", 
+            "high_osm_media" : "high_osm_media",
+            
+            "YPAD" : "rich_media",
+            "Yeast_Extract_Peptone_Adenine_Dextrose (a.k.a. YPAD Media)" : "rich_media",
+            "rich_media" : "rich_media"
         }
         if type(x) is str:
             return media_map[x]
@@ -221,8 +219,12 @@ def compute_correctness(m_df,
     print("samples length: {}".format(len(samples)))
     plot_df = pd.DataFrame()
     for sample_id in samples:
+                
         #print("sample_id: {}".format(sample_id))
         sample = m_df.loc[m_df[id_name] == sample_id]
+        if len(sample['output'].dropna().unique()) == 0:
+            continue
+            
         #print("sample.head(): {}".format(sample.head()))
         circuit = sample['gate'].unique()[0]
         #print("circuit: {} type: {}".format(circuit, type(circuit)))
@@ -291,6 +293,91 @@ def compute_correctness(m_df,
         plot_df = plot_df.append(thold_df, ignore_index=True)
     #plot_df = plot_df.rename(columns={mean_correct_name : output_label})
     return plot_df 
+
+
+def compute_correctness2(m_df,
+                        id_name="id",
+                     channel='BL1_A',
+                     threshold=None,
+                     use_log_value=True,
+                     high_control=Names.NOR_00_CONTROL,
+                     low_control=Names.WT_LIVE_CONTROL,
+                     output_label='probability_correct',
+                     mean_name='mean_log_gfp',
+                     std_name='std_log_gfp',
+                     mean_correct_name='probability_correct',
+                     std_correct_name='std_correct',
+                     mean_correct_high_name='mean_correct_high_threshold',
+                     std_correct_high_name='std_correct_high_threshold',
+                     mean_correct_low_name='mean_correct_low_threshold',
+                     std_correct_low_name='std_correct_low_threshold',
+                     count_name='count',
+                     threshold_name='threshold'
+                     ):
+    if threshold is None:
+        try:
+            threshold, threshold_quality = get_threshold(m_df, channel, high_control=high_control, low_control=low_control)
+        except Exception as e:
+            #print(e)
+            raise Exception("Could not find controls to auto-set threshold: " + str(e))
+            #thresholds = [np.log(10000)]
+
+    #print("Threshold  = " + str(thresholds[0]))
+    #samples = m_df[id_name].unique()
+    #print("samples length: {}".format(len(samples)))
+    #plot_df = pd.DataFrame()
+    
+    prediction_df = pd.DataFrame()
+    
+    def correct(x, threshold):
+        if x['output'].isnull():
+            return None
+        
+        true_gate_output = int(x['output'])
+        measured_gate_output = float(row['value'])
+        if (true_gate_output == 1 and measured_gate_output >= threshold) or \
+           (true_gate_output == 0 and measured_gate_output < threshold) :
+            return 1.0
+        else:
+            return 0.0
+        
+    def high(x, threshold):
+        if x['output'].isnull():
+            return None
+        
+        true_gate_output = int(x['output'])
+        measured_gate_output = float(row['value'])
+        if measured_gate_output >= threshold:
+            return 1.0
+        else:
+            return 0.0
+
+    def low(x, threshold):
+        if x['output'].isnull():
+            return None
+        
+        true_gate_output = int(x['output'])
+        measured_gate_output = float(row['value'])
+        if measured_gate_output < threshold:
+            return 1.0
+        else:
+            return 0.0
+
+    value_df = m_df[[channel, 'output', id_name]].rename(index=str, columns={channel: "value"})
+    if use_log_value:
+        value_df = value_df.loc[value_df['value'] > 0]
+        value_df.loc[:,'value'] = np.log(value_df['value']).replace([np.inf, -np.inf], np.nan).dropna()
+
+
+        
+    prediction_df.loc[:, id_name] = value_df[id_name]
+    prediction_df.loc[:, 'correct'] = value_df.apply(lambda x: correct(x, threshold), axis=1)
+    prediction_df.loc[:, 'high'] = value_df.apply(lambda x: high(x, threshold), axis=1)
+    prediction_df.loc[:, 'low'] = value_df.apply(lambda x: low(x, threshold), axis=1)
+    
+    thold_df.loc[:, mean_correct_name] = predictions_df.groupby([id_name])['correct'].agg('mean').reset_index()
+    
+    return thold_df
 
 
 def do_threshold_analysis(df,
