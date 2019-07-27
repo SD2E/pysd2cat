@@ -16,7 +16,7 @@ from pysd2cat.analysis.Names import Names
 from pysd2cat.plot import plot
 
 
-def write_live_dead_column(data_file, strain_column_name, live_strain_name, dead_strain_name, output_col, fcs_columns, out_dir, overwrite=False, description=None, random_state=5, dry_run=False):
+def write_live_dead_column(data_file, strain_column_name, live_strain_name, dead_strain_name, output_col, fcs_columns, out_dir, overwrite=False, description=None, random_state=5, dry_run=False, feature_importance=False):
     df = None
     try:
         #data_dir = "/".join(data_file.split('/')[0:-1])
@@ -33,12 +33,12 @@ def write_live_dead_column(data_file, strain_column_name, live_strain_name, dead
             if live_strain_name in strains and dead_strain_name in strains:
 
                 print("Computing live/dead for: " + data_file)
-                df = add_live_dead_test_harness(df, strain_column_name, live_strain_name, dead_strain_name, out_dir=out_dir, output_col= output_col, fcs_columns=fcs_columns, description=description, random_state=random_state)
+                df = add_live_dead_test_harness(df, strain_column_name, live_strain_name, dead_strain_name, out_dir=out_dir, output_col= output_col, fcs_columns=fcs_columns, description=description, random_state=random_state, feature_importance=feature_importance)
                 print("Writing live/dead for: " + data_file)
                 df.to_csv(data_file)
         else:
             # dry run, just build classifier
-            df = add_live_dead_test_harness(df, strain_column_name, live_strain_name, dead_strain_name, out_dir=out_dir, output_col= output_col, fcs_columns=fcs_columns, description=description, random_state=random_state, dry_run=dry_run)
+            df = add_live_dead_test_harness(df, strain_column_name, live_strain_name, dead_strain_name, out_dir=out_dir, output_col= output_col, fcs_columns=fcs_columns, description=description, random_state=random_state, dry_run=dry_run, feature_importance=feature_importance)
     except Exception as e:
         print("File failed: " + data_file + " with: " + str(e))
         
@@ -114,12 +114,12 @@ def add_live_dead_test_harness(df,
                                description=None,
                                out_dir='.',
                                random_state=5,
-                               dry_run=False):
+                               dry_run=False,
+                               feature_importance=False):
     """
     Same as add_live_dead(), but use test-harness.
     """
  
-    experiment = df.lab_id.unique()[0]
 
     ## Build the training/test input
     c_df = get_classifier_dataframe(df,
@@ -141,6 +141,7 @@ def add_live_dead_test_harness(df,
 
 
     if not description:
+        experiment = df.lab_id.unique()[0]
         description = experiment+"_live"
 
     ## Build the classifier
@@ -152,7 +153,8 @@ def add_live_dead_test_harness(df,
                                  output_location=out_dir,
                                  description=description,
                                  random_state=random_state,
-                                 dry_run=dry_run
+                                 dry_run=dry_run,
+                                 feature_importance=feature_importance
                                 )
     if not dry_run:
         #print(pred_df.head())
