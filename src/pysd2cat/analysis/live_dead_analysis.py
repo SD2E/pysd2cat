@@ -16,39 +16,52 @@ from pysd2cat.analysis.Names import Names
 from pysd2cat.plot import plot
 
 
-def write_live_dead_column(data_file, strain_column_name, live_strain_name, dead_strain_name):
+def write_live_dead_column(data_file, strain_column_name, live_strain_name, dead_strain_name, output_col, fcs_columns, out_dir, overwrite=False, description=None, random_state=5, dry_run=False, feature_importance=False):
     df = None
     try:
         #data_dir = "/".join(data_file.split('/')[0:-1])
         #out_path = os.path.join(data_dir, 'accuracy')
         #out_file = os.path.join(out_path, data_file.split('/')[-1])
-        df = pd.read_csv(data_file)
-        print(df.head(5))
-        if 'live' in df.columns:
+        df = pd.read_csv(data_file, dtype={'od': float, 'input' : object, 'output' : object}, index_col=0)
+        #print(df.head(5))
+        if not dry_run and not overwrite and output_col in df.columns:
             print("Already done: " + data_file)
-        else:
+        elif not dry_run:
             strains = df[strain_column_name].unique()
-            print("strains: {}".format(type(strains)))
-            print(strains)
+            #print("strains: {}".format(type(strains)))
+            #print(strains)
             if live_strain_name in strains and dead_strain_name in strains:
 
                 print("Computing live/dead for: " + data_file)
-                df = add_live_dead(df, strain_column_name, live_strain_name, dead_strain_name)
-                #print("Writing live/dead for: " + data_file)
-                #df.to_csv(data_file)
+                df = add_live_dead_test_harness(df, strain_column_name, live_strain_name, dead_strain_name, out_dir=out_dir, output_col= output_col, fcs_columns=fcs_columns, description=description, random_state=random_state, feature_importance=feature_importance)
+                print("Writing live/dead for: " + data_file)
+                df.to_csv(data_file)
+        else:
+            # dry run, just build classifier
+            df = add_live_dead_test_harness(df, strain_column_name, live_strain_name, dead_strain_name, out_dir=out_dir, output_col= output_col, fcs_columns=fcs_columns, description=description, random_state=random_state, dry_run=dry_run, feature_importance=feature_importance)
     except Exception as e:
         print("File failed: " + data_file + " with: " + str(e))
         
-    return df
+    #return df
 
-def write_live_dead_columns(data):
+def write_live_dead_column_job(args, kwargs):
+    write_live_dead_column(*args, **kwargs)
+
+
+
+def write_live_dead_columns(data, strain_column_name, live_strain_name, dead_strain_name, fcs_columns, output_col='live', num_cpu=None, overwrite=False, description=None, out_dir='.', random_state=5, dry_run=False):
     import multiprocessing
-    pool = multiprocessing.Pool(int(multiprocessing.cpu_count()))
-    multiprocessing.cpu_count()
+    if num_cpu:
+        pool = multiprocessing.Pool(num_cpu)
+    else:
+        pool = multiprocessing.Pool(multiprocessing.cpu_count())
+    
     tasks = []
     for d in data:
-        tasks.append((d, True))
-    results = [pool.apply_async(write_live_dead_column, t) for t in tasks]
+        run_id=d.split("/")[-1].split('.')[0]
+        tasks.append(((d, strain_column_name, live_strain_name, dead_strain_name, output_col, fcs_columns, out_dir),
+                     {'overwrite': overwrite, 'description' : run_id + "_" + str(random_state) + "_" + description, 'random_state' : random_state, 'dry_run' : dry_run}))
+    results = [pool.apply_async(write_live_dead_column_job, t) for t in tasks]
 
     for result in results:
         data_list = result.get()
@@ -61,9 +74,9 @@ def strain_to_class(x,
     Boolean class labels for live/dead classifier
     """
     if x[strain_column_name] == live_strain_name:
-        return "1"
+        return 1
     elif x[strain_column_name] == dead_strain_name:
-        return "0"
+        return 0
     else:
         return None
 
@@ -92,18 +105,21 @@ def get_classifier_dataframe(df,
     live_dead_df = live_dead_df[data_columns + ['class_label']]
     return live_dead_df
 
-
 def add_live_dead_test_harness(df,
                                strain_column_name,
                                live_strain_name,
                                dead_strain_name,
-                               fcs_columns = None,                               
-                               out_dir='.'):
+                               output_col='live',
+                               fcs_columns = None,   
+                               description=None,
+                               out_dir='.',
+                               random_state=5,
+                               dry_run=False,
+                               feature_importance=False):
     """
     Same as add_live_dead(), but use test-harness.
     """
  
-    experiment = df.plan.unique()[0]
 
     ## Build the training/test input
     c_df = get_classifier_dataframe(df,
@@ -116,6 +132,17 @@ def add_live_dead_test_harness(df,
     #c_df.loc[:, 'id'] = df['id']
     df.loc[:, 'index'] = df.index
 
+    if fcs_columns:
+        data_columns = fcs_columns
+        #ouput_columns = list(df.columns) + [output_col]
+    else:
+        data_columns = list(set(df.columns) - {'sample_id', strain_column_name, 'file_id'})
+       # ouput_columns = ['sample_id'] + data_columns + [output_col]
+
+
+    if not description:
+        experiment = df.lab_id.unique()[0]
+        description = experiment+"_live"
 
     ## Build the classifier
     ## Predict label for unseen data
@@ -124,19 +151,25 @@ def add_live_dead_test_harness(df,
                                  input_cols=data_columns,
                                  index_cols=['index'],
                                  output_location=out_dir,
-                                 description=experiment+"_live"
+                                 description=description,
+                                 random_state=random_state,
+                                 dry_run=dry_run,
+                                 feature_importance=feature_importance
                                 )
-    #print(pred_df.head())
-    if 'live' in df.columns:
-        df=df.drop(['live'], axis=1)
-    #df=df.reset_index()
-    live_col = pred_df.rename(columns={'class_label_predictions': 'live'})[['live']]
-    live_col.index = live_col.index.astype(str)
+    if not dry_run:
+        #print(pred_df.head())
+        if output_col in df.columns:
+            print("Dropping column " + output_col)
+            df=df.drop([output_col], axis=1)
+        #df=df.reset_index()
+        live_col = pred_df.rename(columns={'class_label_predictions': output_col})[[output_col]]
+        #live_col.index = live_col.index.astype(str)
+        #print(live_col.dtypes)
 
-    #print(live_col.head())
-#    print(df.dtypes)
-    df = df.join(live_col, how='left')
-    #print(df.head())
+        #print(live_col.sort_index().head())
+        #print(df.dtypes)
+        df = df.join(live_col, how='left')
+        #print(df.sort_index().head())
     
     return df
 
