@@ -56,7 +56,9 @@ def train_models_for_prediction(experiment_df, out_dir='.',
                                 fcs_columns = ['FSC-A', 'SSC-A', 'FL1-A', 'FL2-A', 'FL3-A', 'FL4-A', 
                                                 'FSC-H', 'SSC-H', 'FL1-H', 'FL2-H', 'FL3-H', 'FL4-H'],
                                 overwrite=False,
-                                combine_stains=False
+                                combine_stains=False,
+                                additional_description={},
+                                output_col='live'
                                 ):
     experiment_id = experiment_df.experiment_id.unique()[0]
     random_state=0
@@ -68,6 +70,7 @@ def train_models_for_prediction(experiment_df, out_dir='.',
                           "dead_volume" : dead_strain_name,
                           "stain" : "All",
                           "prediction" : True }
+        description.update(additional_description)
         print(description)
 
         if overwrite or not leader_board_case_exists(out_dir, str(description)):
@@ -80,6 +83,7 @@ def train_models_for_prediction(experiment_df, out_dir='.',
                                        description=str(description),
                                        random_state=random_state,
                                        dry_run=False,
+                                       output_col=output_col,
                                        feature_importance=False)
             return res_df
         else:
@@ -95,6 +99,7 @@ def train_models_for_prediction(experiment_df, out_dir='.',
                           "dead_volume" : dead_strain_name,
                           "stain" : stain,
                           "prediction" : True }
+            description.update(additional_description)
             if type(stain) is not str  and ( stain is None or math.isnan(stain)):
                 df = experiment_df.loc[(experiment_df['stain'].isna())]
             else:
@@ -108,6 +113,7 @@ def train_models_for_prediction(experiment_df, out_dir='.',
                                            dead_strain_name,
                                            fcs_columns=fcs_columns,
                                            out_dir=out_dir,
+                                           output_col=output_col,
                                            description=str(description),
                                            random_state=random_state,
                                            dry_run=False,
@@ -148,7 +154,10 @@ def extract_lb_attribute(x, attribute):
         
         description = ast.literal_eval(x['Data and Split Description'].replace(" nan", " None"))
         if attribute in description:
-            return description[attribute]
+            if type(description[attribute]) is list:
+                return str(description[attribute])
+            else:
+                return description[attribute]
         else:
             return None
     except Exception as e:
@@ -161,7 +170,7 @@ def get_leader_board_df(out_dir, expand_description=True):
     leader_board = leader_board.sort_values(by=['Date', 'Time'], ascending=True)
 
     if expand_description:
-        attributes = ['experiment_id', 'random_state', 'stain', 'live_volume', 'dead_volume']
+        attributes = ['experiment_id', 'random_state', 'stain', 'live_volume', 'dead_volume', 'channels']
         for attribute in attributes:
             leader_board.loc[:, attribute] = leader_board.apply(lambda x: extract_lb_attribute(x, attribute), axis = 1)
     return leader_board

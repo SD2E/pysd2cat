@@ -2,6 +2,19 @@ import math
 import matplotlib.pyplot as plt                   # For graphics
 import numpy as np
 
+
+volume_to_per = {
+            0 : 0,
+            29: .03,
+            64 :.06,
+            105: .10,
+            170: .15,
+            250: .20,
+            370: .27,
+            570: .36,
+            980: .49
+            }
+
 def get_statistics_by_volume(leader_board_df, experiment_strain=None, experiment_lab=None):
     metrics=['Balanced Accuracy', 'F1 Score']
     stains=leader_board_df.stain.unique()
@@ -18,17 +31,6 @@ def get_statistics_by_volume(leader_board_df, experiment_strain=None, experiment
 
         #xvals=df['kill']
 
-        volume_to_per = {
-            0 : 0,
-            29: .03,
-            64 :.06,
-            105: .10,
-            170: .15,
-            250: .20,
-            370: .27,
-            570: .36,
-            980: .49
-            }
 
         #col.set_xlabel("Ethanol Volume (uL)")
         col.set_xlabel("Ethanol %")
@@ -79,6 +81,7 @@ def get_statistics_by_volume(leader_board_df, experiment_strain=None, experiment
     return fig
 
 def get_channel_mean_titration(experiment_df,
+                               only_live=False,
                                channels=['FSC-A', 'SSC-A', 'FL1-A', 'FL2-A', 'FL3-A', 'FL4-A',
                                          'FSC-H', 'SSC-H', 'FL1-H', 'FL2-H', 'FL3-H', 'FL4-H']
                                ):
@@ -98,18 +101,24 @@ def get_channel_mean_titration(experiment_df,
     else:
         experiment_id = experiment_df.experiment_id.dropna().unique()[0]        
     for j, col in enumerate(ax):
+        if only_live:
+            df = experiment_df.loc[experiment_df['live'] == 1]
+
         if type(stains[j]) is not str and math.isnan(stains[j]):
-            df = experiment_df.loc[experiment_df['stain'].isna()].groupby(['kill_volume']).agg(np.mean).reset_index()
+            df = df.loc[df['stain'].isna()].groupby(['kill_volume']).agg(np.mean).reset_index()
             col.set_title("Mean Intensity " + str(experiment_id) + ", Stain: None")
 
         else:
-            df = experiment_df.loc[experiment_df['stain'] == stains[j]].groupby(['kill_volume']).agg(np.mean).reset_index()
+            df = df.loc[df['stain'] == stains[j]].groupby(['kill_volume']).agg(np.mean).reset_index()
             col.set_title("Mean Intensity " + str(experiment_id) + ", Stain: " + str(stains[j]))
         col.set_xlabel("Ethanol %")
         col.set_ylabel("Mean Intensity")
 
+
+        print(df.head(1))
         for j, channel in enumerate(channels):
-            col.plot(df['kill_volume']/2000, df[channel], label=channel)
+            col.plot(df['kill_volume'],#.apply(lambda x: volume_to_per[x]),
+                     df[channel], label=channel)
 
         col.set_yscale('log')
         #ax.set_xscale('log')

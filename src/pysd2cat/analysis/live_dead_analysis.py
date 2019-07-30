@@ -159,7 +159,7 @@ def add_live_dead_test_harness(df,
     if not dry_run:
         #print(pred_df.head())
         if output_col in df.columns:
-            #print("Dropping column " + output_col)
+            print("Dropping column " + output_col)
             df=df.drop([output_col], axis=1)
         #df=df.reset_index()
         live_col = pred_df.rename(columns={'class_label_predictions': output_col})[[output_col]]
