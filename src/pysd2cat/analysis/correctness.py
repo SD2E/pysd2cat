@@ -264,10 +264,10 @@ def write_correctness(data_file, overwrite, high_control=Names.NOR_00_CONTROL, l
 def write_correctness_job(args, kwargs):
     write_correctness(*args, **kwargs)
 
-def write_correctness_files(data, overwrite=False, high_control=Names.NOR_00_CONTROL, low_control=Names.WT_LIVE_CONTROL):
+def write_correctness_files(data, overwrite=False, high_control=Names.NOR_00_CONTROL, low_control=Names.WT_LIVE_CONTROL, num_processes=4):
     import multiprocessing
     #pool = multiprocessing.Pool(int(multiprocessing.cpu_count()))
-    pool = multiprocessing.Pool(4)
+    pool = multiprocessing.Pool(num_processes)
     multiprocessing.cpu_count()
     tasks = []
     for d in data:       

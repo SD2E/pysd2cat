@@ -26,48 +26,72 @@ def build_model_pd(classifier_df,
                                  'BL1-H', 'RL1-H', 'FSC-W', 'SSC-W', 'BL1-W', 'RL1-W'],
                    output_cols = ["class_label"],
                    output_location='harness_results',
-                   description="yeast_live_dead_dataframe"
+                   description="yeast_live_dead_dataframe",
+                   random_state=5,
+                   dry_run=False, 
+                   feature_importance=False
                                  ):
     # print("Length of full DF", len(df))
     #print(classifier_df)
     
     l.debug("Splitting Test Harness Data ...")
     train, test = train_test_split(classifier_df, stratify=classifier_df['class_label'],
-                                   test_size=0.2, random_state=5)
+                                   test_size=0.2, random_state=random_state)
     th = TestHarness(output_location=output_location)
-
+    print(th)
     data_df = data_df.copy()
     #data_df.loc[:, 'class_label'] = data_df.index
 
     l.debug("Running Test Harness ...")
-    #rf_classification_model = random_forest_classification(n_estimators=500)
-    th.run_custom(#test_harness_models=rf_classification_model,
-                  function_that_returns_TH_model=random_forest_classification,
-                  dict_of_function_parameters={},
-                       training_data=train, 
-                       testing_data=test,
-                       data_and_split_description=description,
-                       cols_to_predict=output_cols,
-                       index_cols=index_cols,
-                       feature_cols_to_use=input_cols, 
-                       normalize=True, 
-                       feature_cols_to_normalize=input_cols,
-#                    feature_extraction=Names.RFPIMP_PERMUTATION,
-                            feature_extraction=False,
-                       predict_untested_data=data_df)
+    if feature_importance:
+        feature_importance=Names.RFPIMP_PERMUTATION
+    if dry_run:
+        print("HI")
+        th.run_custom(#test_harness_models=rf_classification_model,
+              function_that_returns_TH_model=random_forest_classification,
+              dict_of_function_parameters={},
+                   training_data=train, 
+                   testing_data=test,
+                   data_and_split_description=description,
+                   cols_to_predict=output_cols,
+                   index_cols=index_cols,
+                   feature_cols_to_use=input_cols, 
+                   normalize=True, 
+                   feature_cols_to_normalize=input_cols,
+                   feature_extraction=feature_importance,
+                   predict_untested_data=False)
+        print("HI")
+        return None
 
-    l.debug("Extracting Test Harness Predictions ...")
-    leader_board = pd.read_html(os.path.join(output_location, 'test_harness_results/custom_classification_leaderboard.html'))[0]
-    leader_board = leader_board.sort_values(by=['Date', 'Time'], ascending=True)
-    l.debug("Selecting run: " + str(leader_board.iloc[-1, :]))
-    run = leader_board.loc[:,'Run ID'].iloc[-1]
-    #print(run)
-    run_path = os.path.join(output_location, 'test_harness_results/runs/', "run_" + run)
-    predictions_path = os.path.join(run_path, 'predicted_data.csv')
-    
-    predictions_df = pd.read_csv(predictions_path, index_col=0, dtype={"index" : object})
-    #predictions_df = predictions_df.set_index('class_label')
-    return predictions_df
+    else:
+        #rf_classification_model = random_forest_classification(n_estimators=500)
+        th.run_custom(#test_harness_models=rf_classification_model,
+                      function_that_returns_TH_model=random_forest_classification,
+                      dict_of_function_parameters={},
+                           training_data=train, 
+                           testing_data=test,
+                           data_and_split_description=description,
+                           cols_to_predict=output_cols,
+                           index_cols=index_cols,
+                           feature_cols_to_use=input_cols, 
+                           normalize=True, 
+                           feature_cols_to_normalize=input_cols,
+    #                    feature_extraction=Names.RFPIMP_PERMUTATION,
+                                feature_extraction=feature_importance,
+                           predict_untested_data=data_df)
+
+        l.debug("Extracting Test Harness Predictions ...")
+        leader_board = pd.read_html(os.path.join(output_location, 'test_harness_results/custom_classification_leaderboard.html'))[0]
+        leader_board = leader_board.sort_values(by=['Date', 'Time'], ascending=True)
+        l.debug("Selecting run: " + str(leader_board.iloc[-1, :]))
+        run = leader_board.loc[:,'Run ID'].iloc[-1]
+        #print(run)
+        run_path = os.path.join(output_location, 'test_harness_results/runs/', "run_" + run)
+        predictions_path = os.path.join(run_path, 'predicted_data.csv')
+
+        predictions_df = pd.read_csv(predictions_path, index_col=0, dtype={"index" : object})
+        #predictions_df = predictions_df.set_index('class_label')
+        return predictions_df
 
 def build_model(dataframe):   
     X = dataframe.drop(columns=['class_label'])
