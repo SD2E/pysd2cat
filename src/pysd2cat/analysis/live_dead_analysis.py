@@ -156,6 +156,7 @@ def add_live_dead_test_harness(df,
                                  dry_run=dry_run,
                                  feature_importance=feature_importance
                                 )
+    print("output_col: " + output_col)
     if not dry_run:
         #print(pred_df.head())
         if output_col in df.columns:

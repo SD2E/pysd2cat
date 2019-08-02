@@ -62,6 +62,7 @@ def train_models_for_prediction(experiment_df, out_dir='.',
                                 ):
     experiment_id = experiment_df.experiment_id.unique()[0]
     random_state=0
+    print("output_col: " + output_col)
 
     if combine_stains:
         description={ "experiment_id" : experiment_id,
