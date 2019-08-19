@@ -75,7 +75,7 @@ def get_fcs_files(run_obj, tx_email, tx_token,
                 unzip_tmp_path = os.path.join(work_dir, 'fcs_tmp')
                 with open(zip_path, 'wb') as f:
                     logger.info("Writing data to: " + zip_path)
-                    logger.info("Response: " + str(response))
+                    #logger.info("Response: " + str(response))
                     f.write(response.content)
 
                 # Unzip to tmp_path. Unzips to a directory a weird name
@@ -100,7 +100,7 @@ def get_fcs_files(run_obj, tx_email, tx_token,
                 os.remove(zip_path)
 
             properties = get_plate_well_properties(run_obj, container_name=container_name)
-            logger.debug(properties)
+            #logger.debug(properties)
             # well id -> file info
             
             files = {_fcs_file_well_id(f) : {'file': f,
@@ -136,7 +136,11 @@ def create_fcs_manifest_and_get_files(run_id,
                                       source_container_run=None):
    
     run_obj = get_tx_run(run_id)
-    fcs_files = get_fcs_files(run_obj, transcriptic_email, transcriptic_token, fcs_path, download_zip=download_zip, logger=logger, container_name=container_name, source_container_run=source_container_run)
+    src_run_obj = None
+    if source_container_run:
+        src_run_obj = get_tx_run(source_container_run)
+        
+    fcs_files = get_fcs_files(run_obj, transcriptic_email, transcriptic_token, fcs_path, download_zip=download_zip, logger=logger, container_name=container_name, source_container_run=src_run_obj)
     return fcs_files
     #create_fcs_manifest(run_obj, experiment_id, fcs_files, manifest_path)
     #print("Have FCS manifest")
