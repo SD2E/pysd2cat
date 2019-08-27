@@ -103,12 +103,12 @@ def get_fcs_files(run_obj, tx_email, tx_token,
             #logger.debug(properties)
             # well id -> file info
             
-            files = {_fcs_file_well_id(f) : {'file': f,
+            aliquots = {_fcs_file_well_id(f) : {'file': f,
                                 'properties' : properties[_fcs_file_well_id(f).upper()],
                                 'checksum': _file_checksum(f)}
                      for f in glob.glob(os.path.join(unzip_path, '*.fcs'))
                      if  _fcs_file_well_id(f).upper() in properties }
-
+            files = { "aliquots" : aliquots }
             if source_container_run:
                 files['source_container'] = get_source_container(source_container_run)
             #logger.debug(files)
