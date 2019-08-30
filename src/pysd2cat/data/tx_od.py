@@ -391,7 +391,7 @@ def get_meta(experiment, xplan_base='sd2e-projects/sd2e-project-14/'):
 
     return meta
 
-def get_data_and_metadata_df(experiment, out_dir, overwrite=False):
+def get_data_and_metadata_df(experiment, out_dir, state_file, overwrite=False):
     """
     Get all metadata and data for an experiment (run triple),
     cache a copy in out_dir, and return it.

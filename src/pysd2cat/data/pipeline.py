@@ -353,7 +353,7 @@ def get_xplan_data_and_metadata_df(metadata_df, data_dir, fraction=None, max_rec
         "strain_input_state" : "input_state",
         "strain_circuit" : "gate",
 #        "strain_sbh_uri" : "strain",
-        "strain" : "strain_name"
+#        "strain" : "strain_name"
 #        "temperature" : 'inc_temp'
     }
     for col in df.columns:
