@@ -90,27 +90,27 @@ def get_sample_correctness(data):
 
 
 
-def get_threshold(df, channel='BL1_A', high_control=Names.NOR_00_CONTROL, low_control=Names.WT_LIVE_CONTROL):
+def get_threshold(df, channel='BL1_A', strain_col=Names.STRAIN, high_control=Names.NOR_00_CONTROL, low_control=Names.WT_LIVE_CONTROL):
 
-    if False and high_control not in df['strain_name'].unique():
+    if False and high_control not in df[strain_col].unique():
         fixed_high_control = high_control.replace(" ", "-")
-        if fixed_high_control in df['strain_name'].unique():
+        if fixed_high_control in df[strain_col].unique():
             high_control = fixed_high_control
         else:
-            raise Exception("Cannot compute threshold if do not have both low and high control for high_control=\"" + str(high_control) + "\" low_control = \"" + str(low_control) + "\" Have strain_name's: " + str(df.strain_name.unique()))
-    if False and low_control not in df['strain_name'].unique():
+            raise Exception("Cannot compute threshold if do not have both low and high control for high_control=\"" + str(high_control) + "\" low_control = \"" + str(low_control) + "\" Have strain_name's: " + str(df[strain_col].unique()))
+    if False and low_control not in df[strain_col].unique():
         fixed_low_control = low_control.replace(" ", "-")
-        if fixed_low_control in df['strain_name'].unique():
+        if fixed_low_control in df[strain_col].unique():
             low_control = fixed_low_control
         else:
-            raise Exception("Cannot compute threshold if do not have both low and high control for high_control=\"" + str(high_control) + "\" low_control = \"" + str(low_control) + "\" Have strain_name's: " + str(df.strain_name.unique()))
+            raise Exception("Cannot compute threshold if do not have both low and high control for high_control=\"" + str(high_control) + "\" low_control = \"" + str(low_control) + "\" Have strain_name's: " + str(df[strain_col].unique()))
 
 
            
     ## Prepare the data for high and low controls
-    high_df = df.loc[( df['strain_name'] == high_control)]
+    high_df = df.loc[( df[strain_col] == high_control)]
     high_df.loc[:,'output'] = high_df.apply(lambda x: 1, axis=1)
-    low_df = df.loc[(df['strain_name'] == low_control) ]
+    low_df = df.loc[(df[strain_col] == low_control) ]
     low_df.loc[:,'output'] = low_df.apply(lambda x: 0, axis=1)
     high_low_df = high_df.append(low_df)
     high_low_df = high_low_df.loc[high_low_df[channel] > 0]
@@ -118,7 +118,7 @@ def get_threshold(df, channel='BL1_A', high_control=Names.NOR_00_CONTROL, low_co
     #high_low_df[channel]
     
     if len(high_df) == 0 or len(low_df) == 0:
-        raise Exception("Cannot compute threshold if do not have both low and high control for high_control=\"" + str(high_control) + "\" low_control = \"" + str(low_control) + "\" Have strain_name's: " + str(df.strain_name.unique()))
+        raise Exception("Cannot compute threshold if do not have both low and high control for high_control=\"" + str(high_control) + "\" low_control = \"" + str(low_control) + "\" Have strain_name's: " + str(df[strain_col].unique()))
 
     ## Setup Gradient Descent Paramters
 
@@ -193,6 +193,7 @@ def compute_correctness(m_df,
                      use_log_value=True,
                      high_control=Names.NOR_00_CONTROL,
                      low_control=Names.WT_LIVE_CONTROL,
+                     strain_col=Names.STRAIN,
                      output_label='probability_correct',
                      mean_name='mean_log_gfp',
                      std_name='std_log_gfp',
@@ -207,7 +208,7 @@ def compute_correctness(m_df,
                      ):
     if thresholds is None:
         try:
-            threshold, threshold_quality = get_threshold(m_df, channel, high_control=high_control, low_control=low_control)
+            threshold, threshold_quality = get_threshold(m_df, channel, strain_col=strain_col, high_control=high_control, low_control=low_control)
             thresholds = [threshold]
         except Exception as e:
             #print(e)

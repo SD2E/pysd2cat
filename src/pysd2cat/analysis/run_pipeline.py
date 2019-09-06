@@ -1,5 +1,8 @@
 from pysd2cat.data import tx_od, tx_fcs
+from pysd2cat.analysis.Names import Names
+from pysd2cat.analysis.live_dead_analysis import add_live_dead, get_fcs_columns
 from pysd2cat.data.pipeline import get_xplan_data_and_metadata_df
+from pysd2cat.analysis.correctness import compute_correctness_all
 import pandas as pd
 import logging
 import os
@@ -19,7 +22,10 @@ def run(
         challenge_out_dir,        
         logger=l,
         local=False,
-        overwrite = True
+        overwrite = True,
+        output_id_strain = { "A12" : {"strain": "WT-Live-Control"},
+                                  "B12" : {"strain": "WT-Dead-Control"},
+                                  "C12"  : {"strain": "NOR-00-Control"}}
 ):
     """
     Retreive the data from the experiment and run it through processing pipeline.
@@ -49,13 +55,14 @@ def run(
             logger.debug(record)
             mfile = record['file']
             row = {"output_id" : laliquot.upper(), "filename" : mfile}
-            if 'control' in record['properties']:
-                #row['strain'] = record['properties']['control']
-                metadata = metadata.append({ "strain" : row['strain'], "output_id" : laliquot.upper() }, ignore_index=True)
+            if row['output_id'] in output_id_strain:
+                metadata = metadata.append({ "strain" : output_id_strain[laliquot.upper()]['strain'],
+                                             "output_id" : laliquot.upper() },
+                                            ignore_index=True)
+            
             fcs_measurements = fcs_measurements.append(row, ignore_index=True)
 
         logger.debug(fcs_measurements)
-
 
         if local:
             max_records = 10
@@ -68,32 +75,32 @@ def run(
         fcs_df = get_xplan_data_and_metadata_df(fcs_measurements, data_dir, max_records=max_records)
         fcs_df = fcs_df.drop(columns=['filename'])
         fcs_df = fcs_df.merge(metadata, on='output_id', how='outer')
-        #fcs_df.loc[:,'strain'] = fcs_df.apply(lambda x: x['strain_y'] if x['strain_x'] is None else x['strain_x'], axis=1)
-        #logger.debug(fcs_df)
-        #logger.debug(fcs_df.strain.unique())
-        fcs_df.to_csv('dan.csv')
 
         if 'live' not in fcs_df.columns or len(fcs_df.live.dropna()) == 0:
             ## Add live column
             logger.info("Adding live column")
-            
+            logger.debug(fcs_df.columns)
             strains = fcs_df.strain.unique()
             logger.info("Strains are: " + str(strains))
             if Names.WT_DEAD_CONTROL in strains and Names.WT_LIVE_CONTROL in strains:
                 try:
-                    logger.info(df.shape)
-                    df1 = live_dead_analysis.add_live_dead(fcs_df, Names.STRAIN_NAME, Names.WT_LIVE_CONTROL, Names.WT_DEAD_CONTROL, fcs_columns=live_dead_analysis.get_fcs_columns())
-                    logger.info("Adding live column...")
+                    fcs_df = add_live_dead(fcs_df, Names.STRAIN, Names.WT_LIVE_CONTROL, Names.WT_DEAD_CONTROL, fcs_columns=get_fcs_columns())
+                    
+                    #logger.info("Adding live column...")
                     #robj.logger.info(df1.shape)
-                    logger.info(df1['live'])
+                    #logger.info(df1['live'])
                     # Write dataframe as csv
-                    logger.info("Writing: " + run_data_file_stash)
+                    #logger.info("Writing: " + run_data_file_stash)
                     #df1.to_csv(run_data_file_stash)
                 except Exception as e:
-                    robj.logger.debug("Problem with live dead classification: " + str(e))
+                    logger.debug("Problem with live dead classification: " + str(e))
+        logger.debug(fcs_df)
 
+        correctness_df = compute_correctness_all(fcs_df, out_dir=challenge_out_dir)
+
+        logger.debug(correctness_df)
         
-    get_od = True
+    get_od = False
     if get_od:
         # Get OD data
         ## TODO get calibration_id
@@ -107,9 +114,15 @@ def run(
             os.makedirs(od_out_dir)
 
         od_meta_and_data_df = tx_od.get_experiment_data(experiment, od_out_dir, overwrite=overwrite)
-        od_meta_and_data_df['part_1_id'] = experiment['part_1_id']
-        od_meta_and_data_df['part_2_id'] = experiment['part_2_id']
-        od_meta_and_data_df['calibration_id'] = experiment['calibration_id']
+        od_meta_and_data_df.loc[:, 'pre_well'] = od_meta_and_data_df.apply(lambda x: x['pre_well'].upper(), axis=1)
+        od_meta_and_data_df.loc[:, 'post_well'] = od_meta_and_data_df.apply(lambda x: x['post_well'].upper(), axis=1)
+        od_meta_and_data_df = od_meta_and_data_df.drop(columns=['SynBioHub URI']).rename(columns={'post_well' : 'output_id'})
+        od_meta_and_data_df = od_meta_and_data_df.merge(metadata, on='output_id', how='outer')
+#        od_meta_and_data_df['part_1_id'] = experiment['part_1_id']
+#        od_meta_and_data_df['part_2_id'] = experiment['part_2_id']
+#        od_meta_and_data_df['calibration_id'] = experiment['calibration_id']
+
+        
 
         logger.debug(od_meta_and_data_df)
     

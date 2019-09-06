@@ -13,28 +13,29 @@ l = logging.getLogger(__file__)
 l.setLevel(logging.DEBUG)
 
 
-def strain_to_class(x,  high_control=Names.NOR_00_CONTROL, low_control=Names.WT_LIVE_CONTROL):
-    if x['strain_name'] == low_control:
+def strain_to_class(x,  strain_col=Names.STRAIN, high_control=Names.NOR_00_CONTROL, low_control=Names.WT_LIVE_CONTROL):
+    if x[strain_col] == low_control:
         return 0
-    elif x['strain_name'] == high_control:
+    elif x[strain_col] == high_control:
         return 1
     else:
         return None
 
 
 def get_classifier_dataframe(df, data_columns = ['FSC_A', 'SSC_A', 'BL1_A', 'RL1_A', 'FSC_H', 'SSC_H', 'BL1_H', 'RL1_H', 'FSC_W', 'SSC_W', 'BL1_W', 'RL1_W'],
+                                 strain_col=Names.STRAIN,
                              high_control=Names.NOR_00_CONTROL, low_control=Names.WT_LIVE_CONTROL):
     """
     Get the classifier data corresponding to controls.
     """
-    low_df = df.loc[df['strain_name'] == low_control]
-    high_df = df.loc[df['strain_name'] == high_control]
-    low_df.loc[:,'strain_name'] = low_df.apply(lambda x : strain_to_class(x,  high_control=high_control, low_control=low_control), axis=1)
-    high_df.loc[:,'strain_name'] = high_df.apply(lambda x : strain_to_class(x,  high_control=high_control, low_control=low_control), axis=1)
+    low_df = df.loc[df[strain_col] == low_control]
+    high_df = df.loc[df[strain_col] == high_control]
+    low_df.loc[:,strain_col] = low_df.apply(lambda x : strain_to_class(x,  high_control=high_control, low_control=low_control), axis=1)
+    high_df.loc[:,strain_col] = high_df.apply(lambda x : strain_to_class(x,  high_control=high_control, low_control=low_control), axis=1)
     low_high_df = low_df.append(high_df)
 
     #print(live_dead_df)
-    low_high_df = low_high_df.rename(index=str, columns={'strain_name': "class_label"})
+    low_high_df = low_high_df.rename(index=str, columns={strain_col: "class_label"})
     low_high_df = low_high_df[data_columns + ['class_label']]
     return low_high_df
 
@@ -44,12 +45,13 @@ def compute_predicted_output(df,
                                              'SSC_H', 'BL1_H', 'RL1_H', 'FSC_W', 'SSC_W', 
                                              'BL1_W', 'RL1_W'], 
                              out_dir='.',
+                             strain_col=Names.STRAIN,
                              high_control=Names.NOR_00_CONTROL, 
                              low_control=Names.WT_LIVE_CONTROL,
                              use_harness=False,
                              description=None):
     ## Build the training/test input
-    c_df = get_classifier_dataframe(df, data_columns = data_columns, high_control=high_control, low_control=low_control)
+    c_df = get_classifier_dataframe(df, data_columns = data_columns, strain_col=strain_col, high_control=high_control, low_control=low_control)
     
 
     if use_harness:
@@ -89,13 +91,15 @@ def compute_correctness_classifier(df,
                              std_correct_low_name='std_correct_low_classifier',
                              high_control=Names.NOR_00_CONTROL,
                              low_control=Names.WT_LIVE_CONTROL,
+                             strain_col=Names.STRAIN,
                              description=None,
                              add_predictions = False,
                              use_harness = False):
     df.loc[:,'output'] = pd.to_numeric(df['output'])
     l.debug("Shape at start: " + str(df.shape))
     result_df = compute_predicted_output(df, 
-                                         out_dir=out_dir, 
+                                         out_dir=out_dir,
+                                         strain_col=strain_col,
                                          high_control=high_control, 
                                          low_control=low_control, 
                                          use_harness=use_harness,
@@ -159,7 +163,7 @@ def compute_correctness_classifier(df,
     return acc_df
     
     
-def compute_correctness_all(df, out_dir = '.', high_control=Names.NOR_00_CONTROL, low_control=Names.WT_LIVE_CONTROL):
+def compute_correctness_all(df, out_dir = '.', strain_col=Names.STRAIN, high_control=Names.NOR_00_CONTROL, low_control=Names.WT_LIVE_CONTROL):
     drop_list = ['Time', 'FSC_A', 'SSC_A', 'BL1_A', 'RL1_A', 'FSC_H', 'SSC_H',
                       'BL1_H', 'RL1_H', 'FSC_W', 'SSC_W', 'BL1_W', 'RL1_W', 'live', 'index']
     drop_list = [x for x in drop_list if x in df.columns]
@@ -175,9 +179,10 @@ def compute_correctness_all(df, out_dir = '.', high_control=Names.NOR_00_CONTROL
         
     results = []
     # Get correctness w/o dead cells gated
-    l.debug("Computing Threhold, no gating ...")
+    l.debug("Computing Threshold, no gating ...")
     results.append(compute_correctness(df,
                                     output_label='probability_correct_threshold',
+                                    strain_col=strain_col,
                                     high_control=high_control,
                                     low_control=low_control,
                                     mean_name='mean_log_gfp',
@@ -203,6 +208,7 @@ def compute_correctness_all(df, out_dir = '.', high_control=Names.NOR_00_CONTROL
                                             description = experiment+"_correctness",
                                             high_control=high_control,
                                             low_control=low_control,
+                                            strain_col=strain_col,
                                             use_harness=True))
     
     # Get correctness w/ dead cells gated
@@ -213,6 +219,7 @@ def compute_correctness_all(df, out_dir = '.', high_control=Names.NOR_00_CONTROL
                                         output_label='probability_correct_threshold',
                                         high_control=high_control,
                                         low_control=low_control,
+                                        strain_col=strain_col,
                                         mean_name='mean_log_gfp_live',
                                         std_name='std_log_gfp_live',
                                         mean_correct_name='mean_correct_threshold_live',
@@ -236,6 +243,7 @@ def compute_correctness_all(df, out_dir = '.', high_control=Names.NOR_00_CONTROL
                                                 std_correct_low_name='std_correct_low_classifier_live',
                                                 high_control=high_control,
                                                 low_control=low_control,
+                                                strain_col=strain_col,
                                                 use_harness=True))
 
     #print(len(result))
