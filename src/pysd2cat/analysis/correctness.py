@@ -28,10 +28,11 @@ def get_classifier_dataframe(df, data_columns = ['FSC_A', 'SSC_A', 'BL1_A', 'RL1
     """
     Get the classifier data corresponding to controls.
     """
+    l.info("get_classifier_dataframe(): strain_col = " + strain_col)
     low_df = df.loc[df[strain_col] == low_control]
     high_df = df.loc[df[strain_col] == high_control]
-    low_df.loc[:,strain_col] = low_df.apply(lambda x : strain_to_class(x,  high_control=high_control, low_control=low_control), axis=1)
-    high_df.loc[:,strain_col] = high_df.apply(lambda x : strain_to_class(x,  high_control=high_control, low_control=low_control), axis=1)
+    low_df.loc[:,strain_col] = low_df.apply(lambda x : strain_to_class(x,  high_control=high_control, low_control=low_control, strain_col=strain_col), axis=1)
+    high_df.loc[:,strain_col] = high_df.apply(lambda x : strain_to_class(x,  high_control=high_control, low_control=low_control, strain_col=strain_col), axis=1)
     low_high_df = low_df.append(high_df)
 
     #print(live_dead_df)
@@ -96,7 +97,7 @@ def compute_correctness_classifier(df,
                              add_predictions = False,
                              use_harness = False):
     df.loc[:,'output'] = pd.to_numeric(df['output'])
-    l.debug("Shape at start: " + str(df.shape))
+    l.debug("Shape at start: " + str(df.shape) + " strain_col = " + strain_col)
     result_df = compute_predicted_output(df, 
                                          out_dir=out_dir,
                                          strain_col=strain_col,
@@ -253,33 +254,34 @@ def compute_correctness_all(df, out_dir = '.', strain_col=Names.STRAIN, high_con
         #print(len(result))
     return result
 
-def write_correctness(data_file, overwrite, high_control=Names.NOR_00_CONTROL, low_control=Names.WT_LIVE_CONTROL):
+def write_correctness(data_file, overwrite, high_control=Names.NOR_00_CONTROL, low_control=Names.WT_LIVE_CONTROL, strain_col=Names.STRAIN, logger=l):
     try:
         data_dir = "/".join(data_file.split('/')[0:-1])
         out_path = os.path.join(data_dir, 'correctness')
         out_file = os.path.join(out_path, data_file.split('/')[-1])
         if overwrite or not os.path.isfile(out_file):
-            print("Computing correctness file: " + out_file)
+            l.info("Computing correctness file: " + out_file + ", strain_col = " + strain_col)
             data_df = pd.read_csv(data_file,dtype={'od': float, 'input' : object, 'output' : object}, index_col=0 )
             correctness_df = compute_correctness_all(data_df, out_dir=out_path, 
-                                                     high_control=high_control, low_control=low_control)
-            print("Writing correctness file: " + out_file)
+                                                     high_control=high_control, low_control=low_control,
+                                                     strain_col=strain_col)
+            l.info("Writing correctness file: " + out_file)
             correctness_df.to_csv(out_file)
     except Exception as e:
-        print("File failed: " + data_file + " with: " + str(e))
+        l.warn("File failed: " + data_file + " with: " + str(e))
         pass
 
 def write_correctness_job(args, kwargs):
     write_correctness(*args, **kwargs)
 
-def write_correctness_files(data, overwrite=False, high_control=Names.NOR_00_CONTROL, low_control=Names.WT_LIVE_CONTROL, num_processes=4):
+def write_correctness_files(data, overwrite=False, high_control=Names.NOR_00_CONTROL, low_control=Names.WT_LIVE_CONTROL, num_processes=4, strain_col=Names.STRAIN, logger=l):
     import multiprocessing
     #pool = multiprocessing.Pool(int(multiprocessing.cpu_count()))
     pool = multiprocessing.Pool(num_processes)
     multiprocessing.cpu_count()
     tasks = []
     for d in data:       
-        tasks.append(((d, overwrite), {'high_control':high_control, 'low_control':low_control}))
+        tasks.append(((d, overwrite), {'high_control':high_control, 'low_control':low_control, 'strain_col' : strain_col}))
 #        tasks.append((d, overwrite))
     results = [pool.apply_async(write_correctness_job, t) for t in tasks]
 

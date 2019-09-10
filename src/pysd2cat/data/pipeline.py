@@ -4,6 +4,11 @@ import pandas as pd
 import os
 import FlowCytometryTools as FCT
 from pysd2cat.analysis.Names import Names
+import logging
+
+l = logging.getLogger(__file__)
+l.setLevel(logging.DEBUG)
+
 
 ***REMOVED***
 client = pymongo.MongoClient(dbURI)
@@ -280,15 +285,16 @@ def detect_runtime():
         print("os.environ: {}".format(os.environ))
         return 'cli'
 
-def get_flow_dataframe(data_dir,filename):
-    print(data_dir)
-    print(filename)
-    df = FCT.FCMeasurement(ID=filename, datafile=os.path.join(data_dir, filename)).read_data()
-
+def get_flow_dataframe(data_dir, filename, logger=l):
+    try:
+        df = FCT.FCMeasurement(ID=filename, datafile=os.path.join(data_dir, filename)).read_data()
+    except Exception as e:
+        logger.warn("Problem with FCS file: " + str(filename))
+        
     return df
 
 
-def get_data_and_metadata_df(metadata_df, data_dir, fraction=None, max_records=None):
+def get_data_and_metadata_df(metadata_df, data_dir, fraction=None, max_records=None, logger=l):
     """
     Join each FCS datatable with its metadata.  Costly!
     """
@@ -298,7 +304,7 @@ def get_data_and_metadata_df(metadata_df, data_dir, fraction=None, max_records=N
         ## Substitute local file for SD2 URI to agave file 
         #record['fcs_files'] = local_datafile(record['fcs_files'][0], data_dir)
         #dataset_local_df = dataset_local_df.append(record)
-        print("record[{}]: {}".format(Names.FILENAME, record[Names.FILENAME]))
+        logger.debug("record[{}]: {}".format(Names.FILENAME, record[Names.FILENAME]))
         if not os.path.exists(record[Names.FILENAME]):
             # Fix error where wrong path exists with `uploads`
             if 'uploads' in record[Names.FILENAME]:
@@ -309,18 +315,12 @@ def get_data_and_metadata_df(metadata_df, data_dir, fraction=None, max_records=N
                 continue
     
         ## Create a data frame out of FCS file
-        #print("data dir: {}".format(data_dir))
-        #print("Filename: {}".format(record[Names.FILENAME]))
-
-        data_df = get_flow_dataframe(data_dir,record[Names.FILENAME])
-        #print("data_df")
-        #print(data_df.columns.tolist())
-        #print(data_df.head(5))
+        data_df = get_flow_dataframe(data_dir,record[Names.FILENAME], logger=logger)
 
         if max_records is not None:
             data_df = data_df[0:min(len(data_df), max_records)]
         elif fraction is not None:
-            print("In get_data_metadata_df ELIF condition fraction is: ", fraction)
+            logger.debug("In get_data_metadata_df ELIF condition fraction is: ", fraction)
             data_df = data_df.sample(frac=fraction, replace=True)
             #data_df = data_df.replace([np.inf, -np.inf], np.nan)
         #data_df = data_df[~data_df.isin(['NaN', 'NaT']).any(axis=1)]
@@ -329,38 +329,43 @@ def get_data_and_metadata_df(metadata_df, data_dir, fraction=None, max_records=N
         all_data_df = all_data_df.append(data_df)
 
     ## Join data and metadata
-    #print("metadata_df")
-    #print(metadata_df.columns.tolist())
-    #print(metadata_df.head(5))
-    #print("all_data_df")
-    #print(all_data_df.columns.tolist())
-    #print(all_data_df.head(5))
     final_df = metadata_df.merge(all_data_df, left_on='filename', right_on='filename', how='inner')
     return final_df
 
 def sanitize(my_string):
     return my_string.replace('-', '_').replace(' ', '_')
 
-def get_xplan_data_and_metadata_df(metadata_df, data_dir, fraction=None, max_records=None):
+def get_xplan_data_and_metadata_df(metadata_df, data_dir, fraction=None, max_records=None, strain_col='strain', logger=l):
     """
     Rename columns from data and metadata to match xplan columns
     """
-    print("Getting xplan dataframe for experiment...")
-    df = get_data_and_metadata_df(metadata_df, data_dir, fraction=fraction, max_records=max_records)
+    logger.info("Getting xplan dataframe for experiment...")
+    df = get_data_and_metadata_df(metadata_df, data_dir, fraction=fraction, max_records=max_records, logger=logger)
+    logger.info("Renaming columns ...")
     rename_map = {
 #        "experiment_id" : "plan",
 #        "sample_id" : "id",
         "strain_input_state" : "input_state",
         "strain_circuit" : "gate",
 #        "strain_sbh_uri" : "strain",
-#        "strain" : "strain_name"
+        "strain" : strain_col
 #        "temperature" : 'inc_temp'
     }
+    final_rename_map = {}
     for col in df.columns:
         if col not in rename_map:
-            rename_map[col] = sanitize(col)
-    #print("renaming columns as: " + str(rename_map))
-    df = df.rename(index=str, columns=rename_map)
+            final_rename_map[col] = sanitize(col)
+    
+    for col in rename_map:
+        if col in df.columns:
+            final_rename_map[col] = rename_map[col]
+    logger.info("renaming columns as: " + str(final_rename_map))
+    logger.info("columns: " + str(df.columns))
+    try:
+        df = df.rename(columns=final_rename_map)
+    except Exception as e:
+        logger.info(e)
+    logger.info("Renamed columns ...")
     return df
     
 def get_mefl_data_and_metadata_df(metadata_df, fraction=None, max_records=None):
