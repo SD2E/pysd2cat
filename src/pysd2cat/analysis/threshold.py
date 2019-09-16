@@ -5,6 +5,10 @@ import os
 from pysd2cat.data import pipeline
 from pysd2cat.analysis.Names import Names    
 
+import logging
+
+l = logging.getLogger(__file__)
+l.setLevel(logging.DEBUG)
  
 
 def get_experiment_correctness_and_metadata(adf):
@@ -90,7 +94,7 @@ def get_sample_correctness(data):
 
 
 
-def get_threshold(df, channel='BL1_A', strain_col=Names.STRAIN, high_control=Names.NOR_00_CONTROL, low_control=Names.WT_LIVE_CONTROL):
+def get_threshold(df, channel='BL1_A', strain_col=Names.STRAIN, high_control=Names.NOR_00_CONTROL, low_control=Names.WT_LIVE_CONTROL, logger=l):
 
     if False and high_control not in df[strain_col].unique():
         fixed_high_control = high_control.replace(" ", "-")
@@ -148,9 +152,9 @@ def get_threshold(df, channel='BL1_A', strain_col=Names.STRAIN, high_control=Nam
         try:
             grad = (np.sum(correct) - np.sum(correctp))/delta
         except Exception as e:
-            print(sum(correct))
-            print(sum(correctp))
-            print(e)
+            logger.warn(sum(correct))
+            logger.warn(sum(correctp))
+            logger.warn(e)
         #print("Gradient at: " + str(x) + " is " + str(grad))
         return grad
 
@@ -204,7 +208,8 @@ def compute_correctness(m_df,
                      mean_correct_low_name='mean_correct_low_threshold',
                      std_correct_low_name='std_correct_low_threshold',
                      count_name='count',
-                     threshold_name='threshold'
+                     threshold_name='threshold',
+                     logger=l
                      ):
     if thresholds is None:
         try:
@@ -217,7 +222,7 @@ def compute_correctness(m_df,
 
     #print("Threshold  = " + str(thresholds[0]))
     samples = m_df[id_name].unique()
-    print("samples length: {}".format(len(samples)))
+    logger.info("samples length: {}".format(len(samples)))
     plot_df = pd.DataFrame()
     for sample_id in samples:
                 

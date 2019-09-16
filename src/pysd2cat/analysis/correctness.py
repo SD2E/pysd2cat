@@ -95,9 +95,11 @@ def compute_correctness_classifier(df,
                              strain_col=Names.STRAIN,
                              description=None,
                              add_predictions = False,
-                             use_harness = False):
+                             use_harness = False,
+                             logger=l):
+    
     df.loc[:,'output'] = pd.to_numeric(df['output'])
-    l.debug("Shape at start: " + str(df.shape) + " strain_col = " + strain_col)
+    logger.debug("Shape at start: " + str(df.shape) + " strain_col = " + strain_col)
     result_df = compute_predicted_output(df, 
                                          out_dir=out_dir,
                                          strain_col=strain_col,
@@ -105,14 +107,14 @@ def compute_correctness_classifier(df,
                                          low_control=low_control, 
                                          use_harness=use_harness,
                                          description=description)
-    l.debug("Shape of result: " + str(result_df.shape) + ", columns= " + str(result_df.columns))
+    logger.debug("Shape of result: " + str(result_df.shape) + ", columns= " + str(result_df.columns))
     result_df.loc[:, 'predicted_correct'] = result_df.apply(lambda x : None if np.isnan(x['output']) or np.isnan(x['predicted_output']) else 1.0 - np.abs(x['output'] - x['predicted_output']), axis=1)
     result_df.loc[:, 'predicted_high'] = result_df.apply(lambda x : None if np.isnan(x['output']) or np.isnan(x['predicted_output']) else 1.0 - np.abs(1- x['predicted_output']), axis=1)
     result_df.loc[:, 'predicted_low'] = result_df.apply(lambda x : None if np.isnan(x['output']) or np.isnan(x['predicted_output']) else 1.0 - np.abs(x['predicted_output']), axis=1)
 
 
 
-    l.debug(result_df)
+    logger.debug(result_df)
     if add_predictions:
         df.loc[:, 'predicted_output'] = result_df['predicted_output']
         df.loc[:, 'predicted_correct'] = result_df['predicted_correct']
@@ -151,7 +153,7 @@ def compute_correctness_classifier(df,
     groups = result_df.groupby(['id'])
     acc_df = groups.apply(nan_agg).reset_index() 
 
-    l.debug("Shape of acc: " + str(acc_df.shape))
+    logger.debug("Shape of acc: " + str(acc_df.shape))
     #print(acc_df)
     acc_df = acc_df.rename(columns={'mean' : mean_output_label, 
                                     'std' : std_output_label,
@@ -164,7 +166,7 @@ def compute_correctness_classifier(df,
     return acc_df
     
     
-def compute_correctness_all(df, out_dir = '.', strain_col=Names.STRAIN, high_control=Names.NOR_00_CONTROL, low_control=Names.WT_LIVE_CONTROL):
+def compute_correctness_all(df, out_dir = '.', strain_col=Names.STRAIN, high_control=Names.NOR_00_CONTROL, low_control=Names.WT_LIVE_CONTROL, logger=l):
     drop_list = ['Time', 'FSC_A', 'SSC_A', 'BL1_A', 'RL1_A', 'FSC_H', 'SSC_H',
                       'BL1_H', 'RL1_H', 'FSC_W', 'SSC_W', 'BL1_W', 'RL1_W', 'live', 'index']
     drop_list = [x for x in drop_list if x in df.columns]
@@ -177,10 +179,12 @@ def compute_correctness_all(df, out_dir = '.', strain_col=Names.STRAIN, high_con
         experiment = df['plan'].unique()[0]
     elif 'experiment_id' in df.columns:
         experiment = df['experiment_id'].unique()[0]
+
+    logger.info("Compute Correctness for experiment " + str(experiment))
         
     results = []
     # Get correctness w/o dead cells gated
-    l.debug("Computing Threshold, no gating ...")
+    logger.debug("Computing Threshold, no gating ...")
     results.append(compute_correctness(df,
                                     output_label='probability_correct_threshold',
                                     strain_col=strain_col,
@@ -195,9 +199,9 @@ def compute_correctness_all(df, out_dir = '.', strain_col=Names.STRAIN, high_con
                                     mean_correct_low_name='mean_correct_low_threshold',
                                     std_correct_low_name='std_correct_low_threshold',
                                     count_name='count',
-                                    threshold_name='threshold'))
-
-    l.debug("Computing Random Forest, no gating ...")
+                                    threshold_name='threshold',
+                                    logger=logger))
+    logger.debug("Computing Random Forest, no gating ...")
     results.append(compute_correctness_classifier(df,
                                             out_dir = out_dir,
                                             mean_output_label='mean_correct_classifier',
@@ -206,16 +210,17 @@ def compute_correctness_all(df, out_dir = '.', strain_col=Names.STRAIN, high_con
                                             std_correct_high_name='std_correct_high_classifier',
                                             mean_correct_low_name='mean_correct_low_classifier',
                                             std_correct_low_name='std_correct_low_classifier',
-                                            description = experiment+"_correctness",
+                                            description = str(experiment)+"_correctness",
                                             high_control=high_control,
                                             low_control=low_control,
                                             strain_col=strain_col,
-                                            use_harness=True))
-    
+                                            use_harness=True,
+                                            logger=logger))
+
     # Get correctness w/ dead cells gated
     if 'live' in df.columns:
         gated_df = df.loc[df['live'] == 1]
-        l.debug("Computing Threhold, with gating ...")
+        logger.debug("Computing Threhold, with gating ...")
         results.append(compute_correctness(gated_df,
                                         output_label='probability_correct_threshold',
                                         high_control=high_control,
@@ -230,14 +235,15 @@ def compute_correctness_all(df, out_dir = '.', strain_col=Names.STRAIN, high_con
                                         mean_correct_low_name='mean_correct_low_threshold_live',
                                         std_correct_low_name='std_correct_low_threshold_live',
                                         count_name='count_live',
-                                        threshold_name='threshold_live'))
+                                        threshold_name='threshold_live',
+                                        logger=logger))
 
-        l.debug("Computing Random Forest, with gating ...")
+        logger.debug("Computing Random Forest, with gating ...")
         results.append(compute_correctness_classifier(gated_df,
                                                 out_dir = out_dir,
                                                 mean_output_label='mean_correct_classifier_live',
                                                 std_output_label='std_correct_classifier_live',
-                                                description = experiment + "_correctness_live",
+                                                description = str(experiment) + "_correctness_live",
                                                 mean_correct_high_name='mean_correct_high_classifier_live',
                                                 std_correct_high_name='std_correct_high_classifier_live',
                                                 mean_correct_low_name='mean_correct_low_classifier_live',
@@ -245,7 +251,8 @@ def compute_correctness_all(df, out_dir = '.', strain_col=Names.STRAIN, high_con
                                                 high_control=high_control,
                                                 low_control=low_control,
                                                 strain_col=strain_col,
-                                                use_harness=True))
+                                                use_harness=True,
+                                                logger=logger))
 
     #print(len(result))
     for r in results:
@@ -260,15 +267,15 @@ def write_correctness(data_file, overwrite, high_control=Names.NOR_00_CONTROL, l
         out_path = os.path.join(data_dir, 'correctness')
         out_file = os.path.join(out_path, data_file.split('/')[-1])
         if overwrite or not os.path.isfile(out_file):
-            l.info("Computing correctness file: " + out_file + ", strain_col = " + strain_col)
+            logger.info("Computing correctness file: " + out_file + ", strain_col = " + strain_col)
             data_df = pd.read_csv(data_file,dtype={'od': float, 'input' : object, 'output' : object}, index_col=0 )
             correctness_df = compute_correctness_all(data_df, out_dir=out_path, 
                                                      high_control=high_control, low_control=low_control,
                                                      strain_col=strain_col)
-            l.info("Writing correctness file: " + out_file)
+            logger.info("Writing correctness file: " + out_file)
             correctness_df.to_csv(out_file)
     except Exception as e:
-        l.warn("File failed: " + data_file + " with: " + str(e))
+        logger.warn("File failed: " + data_file + " with: " + str(e))
         pass
 
 def write_correctness_job(args, kwargs):

@@ -1,7 +1,7 @@
 from pysd2cat.data import tx_od, tx_fcs
 from pysd2cat.analysis.Names import Names
 from pysd2cat.analysis.live_dead_analysis import add_live_dead, get_fcs_columns
-from pysd2cat.data.pipeline import get_xplan_data_and_metadata_df
+from pysd2cat.data.pipeline import get_xplan_data_and_metadata_df, handle_missing_data
 from pysd2cat.analysis.correctness import compute_correctness_all
 import pandas as pd
 import logging
@@ -29,14 +29,19 @@ def run(
 ):
     """
     Retreive the data from the experiment and run it through processing pipeline.
-    Save files: 
-    1) FCS data with live/dead, high/low predictions
-    2) Experiment Design 
-    3) OD data
-    4) Update master summary of all experiments
-    5) 
     """
-
+    data_base_path = os.path.join(challenge_out_dir, 'data/transcriptic')
+    lab_id = str(run_id_part_1) + "_" + str(run_id_part_2)
+    correctness_file_path = os.path.join(data_base_path, 'correctness', lab_id + ".csv")
+    full_data_file_path = os.path.join(data_base_path, lab_id + ".csv")
+    od_file_path = os.path.join(data_base_path, 'od_corrected', lab_id + ".csv")
+    
+    ## Add metadata to metadata that is needed below
+    for key in [Names.GATE, Names.INPUT, Names.OUTPUT]:
+        metadata.loc[:,key] = metadata.apply(lambda x: handle_missing_data(x, key), axis=1)
+    metadata.loc[:,'lab_id'] = lab_id
+    logger.debug("metadata added: " + str(metadata['output'].unique()))
+        
     ## Get all the data
     get_fcs = True
     if get_fcs:
@@ -50,9 +55,12 @@ def run(
             download_zip=False,
             logger=logger,
             source_container_run=run_id_part_1)
+        
+        metadata.loc[:,'source_container'] = fcs_files['source_container'].id
+
         fcs_measurements = pd.DataFrame()
         for laliquot, record in fcs_files['aliquots'].items():
-            logger.debug(record)
+            #logger.debug(record)
             mfile = record['file']
             row = {"output_id" : laliquot.upper(), "filename" : mfile}
             if row['output_id'] in output_id_strain:
@@ -96,9 +104,13 @@ def run(
                     logger.debug("Problem with live dead classification: " + str(e))
         logger.debug(fcs_df)
 
-        correctness_df = compute_correctness_all(fcs_df, out_dir=challenge_out_dir)
+        if not os.path.exists(correctness_file_path):
+            correctness_df = compute_correctness_all(fcs_df, out_dir=challenge_out_dir, logger=logger)
+            correctness_df.to_csv(correctness_file_path)
+            logger.debug(correctness_df)
 
-        logger.debug(correctness_df)
+        fcs_df.to_csv(full_data_file_path)
+        
         
     get_od = False
     if get_od:
