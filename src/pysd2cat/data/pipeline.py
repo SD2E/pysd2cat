@@ -194,7 +194,11 @@ def handle_missing_data(result, key):
         
     if key in Names.STRAIN_INPUT_STATE and strain is not None and strain in strain_inputs:
         return strain_inputs[strain]['input']
+    if key in Names.INPUT and strain is not None and strain in strain_inputs:
+        return strain_inputs[strain]['input']
     elif key in Names.STRAIN_CIRCUIT and strain is not None  and strain in strain_inputs:
+        return strain_inputs[strain]['gate']
+    elif key in Names.GATE and strain is not None  and strain in strain_inputs:
         return strain_inputs[strain]['gate']
     elif key in Names.OUTPUT and strain is not None  and strain in strain_inputs:
         return strain_inputs[strain]['output']
