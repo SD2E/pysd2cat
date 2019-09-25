@@ -11,7 +11,8 @@ def train_models_for_stats(experiment_df,
                                           'FSC-H', 'SSC-H', 'FL1-H', 'FL2-H', 'FL3-H', 'FL4-H'],
                            dead_volumes=[980., 570., 370., 250., 170., 105.,  64., 29],
                            live_volume=0.0,
-                           strain_column_name='kill_volume'
+                           strain_column_name='kill_volume',
+                           time_point="0"
                            ):
     """
     experiment_df has kill_volume, and stain vs not 
@@ -28,7 +29,8 @@ def train_models_for_stats(experiment_df,
                                "random_state" : i,
                                "live_volume" : live_volume,
                                "dead_volume" : dead_strain_name,
-                               "stain" : stain}
+                               "stain" : stain,
+                               "time_point" : time_point }
                 #print(stain)
                 if type(stain) is not str and ( stain is None or math.isnan(stain)):
                     df = experiment_df.loc[(experiment_df['stain'].isna())]
@@ -171,10 +173,19 @@ def get_leader_board_df(out_dir, expand_description=True):
     leader_board = leader_board.sort_values(by=['Date', 'Time'], ascending=True)
 
     if expand_description:
-        attributes = ['experiment_id', 'random_state', 'stain', 'live_volume', 'dead_volume', 'channels']
+        attributes = ['experiment_id', 'random_state', 'stain', 'live_volume', 'dead_volume', 'channels', 'time_point']
         for attribute in attributes:
             leader_board.loc[:, attribute] = leader_board.apply(lambda x: extract_lb_attribute(x, attribute), axis = 1)
     return leader_board
+
+def drop_experiment_from_leader_board(out_dir, experiment):
+    leader_board_path=os.path.join(out_dir, 'test_harness_results/custom_classification_leaderboard.html')
+    leader_board = pd.read_html(leader_board_path)[0]
+    leader_board = leader_board.sort_values(by=['Date', 'Time'], ascending=True)
+
+    leader_board = leader_board.loc[~leader_board['Data and Split Description'].str.contains(experiment)]
+    leader_board.to_html(leader_board_path)
+
 
 def leader_board_case_exists(out_dir, description):
     leader_board_df = get_leader_board_df(out_dir, expand_description=False)
