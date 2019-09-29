@@ -128,7 +128,7 @@ def get_statistics_by_time(leader_board_df, experiment_strain=None, experiment_l
 
 
         #col.set_xlabel("Ethanol Volume (uL)")
-        col.set_xlabel("Time point")
+        col.set_xlabel("Time (h)")
         col.set_ylabel(metrics[j])
 
         for experiment in experiments:
@@ -146,10 +146,10 @@ def get_statistics_by_time(leader_board_df, experiment_strain=None, experiment_l
                     mdf=mdf.drop_duplicates().sort_values(by=['time_point'])
                     #print(mdf.head(1))
 
-                    xvals=mdf['time_point']
-                    xvals1=mdf.groupby(['time_point']).agg(np.mean).reset_index()['time_point']
+                    xvals=mdf['time']
+                    xvals1=mdf.groupby(['time']).agg(np.mean).reset_index()['time']
                     yvals=mdf[metrics[j]]
-                    yvals1=mdf.groupby(['time_point']).agg(np.mean)[metrics[j]]
+                    yvals1=mdf.groupby(['time']).agg(np.mean)[metrics[j]]
                     #plt.xtics(xvals)
 
                     #col.scatter(xvals, yvals,s=100, alpha=0.5, label=label)
@@ -236,7 +236,6 @@ def get_channel_mean_titration(experiment_df,
     return fig
 
 def get_channel_mean_timeseries(experiment_df,
-                               only_live=False,
                                channels=['FSC-A', 'SSC-A', 'FL1-A', 'FL2-A', 'FL3-A', 'FL4-A',
                                          'FSC-H', 'SSC-H', 'FL1-H', 'FL2-H', 'FL3-H', 'FL4-H'],
                                lab='BioFab',
@@ -246,47 +245,34 @@ def get_channel_mean_timeseries(experiment_df,
 
     stains=experiment_df.stain.unique()
     print(stains)
-    
+
+    volumes=experiment_df.kill_volume.unique()
     channels.sort()
 
     #fig = plt.figure( dpi=200)
 
-    fig, ax = plt.subplots(nrows=1, ncols=len(stains), figsize=(4*len(stains)+4, 4), dpi=200)
-    experiments = experiment_df.experiment_id.dropna().unique()
-    if 'strain' in experiment_df.columns:
-        experiment_id = experiment_df.strain.dropna().unique()[0]
-    else:
-        experiment_id = experiment_df.experiment_id.dropna().unique()[0]        
+    fig, ax = plt.subplots(nrows=len(volumes), ncols=len(stains), figsize=(4*len(stains)+4, 4*len(volumes)+4), dpi=200)
+#    experiments = experiment_df.experiment_id.dropna().unique()
+#    if 'strain' in experiment_df.columns:
+#        experiment_id = experiment_df.strain.dropna().unique()[0]
+#    else:
+#        experiment_id = experiment_df.experiment_id.dropna().unique()[0]        
     for j, col in enumerate(ax):
-        if only_live:
-            df = experiment_df.loc[experiment_df['live'] == 1]
-        else:
-            df = experiment_df
+        for i, row in enumerate(col):
 
-        if type(stains[j]) is not str and math.isnan(stains[j]):
-            plot_df = df.loc[df['stain'].isna()].groupby(['kill_volume']).agg(stat).reset_index()
-            col.set_title("Mean Intensity " + str(experiment_id) + ", Stain: None")
+            row.set_xlabel("Time (h)")
+            row.set_ylabel("Mean Intensity")
 
-        else:
-            plot_df = df.loc[df['stain'] == stains[j]].groupby(['kill_volume']).agg(stat).reset_index()
-            col.set_title("Mean Intensity " + str(experiment_id) + ", Stain: " + str(stains[j]))
-        col.set_xlabel("Ethanol %")
-        col.set_ylabel("Mean Intensity")
+            plot_df = experiment_df.loc[(experiment_df['stain'] == stains[j]) & (experiment_df['kill_volume'] == volumes[i])].sort_values(by=['time'])
+            
+            for c, channel in enumerate(channels):
+                row.plot(plot_df['time'],
+                            plot_df[channel], label=channel)
+                
 
-
-        print(df.head(1))
-        for j, channel in enumerate(channels):
-            if lab == 'BioFab':
-                col.plot(plot_df['kill_volume'].apply(lambda x: x/(1700.0)),
-                        plot_df[channel], label=channel)
-            elif lab == 'TX':
-                col.plot(plot_df['kill_volume'].apply(lambda x: x/(x+250.0)),
-                        df[channel], label=channel)
-            else:
-                raise("Don't know how to calculate % for lab: "+ lab)
-
-        col.set_yscale('log')
-        #ax.set_xscale('log')
+            row.set_yscale('log')
+            row.set_title("Stain: {} Ethanol Vol: {}".format(stains[j], volumes[i]))
+            #ax.set_xscale('log')
     plt.legend( bbox_to_anchor=(1.0, 1.0),
               ncol=1)
 

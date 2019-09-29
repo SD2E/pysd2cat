@@ -61,6 +61,8 @@ def get_fcs_files(run_obj, tx_email, tx_token,
                   container_name="flow_plate (sytox)",
                   source_container_run=None):
     d = run_obj.data
+    print(d)
+    d = d.loc[d['Name'].str.contains(container_name.replace('(', '\(').replace(')', '\)'))]
     for dataset in d['Datasets']:
         if dataset.data_type == "file":
             unzip_path = os.path.join(work_dir, 'fcs')

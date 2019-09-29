@@ -60,7 +60,8 @@ def train_models_for_prediction(experiment_df, out_dir='.',
                                 overwrite=False,
                                 combine_stains=False,
                                 additional_description={},
-                                output_col='live'
+                                output_col='live',
+                                time_point="0"
                                 ):
     experiment_id = experiment_df.experiment_id.unique()[0]
     random_state=0
@@ -72,7 +73,8 @@ def train_models_for_prediction(experiment_df, out_dir='.',
                           "live_volume" : live_strain_name,
                           "dead_volume" : dead_strain_name,
                           "stain" : "All",
-                          "prediction" : True }
+                          "prediction" : True,
+                           "time_point" : time_point }
         description.update(additional_description)
         print(description)
 
@@ -101,7 +103,8 @@ def train_models_for_prediction(experiment_df, out_dir='.',
                           "live_volume" : live_strain_name,
                           "dead_volume" : dead_strain_name,
                           "stain" : stain,
-                          "prediction" : True }
+                          "prediction" : True,
+                           "time_point" : time_point}
             description.update(additional_description)
             if type(stain) is not str  and ( stain is None or math.isnan(stain)):
                 df = experiment_df.loc[(experiment_df['stain'].isna())]
