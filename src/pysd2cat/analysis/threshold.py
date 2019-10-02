@@ -30,6 +30,7 @@ def get_experiment_correctness_and_metadata(adf):
             "SC High Osm" : "high_osm_media", 
             "high_osm_media" : "high_osm_media",
             
+            
             "YPAD" : "rich_media",
             "Yeast_Extract_Peptone_Adenine_Dextrose (a.k.a. YPAD Media)" : "rich_media",
             "rich_media" : "rich_media"
@@ -59,7 +60,7 @@ def get_experiment_correctness_and_metadata(adf):
            'SSC_W', 'BL1_W', 'RL1_W', 'Time']
     final_df = adf
     #print(final_df['media'])
-    final_df.loc[:, 'media'] = final_df['media'].apply(media_fix)
+    #final_df.loc[:, 'media'] = final_df['media'].apply(media_fix)
     final_df = final_df.apply(fix_input, axis=1)            
     final_df = final_df.apply(fix_output, axis=1)
     final_df = final_df.apply(fix_temp, axis=1)
