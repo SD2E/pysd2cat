@@ -39,10 +39,11 @@ def train_models_for_stats(experiment_df,
                 print(description)
 
                 if not leader_board_case_exists(out_dir, str(description)):
-                    lda.add_live_dead_test_harness(df,
+                    lda.add_live_dead_test_harness(df, 
                                                strain_column_name,
                                                live_volume, 
                                                dead_strain_name,
+                                               classifier_df = df,
                                                fcs_columns=fcs_columns,
                                                out_dir=out_dir,
                                                description=str(description),
@@ -50,7 +51,9 @@ def train_models_for_stats(experiment_df,
                                                dry_run=True,
                                                feature_importance=False) 
 
-def train_models_for_prediction(experiment_df, out_dir='.',
+def train_models_for_prediction(classifier_df,
+                                experiment_df,                                
+                                out_dir='.',
                                 data_dir='data/biofab',
                                 strain_column_name='kill_volume',
                                 live_strain_name=0,
@@ -83,6 +86,7 @@ def train_models_for_prediction(experiment_df, out_dir='.',
                                        strain_column_name,
                                        live_strain_name, 
                                        dead_strain_name,
+                                       classifier_df=classifier_df,
                                        fcs_columns=fcs_columns,
                                        out_dir=out_dir,
                                        description=str(description),
@@ -108,8 +112,10 @@ def train_models_for_prediction(experiment_df, out_dir='.',
             description.update(additional_description)
             if type(stain) is not str  and ( stain is None or math.isnan(stain)):
                 df = experiment_df.loc[(experiment_df['stain'].isna())]
+                c_df = classifier_df.loc[(classifier_df['stain'].isna())]
             else:
                 df = experiment_df.loc[(experiment_df['stain'] == stain)]
+                c_df = classifier_df.loc[(classifier_df['stain'] == stain)]
 
             if overwrite or not leader_board_case_exists(out_dir, str(description)):
                 print(description)
@@ -117,6 +123,7 @@ def train_models_for_prediction(experiment_df, out_dir='.',
                                            strain_column_name,
                                            live_strain_name, 
                                            dead_strain_name,
+                                           classifier_df=c_df,
                                            fcs_columns=fcs_columns,
                                            out_dir=out_dir,
                                            output_col=output_col,
