@@ -254,7 +254,7 @@ def get_channel_mean_timeseries(experiment_df,
 
     #fig = plt.figure( dpi=200)
 
-    fig, ax = plt.subplots(nrows=len(volumes), ncols=len(stains), figsize=(4*len(stains)+4, 4*len(volumes)+4), dpi=200)
+    fig, ax = plt.subplots(ncols=len(volumes), nrows=len(stains), figsize=(4*len(volumes)+4, 4*len(stains)+4), dpi=100)
 #    experiments = experiment_df.experiment_id.dropna().unique()
 #    if 'strain' in experiment_df.columns:
 #        experiment_id = experiment_df.strain.dropna().unique()[0]
@@ -275,6 +275,9 @@ def get_channel_mean_timeseries(experiment_df,
 
             row.set_yscale('log')
             row.set_title("Stain: {} Ethanol Vol: {}".format(stains[j], volumes[i]))
+            #row.set_xlim([0., 1])
+            row.set_ylim([1e-2, 1e6])
+
             #ax.set_xscale('log')
     plt.legend( bbox_to_anchor=(1.0, 1.0),
               ncol=1)
@@ -391,7 +394,7 @@ def get_channel_histograms(experiment_df, stain='SYTOX Red Stain',
 
 
 
-def get_timeseries_scatter(xcol, ycol, stain, time_points, kill_volumes, prediction_files, flow_data, frac=0.1):
+def get_timeseries_scatter(xcol, ycol, stain, time_points, kill_volumes, prediction_files, flow_data, live_col='live', frac=0.1):
     num_points = {'dead' : {k: [] for k in kill_volumes}, "live" : {k: [] for k in kill_volumes}}
     fig, ax = plt.subplots(ncols=len(time_points), nrows=len(kill_volumes), figsize=(4*len(time_points), 4*len(kill_volumes)), dpi=200)
     for i, row in enumerate(ax):
@@ -406,8 +409,8 @@ def get_timeseries_scatter(xcol, ycol, stain, time_points, kill_volumes, predict
 
 
             plot_df = df.loc[(df.stain == stain) & (df.kill_volume == kill_volume)]
-            live_df = plot_df.loc[plot_df.live == 1]
-            dead_df = plot_df.loc[plot_df.live == 0]
+            live_df = plot_df.loc[plot_df[live_col] == 1]
+            dead_df = plot_df.loc[plot_df[live_col] == 0]
             #live_df = plot_df.loc[plot_df.live == i]
 
             num_points['dead'][kill_volume].append(len(dead_df))
