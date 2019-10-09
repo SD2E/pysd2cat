@@ -22,13 +22,18 @@ def get_plate_well_properties(run_obj, container_name="flow_plate (sytox)"):
         cs = run_obj.containers
     except Exception as e:
         cs = run_obj.containers
-                
-    flow_plate_id = cs.loc[cs['Name'] == container_name].iloc[0]['ContainerId']
+
+    #print("Getting container well properties: %s", container_name)
+    #print("From: %s", str(cs))
+        
+    flow_plate_id = cs.loc[cs['Name'].str.contains(container_name)].iloc[0]['ContainerId']
     flow_plate = transcriptic.container(flow_plate_id)
     aliquots = flow_plate.attributes['aliquots']
     properties = {}
     for a in flow_plate.attributes['aliquots']:
-        properties[flow_plate.container_type.humanize(a['well_idx'])] = a['properties']
+        #print(a)
+        well = flow_plate.container_type.humanize(a['well_idx'])
+        properties[well] = a['properties']
     return properties
 
 def _fcs_file_well_id(filename):
@@ -59,10 +64,12 @@ def _file_checksum(filePath):
 def get_fcs_files(run_obj, tx_email, tx_token,
                   work_dir, download_zip=True, logger=l,
                   container_name="flow_plate (sytox)",
+                  data_set_name=None,
                   source_container_run=None):
     d = run_obj.data
-    print(d)
-    d = d.loc[d['Name'].str.contains(container_name.replace('(', '\(').replace(')', '\)'))]
+    if data_set_name:
+        d = d.loc[d['Name'].str.contains(data_set_name)]
+    logger.info("Datasets: %s", str(d))
     for dataset in d['Datasets']:
         if dataset.data_type == "file":
             unzip_path = os.path.join(work_dir, 'fcs')
@@ -102,7 +109,7 @@ def get_fcs_files(run_obj, tx_email, tx_token,
                 os.remove(zip_path)
 
             properties = get_plate_well_properties(run_obj, container_name=container_name)
-            #logger.debug(properties)
+            logger.debug(properties)
             # well id -> file info
             
             aliquots = {_fcs_file_well_id(f) : {'file': f,
@@ -113,7 +120,7 @@ def get_fcs_files(run_obj, tx_email, tx_token,
             files = { "aliquots" : aliquots }
             if source_container_run:
                 files['source_container'] = get_source_container(source_container_run)
-            #logger.debug(files)
+            logger.debug(files)
             return files
 
 def get_tx_run(run_id):
@@ -135,6 +142,7 @@ def create_fcs_manifest_and_get_files(run_id,
                                       download_zip=True,
                                       logger=l,
                                       container_name="flow_plate (sytox)",
+                                      data_set_name=None,
                                       source_container_run=None):
    
     run_obj = get_tx_run(run_id)
@@ -142,7 +150,15 @@ def create_fcs_manifest_and_get_files(run_id,
     if source_container_run:
         src_run_obj = get_tx_run(source_container_run)
         
-    fcs_files = get_fcs_files(run_obj, transcriptic_email, transcriptic_token, fcs_path, download_zip=download_zip, logger=logger, container_name=container_name, source_container_run=src_run_obj)
+    fcs_files = get_fcs_files(run_obj,
+                              transcriptic_email,
+                              transcriptic_token,
+                              fcs_path,
+                              download_zip=download_zip,
+                              logger=logger,
+                              container_name=container_name,
+                              source_container_run=src_run_obj,
+                              data_set_name=data_set_name)
     return fcs_files
     #create_fcs_manifest(run_obj, experiment_id, fcs_files, manifest_path)
     #print("Have FCS manifest")
