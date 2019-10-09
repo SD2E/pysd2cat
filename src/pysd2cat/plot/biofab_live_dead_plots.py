@@ -42,7 +42,8 @@ volume_to_per =  {
     'r1dk8xp9dymm54' : {
             0 : 0,
             300 : 300/2000
-            }
+            },
+    'r1dmsrursbqwuz' : { x: x/(1400.0) for x in [0.0, 140.0, 210.0, 280.0, 1120.0]}
 }
 
 def get_statistics_by_volume(leader_board_df, experiment_strain=None, experiment_lab=None):
