@@ -52,7 +52,8 @@ def run(
             tx_email,
             tx_token,
             fcs_path=challenge_out_dir,
-            download_zip=False,
+            download_zip=True,
+            data_set_name="static_strains_flow",
             logger=logger,
             source_container_run=run_id_part_1)
         
@@ -102,18 +103,18 @@ def run(
                     #df1.to_csv(run_data_file_stash)
                 except Exception as e:
                     logger.debug("Problem with live dead classification: " + str(e))
-        logger.debug(fcs_df)
+        #logger.debug(fcs_df)
 
         if not os.path.exists(correctness_file_path):
             correctness_df = compute_correctness_all(fcs_df, out_dir=challenge_out_dir, logger=logger)
             correctness_df.to_csv(correctness_file_path)
-            logger.debug(correctness_df)
+            #logger.debug(correctness_df)
 
         fcs_df.to_csv(full_data_file_path)
         
         
-    get_od = False
-    if get_od:
+    get_od = True
+    if get_od and not os.path.exists(od_file_path):
         # Get OD data
         ## TODO get calibration_id
         experiment = {
@@ -134,9 +135,9 @@ def run(
 #        od_meta_and_data_df['part_2_id'] = experiment['part_2_id']
 #        od_meta_and_data_df['calibration_id'] = experiment['calibration_id']
 
-        
+        od_meta_and_data_df.to_csv(od_file_path)
 
-        logger.debug(od_meta_and_data_df)
+        #logger.debug(od_meta_and_data_df)
     
 
     ## Process the data
