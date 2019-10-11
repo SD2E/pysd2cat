@@ -246,10 +246,10 @@ def get_channel_mean_timeseries(experiment_df,
                                ):
     # Overlay the channels at different concentrations to see how they shift
 
-    stains=experiment_df.stain.unique()
+    stains=experiment_df['stain', ''].unique()
     print(stains)
 
-    volumes=experiment_df.kill_volume.unique()
+    volumes=experiment_df['kill_volume', ''].unique()
     channels.sort()
 
     #fig = plt.figure( dpi=200)
@@ -266,17 +266,18 @@ def get_channel_mean_timeseries(experiment_df,
             row.set_xlabel("Time (h)")
             row.set_ylabel("Mean Intensity")
 
-            plot_df = experiment_df.loc[(experiment_df['stain'] == stains[j]) & (experiment_df['kill_volume'] == volumes[i])].sort_values(by=['time'])
+            plot_df = experiment_df.loc[(experiment_df['stain', ''] == stains[j]) & (experiment_df['kill_volume', ''] == volumes[i])].sort_values(by=['time'])
             
             for c, channel in enumerate(channels):
                 row.plot(plot_df['time'],
-                            plot_df[channel], label=channel)
-                
+                            plot_df[channel, 'mean'], label=channel)
+                row.fill_between(plot_df['time'], plot_df[channel, 'mean']-plot_df[channel, 'std'], plot_df[channel, 'mean']+plot_df[channel, 'std'], alpha=0.05)
 
-            row.set_yscale('log')
+            #row.set_yscale('log')
             row.set_title("Stain: {} Ethanol Vol: {}".format(stains[j], volumes[i]))
             #row.set_xlim([0., 1])
-            row.set_ylim([1e-2, 1e6])
+            #row.set_ylim([1e-2, 1e6])
+            row.set_ylim([0, 15])
 
             #ax.set_xscale('log')
     plt.legend( bbox_to_anchor=(1.0, 1.0),
