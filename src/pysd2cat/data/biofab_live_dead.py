@@ -176,7 +176,7 @@ def make_row(well, info, aliquot_map_technique=None):
                     row.update(expand_options(ast.literal_eval(v)))
                 else:
                     row[k] = str(v)
-    elif aliquot_map_technique == '10to80':
+    elif '10to80' in aliquot_map_technique:
         row['kill'] = 'Ethanol'
         if '5' in well:
             row['kill_volume'] = 140.0
@@ -189,6 +189,8 @@ def make_row(well, info, aliquot_map_technique=None):
         else:
             row['kill_volume'] = 0.0
 
+
+        
 
                 
                 
