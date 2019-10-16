@@ -395,7 +395,7 @@ def get_channel_histograms(experiment_df, stain='SYTOX Red Stain',
 
 
 
-def get_timeseries_scatter(xcol, ycol, stain, time_points, kill_volumes, prediction_files, flow_data, live_col='live', frac=0.1):
+def get_timeseries_scatter(xcol, ycol, stain, time_points, kill_volumes, prediction_files, flow_data, live_col='live', frac=0.1, kdeplot=False):
     num_points = {'dead' : {k: [] for k in kill_volumes}, "live" : {k: [] for k in kill_volumes}}
     fig, ax = plt.subplots(ncols=len(time_points), nrows=len(kill_volumes), figsize=(4*len(time_points), 4*len(kill_volumes)), dpi=200)
     for i, row in enumerate(ax):
@@ -429,13 +429,19 @@ def get_timeseries_scatter(xcol, ycol, stain, time_points, kill_volumes, predict
             #print(dead_df[ycol].unique())
 
             try:
-                sns.kdeplot(live_df[xcol], live_df[ycol], ax=col, alpha=0.5, cmap="Blues", shade=True, label="Live", shade_lowest=False, 
-                    dropna=True)
+                if kdeplot:
+                    sns.kdeplot(live_df[xcol], live_df[ycol], ax=col, alpha=0.5, cmap="Blues", shade=True, label="Live", shade_lowest=False, 
+                        dropna=True)
+                else:
+                    col.scatter(live_df[xcol], live_df[ycol], c="Blue", label="Live", s=1, alpha=0.1)
             except Exception as e:
                 pass
             try:
-                sns.kdeplot(dead_df[xcol], dead_df[ycol], ax=col,  alpha=0.5, cmap="Oranges", shade=True, label="Dead",shade_lowest=False,
-                    dropna=True)
+                if kdeplot:
+                    sns.kdeplot(dead_df[xcol], dead_df[ycol], ax=col,  alpha=0.5, cmap="Oranges", shade=True, label="Dead",shade_lowest=False,
+                        dropna=True)
+                else:
+                    col.scatter(dead_df[xcol], dead_df[ycol], c ="Red", label="Dead", s=1, alpha=0.1)
                 col.legend()
             except Exception as e:
                 pass
