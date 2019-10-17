@@ -12,6 +12,11 @@ from pysd2cat.data import pipeline
 from pysd2cat.analysis.Names import Names
 from pysd2cat.data import tx_fcs
 
+import logging
+l = logging.getLogger(__file__)
+l.setLevel(logging.DEBUG)
+
+
 def make_experiment_metadata_dataframe(experiment_id):
     df = pd.DataFrame()
     samples = pipeline.get_experiment_samples(experiment_id,file_type='FCS')
@@ -34,7 +39,7 @@ def flatten_sample_contents(feature, value):
                             kv_pairs.append(('kill_volume_unit', content['volume']['unit']))
                         else:
                             raise "Malformed Volume of sample contents: " + str(content['volume'])
-                elif content['name']['label'] == 'SYTOX Red Stain':
+                elif content['name']['label'] == 'SYTOX Red ':
                     #print(content['name'])
                     kv_pairs.append(('stain', 'SYTOX Red Stain'))
                     if 'volume' in content:
@@ -55,9 +60,10 @@ def flatten_feature(feature, value):
     elif feature == 'temperature':
         return flatten_temperature(feature, value)
     else:
-        raise "Cannot flatten feature: " + feature
+        raise Exception("Cannot flatten feature: " + feature)
 
 def sample_to_row(sample):
+    
     features = [k for k,v in sample.items() if type(v) is not dict and type(v) is not list]
     row = {}
     for feature in features:
@@ -65,9 +71,12 @@ def sample_to_row(sample):
         
     #Handle nested features
     for feature in [x for x in sample.keys() if x  not in features]:
-        kv_pairs = flatten_feature(feature, sample[feature])
-        for k, v in kv_pairs:
-            row[k] = v
+        try:
+            kv_pairs = flatten_feature(feature, sample[feature])
+            for k, v in kv_pairs:
+                row[k] = v
+        except Exception as e:
+            pass
     return row
 
 def fetch_data(meta_df, data_dir, overwrite=False):
