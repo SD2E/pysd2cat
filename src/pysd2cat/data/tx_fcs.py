@@ -16,17 +16,18 @@ import logging
 l = logging.getLogger(__file__)
 l.setLevel(logging.DEBUG)
 
-def get_plate_well_properties(run_obj, container_name="flow_plate (sytox)"):
+def get_plate_well_properties(run_obj, container_name="flow_plate \(sytox\)"):
     #print("getting flow well properties")
     try:
         cs = run_obj.containers
     except Exception as e:
         cs = run_obj.containers
 
-    #print("Getting container well properties: %s", container_name)
-    #print("From: %s", str(cs))
-        
+    l.debug("Getting container well properties: %s", container_name)
+    l.debug("From: %s", str(cs))
+    l.debug("Matches %s", str(cs.loc[cs['Name'].str.contains(container_name)]))
     flow_plate_id = cs.loc[cs['Name'].str.contains(container_name)].iloc[0]['ContainerId']
+    l.debug("Have flow_plate_id: %s", flow_plate_id)
     flow_plate = transcriptic.container(flow_plate_id)
     aliquots = flow_plate.attributes['aliquots']
     properties = {}
@@ -34,6 +35,7 @@ def get_plate_well_properties(run_obj, container_name="flow_plate (sytox)"):
         #print(a)
         well = flow_plate.container_type.humanize(a['well_idx'])
         properties[well] = a['properties']
+    l.debug("Have properties %s", str(properties))
     return properties
 
 def _fcs_file_well_id(filename):
@@ -63,7 +65,7 @@ def _file_checksum(filePath):
 
 def get_fcs_files(run_obj, tx_email, tx_token,
                   work_dir, download_zip=True, logger=l,
-                  container_name="flow_plate (sytox)",
+                  container_name="flow_plate \(sytox\)",
                   data_set_name=None,
                   source_container_run=None):
     d = run_obj.data
@@ -141,7 +143,7 @@ def create_fcs_manifest_and_get_files(run_id,
                                       fcs_path='.',
                                       download_zip=True,
                                       logger=l,
-                                      container_name="flow_plate (sytox)",
+                                      container_name="flow_plate \(sytox\)",
                                       data_set_name=None,
                                       source_container_run=None):
    
