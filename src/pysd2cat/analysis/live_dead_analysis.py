@@ -124,7 +124,7 @@ def add_live_dead_test_harness(df,
 
     ## Build the training/test input
     ## Use classifier_df to build classifier, but predict in df
-    if classifier_df is not None:
+    if classifier_df is None:
         classifier_df = df
     c_df = get_classifier_dataframe(classifier_df,
                                     strain_column_name,

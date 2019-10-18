@@ -1,6 +1,6 @@
 from pysd2cat.data import tx_od, tx_fcs
 from pysd2cat.analysis.Names import Names
-from pysd2cat.analysis.live_dead_analysis import add_live_dead, get_fcs_columns
+from pysd2cat.analysis.live_dead_analysis import add_live_dead_test_harness, get_fcs_columns
 from pysd2cat.data.pipeline import get_xplan_data_and_metadata_df, handle_missing_data
 from pysd2cat.analysis.correctness import compute_correctness_all
 import pandas as pd
@@ -90,27 +90,37 @@ def run(
             logger.info("Adding live column")
             logger.debug(fcs_df.columns)
             strains = fcs_df.strain.unique()
-            logger.info("Strains are: " + str(strains))
+            logger.info("The strains are: " + str(strains))
             if Names.WT_DEAD_CONTROL in strains and Names.WT_LIVE_CONTROL in strains:
                 try:
-                    fcs_df = add_live_dead(fcs_df, Names.STRAIN, Names.WT_LIVE_CONTROL, Names.WT_DEAD_CONTROL, fcs_columns=get_fcs_columns())
+                    logger.info("Adding live column...")
+                    fcs_df = add_live_dead_test_harness(fcs_df, Names.STRAIN, Names.WT_LIVE_CONTROL, Names.WT_DEAD_CONTROL, out_dir=challenge_out_dir,
+                                                            description=run_id_part_1 + run_id_part_2 + "_live", fcs_columns=get_fcs_columns())
                     
-                    #logger.info("Adding live column...")
+                    
                     #robj.logger.info(df1.shape)
                     #logger.info(df1['live'])
                     # Write dataframe as csv
                     #logger.info("Writing: " + run_data_file_stash)
                     #df1.to_csv(run_data_file_stash)
                 except Exception as e:
-                    logger.debug("Problem with live dead classification: " + str(e))
+                    logger.exception("Problem with live dead classification: " + str(e))
+            else:
+                logger.exception("Do not have live and dead controls")
         #logger.debug(fcs_df)
+        logger.info("Writing %s", full_data_file_path)
+        fcs_df.to_csv(full_data_file_path)
 
+        if not os.path.exists(os.path.join(data_base_path, 'correctness')):
+            os.mkdir(os.path.join(data_base_path, 'correctness'))
+        
         if not os.path.exists(correctness_file_path):
+            logger.info("Computing Correctness...")
             correctness_df = compute_correctness_all(fcs_df, out_dir=challenge_out_dir, logger=logger)
             correctness_df.to_csv(correctness_file_path)
             #logger.debug(correctness_df)
 
-        fcs_df.to_csv(full_data_file_path)
+       
         
         
     get_od = True
