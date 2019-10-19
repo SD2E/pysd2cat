@@ -18,6 +18,14 @@ Currently, `pysd2cat` runs on the TACC infrastructure so that it may have fast a
 To run an example analysis script, run:
 * `python src/pysd2cat/analysis/live_dead_analysis.py`
 
+Environment Configuration:
+=====================
+You will need to have the following dependencies and logins:
+1. pip install transcriptic
+2. pip install autoprotocol
+3. Get a transcriptic login from Transcriptic (or Strateos). Talk to Josh Nowak.
+4. Run transcriptic login once so that it creates the required folders to fetch data.
+
 Code Layout:
 ===========
 
