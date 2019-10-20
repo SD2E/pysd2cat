@@ -260,14 +260,16 @@ def extract_lb_attribute(x, attribute):
 
 def get_leader_board_df(out_dir, expand_description=True):
     leader_board_path=os.path.join(out_dir, 'test_harness_results/custom_classification_leaderboard.html')
-    leader_board = pd.read_html(leader_board_path)[0]
-    leader_board = leader_board.sort_values(by=['Date', 'Time'], ascending=True)
+    if os.path.exists(leader_board_path):
+        leader_board = pd.read_html(leader_board_path)[0]
+        leader_board = leader_board.sort_values(by=['Date', 'Time'], ascending=True)
 
-    if expand_description:
-        attributes = ['experiment_id', 'random_state', 'stain', 'live_volume', 'dead_volume', 'channels', 'time_point']
-        for attribute in attributes:
-            leader_board.loc[:, attribute] = leader_board.apply(lambda x: extract_lb_attribute(x, attribute), axis = 1)
-    return leader_board
+        if expand_description:
+            attributes = ['experiment_id', 'random_state', 'stain', 'live_volume', 'dead_volume', 'channels', 'time_point']
+            for attribute in attributes:
+                leader_board.loc[:, attribute] = leader_board.apply(lambda x: extract_lb_attribute(x, attribute), axis = 1)
+        return leader_board
+
 
 def drop_experiment_from_leader_board(out_dir, experiment):
     leader_board_path=os.path.join(out_dir, 'test_harness_results/custom_classification_leaderboard.html')
@@ -279,5 +281,10 @@ def drop_experiment_from_leader_board(out_dir, experiment):
 
 
 def leader_board_case_exists(out_dir, description):
-    leader_board_df = get_leader_board_df(out_dir, expand_description=False)
-    return len(leader_board_df.loc[leader_board_df['Data and Split Description'] == description]) > 0
+    leader_board_path=os.path.join(out_dir, 'test_harness_results/custom_classification_leaderboard.html')
+    if os.path.exists(leader_board_path):
+        leader_board_df = get_leader_board_df(out_dir, expand_description=False)
+        return len(leader_board_df.loc[leader_board_df['Data and Split Description'] == description]) > 0
+    else:
+        print("No Leaderboard yet exists")
+        return False
