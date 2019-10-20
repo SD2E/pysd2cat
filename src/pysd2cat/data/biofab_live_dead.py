@@ -11,7 +11,7 @@ from agavepy.files.download import files_download
 from pysd2cat.data import pipeline
 from pysd2cat.analysis.Names import Names
 from pysd2cat.data import tx_fcs
-
+import json
 import logging
 l = logging.getLogger(__file__)
 l.setLevel(logging.DEBUG)
@@ -277,18 +277,35 @@ def write_flow_data_and_metadata(run_id, tx_config, aliquot_map_technique, work_
          flow_data (a dataframe with dataset info about containers and timepoints)
          plate_properties (a list of dicts describing each plate and wells)
     """
-    transcriptic_email = tx_config['email']
-    transcriptic_token = tx_config['token']
+    flow_data_path = os.path.join(work_dir,'flow_data.csv')
+    plate_properties_path = os.path.join(work_dir,'plate_properties.json')
+
+    #If you have already fetched data from TX and stored it, just read it in locally
+    if os.path.exists(flow_data_path) & os.path.exists(plate_properties_path):
+        flow_data = pd.read_csv(flow_data_path)
+        with open(plate_properties_path,'r') as f:
+            plate_properties = json.load(f)
+    #Otherwise fetch from TX
+    else:
+        transcriptic_email = tx_config['email']
+        transcriptic_token = tx_config['token']
 
 
-    flow_data = get_flow_dataframe(run_id)
-    plate_properties = [ get_flow_plate_properties(run_id,
-                                                       transcriptic_email,
-                                                       transcriptic_token,
-                                                       work_dir,
-                                                       aliquot_map_technique,
-                                                       download_data=overwrite,
-                                                       container=flow_data.container[i].attributes['label']) \
-                             for i in flow_data.index]
-    make_container_dataframes(run_id, plate_properties, work_dir, aliquot_map_technique=aliquot_map_technique, overwrite=overwrite)
+        flow_data = get_flow_dataframe(run_id)
+        plate_properties = [ get_flow_plate_properties(run_id,
+                                                           transcriptic_email,
+                                                           transcriptic_token,
+                                                           work_dir,
+                                                           aliquot_map_technique,
+                                                           download_data=overwrite,
+                                                           container=flow_data.container[i].attributes['label']) \
+                                 for i in flow_data.index]
+        make_container_dataframes(run_id, plate_properties, work_dir, aliquot_map_technique=aliquot_map_technique, overwrite=overwrite)
+
+        flow_data.to_csv(flow_data_path)
+        with open(plate_properties_path,'w') as f:
+            json.dump(plate_properties,f)
+
+
     return flow_data, plate_properties
+
