@@ -31,14 +31,14 @@ def build_model_pd(classifier_df,
                    dry_run=False, 
                    feature_importance=False
                                  ):
-    # print("Length of full DF", len(df))
-    #print(classifier_df)
+    l.debug("data_df %s", str(data_df))
+    l.debug("classifier_df %s", str(classifier_df))
     
     l.debug("Splitting Test Harness Data ...")
     train, test = train_test_split(classifier_df, stratify=classifier_df['class_label'],
                                    test_size=0.2, random_state=random_state)
     th = TestHarness(output_location=output_location)
-    print(th)
+    #print(th)
     data_df = data_df.copy()
     #data_df.loc[:, 'class_label'] = data_df.index
 
@@ -46,7 +46,6 @@ def build_model_pd(classifier_df,
     if feature_importance:
         feature_importance=Names.RFPIMP_PERMUTATION
     if dry_run:
-        print("HI")
         th.run_custom(#test_harness_models=rf_classification_model,
               function_that_returns_TH_model=random_forest_classification,
               dict_of_function_parameters={},
@@ -60,7 +59,6 @@ def build_model_pd(classifier_df,
                    feature_cols_to_normalize=input_cols,
                    feature_extraction=feature_importance,
                    predict_untested_data=False)
-        print("HI")
         return None
 
     else:

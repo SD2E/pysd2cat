@@ -395,6 +395,57 @@ def get_channel_histograms(experiment_df, stain='SYTOX Red Stain',
 
 
 
+def get_timeseries_multi_scatter(xcol, ycol, stain, time_points, kill_volumes, prediction_files, flow_data, live_col='live', frac=0.1, kdeplot=False):
+    ## FIXME Assumes that kill_volumes are the classes
+
+    colors = ["Blue", "Green", "Yellow", "Orange", "Red"]
+    
+    ## track number of points classified as class i for each volume
+    num_points = { i : {k: [] for k in kill_volumes} for i, _ in enumerate(kill_volumes)}
+
+    fig, ax = plt.subplots(ncols=len(time_points), nrows=len(kill_volumes), figsize=(4*len(time_points), 4*len(kill_volumes)), dpi=200)
+    for i, row in enumerate(ax):
+        kill_volume = kill_volumes[i]
+        #print(kill_volume)
+        for j, col in enumerate(row):
+
+            time_point = time_points[j]
+            #print(time_point)
+            time = flow_data.loc[flow_data.time_point == time_point].time.iloc[0]
+            df = pd.read_csv(prediction_files[time_point], index_col=0)
+
+
+            plot_df = df.loc[(df.stain == stain) & (df.kill_volume == kill_volume)]
+
+            for c, _ in enumerate(kill_volumes):
+                live_df = plot_df.loc[plot_df[live_col] == c]
+                num_points[c][kill_volume].append(len(live_df))
+
+                live_df = live_df.sample(frac=frac)
+                live_df = live_df[[xcol, ycol]].apply(np.log).replace([-np.inf, np.inf], np.nan).dropna(how="any")
+                try:
+                    if kdeplot:
+                        sns.kdeplot(live_df[xcol], live_df[ycol], ax=col, alpha=0.5, cmap="Blues", shade=True, label=str(kill_volumes[c]), shade_lowest=False, 
+                        dropna=True)
+                    else:
+                        col.scatter(live_df[xcol], live_df[ycol], c=colors[c], label=str(kill_volumes[c]), s=1, alpha=0.1)
+                    col.legend()
+                except Exception as e:
+                    pass
+            col.set_xlabel("log({})".format(xcol))
+            col.set_ylabel("log({})".format(ycol))
+        #        col.set_xscale('log')
+        #        col.set_yscale('log')
+            col.set_xlim(0, 15)
+            col.set_ylim(0, 15)
+            col.set_title("Kill Volume (uL): " + str(kill_volume) + "Time (h): " + str(time))
+            #break
+
+
+    plt.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)
+    return num_points
+
+
 def get_timeseries_scatter(xcol, ycol, stain, time_points, kill_volumes, prediction_files, flow_data, live_col='live', frac=0.1, kdeplot=False):
     num_points = {'dead' : {k: [] for k in kill_volumes}, "live" : {k: [] for k in kill_volumes}}
     fig, ax = plt.subplots(ncols=len(time_points), nrows=len(kill_volumes), figsize=(4*len(time_points), 4*len(kill_volumes)), dpi=200)
