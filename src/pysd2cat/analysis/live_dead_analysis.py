@@ -93,12 +93,9 @@ def get_classifier_dataframe(df,
     """
     df_columns = df.columns.tolist()
     l.info("data_columns: {}".format(df_columns))
-    live_df = df.loc[df[strain_column_name] == live_strain_name]
-    dead_df = df.loc[df[strain_column_name] == dead_strain_name]
+    live_dead_df = df.loc[(df[strain_column_name] == live_strain_name) | (df[strain_column_name] == dead_strain_name)]
     l.info("Writing class labels ...")
-    live_df.loc[:,strain_column_name] = live_df.apply(lambda x : strain_to_class(x, strain_column_name, live_strain_name, dead_strain_name), axis=1)
-    dead_df.loc[:,strain_column_name] = dead_df.apply(lambda x : strain_to_class(x, strain_column_name, live_strain_name, dead_strain_name), axis=1)
-    live_dead_df = live_df.append(dead_df)
+    live_dead_df.loc[:,strain_column_name] = live_dead_df.apply(lambda x : strain_to_class(x, strain_column_name, live_strain_name, dead_strain_name), axis=1)
     l.info(live_dead_df)
     live_dead_df = live_dead_df.rename(index=str, columns={strain_column_name: "class_label"})
     if fcs_columns:
