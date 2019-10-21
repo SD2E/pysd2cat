@@ -94,8 +94,12 @@ def run(
             if Names.WT_DEAD_CONTROL in strains and Names.WT_LIVE_CONTROL in strains:
                 try:
                     logger.info("Adding live column...")
-                    fcs_df = add_live_dead_test_harness(fcs_df, Names.STRAIN, Names.WT_LIVE_CONTROL, Names.WT_DEAD_CONTROL, out_dir=challenge_out_dir,
-                                                            description=run_id_part_1 + run_id_part_2 + "_live", fcs_columns=get_fcs_columns())
+                    fcs_df = add_live_dead_test_harness(fcs_df,
+                                                        Names.STRAIN,
+                                                        Names.WT_LIVE_CONTROL,
+                                                        Names.WT_DEAD_CONTROL,
+                                                        out_dir=challenge_out_dir,
+                                                        description=run_id_part_1 + '_' + run_id_part_2 + "_live", fcs_columns=get_fcs_columns())
                     
                     
                     #robj.logger.info(df1.shape)
