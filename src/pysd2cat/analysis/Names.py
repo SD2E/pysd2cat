@@ -42,6 +42,8 @@ class Names:
     # Circuits
     STRAIN_CIRCUIT = STRAIN + '_circuit'
     STRAIN_INPUT_STATE = STRAIN + '_input_state'
+    GATE = 'gate'
+    INPUT = 'input'
     OUTPUT = 'output'
     XOR = 'XOR'
     XNOR = 'XNOR'

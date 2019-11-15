@@ -7,6 +7,9 @@ import matplotlib
 matplotlib.use('Agg')
 from matplotlib.backends.backend_pdf import PdfPages
 
+import logging
+l = logging.getLogger(__file__)
+l.setLevel(logging.INFO)
 
 
 from pysd2cat.data import pipeline
@@ -89,13 +92,37 @@ def get_classifier_dataframe(df,
     Get the classifier data corresponding to controls.
     """
     df_columns = df.columns.tolist()
+    l.info("data_columns: {}".format(df_columns))
+    live_dead_df = df.loc[(df[strain_column_name].str.contains(live_strain_name)) | (df[strain_column_name].str.contains(dead_strain_name))]
+    l.info("Writing class labels ...")
+    live_dead_df.loc[:,strain_column_name] = live_dead_df.apply(lambda x : strain_to_class(x, strain_column_name, live_strain_name, dead_strain_name), axis=1)
+    l.info(live_dead_df)
+    live_dead_df = live_dead_df.rename(index=str, columns={strain_column_name: "class_label"})
+    if fcs_columns:
+        data_columns = fcs_columns
+    else:
+        data_columns = list(set(df_columns) - {'sample_id', strain_column_name, 'file_id'})
+    l.info("data_columns: %s", str(data_columns))
+    live_dead_df = live_dead_df[data_columns + ['class_label']]
+    return live_dead_df
+
+def get_multi_classifier_dataframe(df,
+                             strain_column_name,
+                             classes,
+                             fcs_columns = None):
+    """
+    Get the classifier data corresponding to controls.
+    """
+    df_columns = df.columns.tolist()
     print("data_columns: {}".format(df_columns))
-    live_df = df.loc[df[strain_column_name] == live_strain_name]
-    dead_df = df.loc[df[strain_column_name] == dead_strain_name]
-    live_df.loc[:,strain_column_name] = live_df.apply(lambda x : strain_to_class(x, strain_column_name, live_strain_name, dead_strain_name), axis=1)
-    dead_df.loc[:,strain_column_name] = dead_df.apply(lambda x : strain_to_class(x, strain_column_name, live_strain_name, dead_strain_name), axis=1)
-    live_dead_df = live_df.append(dead_df)
-    #print(live_dead_df)
+
+    classes.sort()
+    live_dead_df = pd.DataFrame()
+    for i, class_value in enumerate(classes):
+        class_df = df.loc[df[strain_column_name] == class_value]
+        class_df.loc[:, strain_column_name] = i
+        live_dead_df = live_dead_df.append(class_df)
+
     live_dead_df = live_dead_df.rename(index=str, columns={strain_column_name: "class_label"})
     if fcs_columns:
         data_columns = fcs_columns
@@ -109,6 +136,7 @@ def add_live_dead_test_harness(df,
                                strain_column_name,
                                live_strain_name,
                                dead_strain_name,
+                               classifier_df=None,
                                output_col='live',
                                fcs_columns = None,   
                                description=None,
@@ -122,11 +150,93 @@ def add_live_dead_test_harness(df,
  
 
     ## Build the training/test input
-    c_df = get_classifier_dataframe(df,
+    ## Use classifier_df to build classifier, but predict in df
+    if classifier_df is None:
+        l.info("Extracting controls from data to predict ...")
+        classifier_df = df
+    l.info("Getting Data to use for Train and Test ...")
+    c_df = get_classifier_dataframe(classifier_df,
                                     strain_column_name,
                                     live_strain_name,
                                     dead_strain_name,
                                     fcs_columns = fcs_columns)
+    l.info("Have Train and Test Data ...")
+    #print(c_df.head())
+    c_df.loc[:, 'index'] = c_df.index
+    #c_df.loc[:, 'id'] = df['id']
+    df.loc[:, 'index'] = df.index
+
+    l.info("Determining data_columns ...")
+    if fcs_columns:
+        data_columns = fcs_columns
+        #ouput_columns = list(df.columns) + [output_col]
+    else:
+        data_columns = list(set(df.columns) - {'sample_id', strain_column_name, 'file_id'})
+       # ouput_columns = ['sample_id'] + data_columns + [output_col]
+
+    l.info("Using data_columns: %s", str(data_columns))
+    if not description:
+        experiment = df.lab_id.unique()[0]
+        description = experiment+"_live"
+
+    ## Build the classifier
+    ## Predict label for unseen data
+    l.info("Building the model ...")
+    pred_df = ldc.build_model_pd(c_df, 
+                                 data_df = df, 
+                                 input_cols=data_columns,
+                                 index_cols=['index'],
+                                 output_location=out_dir,
+                                 description=description,
+                                 random_state=random_state,
+                                 dry_run=dry_run,
+                                 feature_importance=feature_importance
+                                )
+    #print("output_col: " + output_col)
+    if not dry_run:
+        #print(pred_df.head())
+        if output_col in df.columns:
+            #print("Dropping column " + output_col)
+            df=df.drop([output_col], axis=1)
+        #df=df.reset_index()
+        live_col = pred_df.rename(columns={'class_label_predictions': output_col})[[output_col]]
+        #live_col.index = live_col.index.astype(str)
+        #print(live_col.dtypes)
+
+        #print(live_col.sort_index().head())
+        #print(df.dtypes)
+        df = df.join(live_col, how='left')
+        #print(df.sort_index().head())
+    
+    return df
+
+def add_live_dead_multi_test_harness(df,
+                               strain_column_name,
+                               classes,
+                               classifier_df=None,
+                               output_col='live',
+                               fcs_columns = None,   
+                               description=None,
+                               out_dir='.',
+                               random_state=5,
+                               dry_run=False,
+                               feature_importance=False):
+    """
+    Same as add_live_dead(), but use test-harness.
+    """
+ 
+
+    ## Build the training/test input
+    ## Use classifier_df to build classifier, but predict in df
+    if classifier_df is None:
+        l.info("Extracting controls from data to predict ...")
+        classifier_df = df
+    l.info("Getting Data to use for Train and Test ...")
+    c_df = get_multi_classifier_dataframe(classifier_df,
+                                    strain_column_name,
+                                    classes,
+                                    fcs_columns = fcs_columns)
+
     #print(c_df.head())
     c_df.loc[:, 'index'] = c_df.index
     #c_df.loc[:, 'id'] = df['id']
@@ -139,13 +249,14 @@ def add_live_dead_test_harness(df,
         data_columns = list(set(df.columns) - {'sample_id', strain_column_name, 'file_id'})
        # ouput_columns = ['sample_id'] + data_columns + [output_col]
 
-
+    l.info("Using data_columns: %s", str(data_columns))
     if not description:
         experiment = df.lab_id.unique()[0]
         description = experiment+"_live"
 
     ## Build the classifier
     ## Predict label for unseen data
+    l.info("Building the model ...")
     pred_df = ldc.build_model_pd(c_df, 
                                  data_df = df, 
                                  input_cols=data_columns,
@@ -156,11 +267,11 @@ def add_live_dead_test_harness(df,
                                  dry_run=dry_run,
                                  feature_importance=feature_importance
                                 )
-    print("output_col: " + output_col)
+    #print("output_col: " + output_col)
     if not dry_run:
         #print(pred_df.head())
         if output_col in df.columns:
-            print("Dropping column " + output_col)
+            #print("Dropping column " + output_col)
             df=df.drop([output_col], axis=1)
         #df=df.reset_index()
         live_col = pred_df.rename(columns={'class_label_predictions': output_col})[[output_col]]
