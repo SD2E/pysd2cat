@@ -7,7 +7,12 @@ metrics of ON vs OFF for plate reader or aggregated flow cytometry data (one mea
 import itertools
 import numpy as np
 import pandas as pd
-
+import matplotlib
+import platform
+if platform.system() == "Darwin":
+    matplotlib.use("TkAgg")
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 # column mappings, in case data format changes
 experiment_col = 'experiment_id'
@@ -22,29 +27,37 @@ def make_synth_data():
     """
     makes a synthetic data set in a narrow format. synthetic data is plate reader data.
 
-    :return: pandas.dataframe, columns: ['experiment_id', 'output_id', 'time', 'replicate', 'intended_output',
+    :return: pandas.DataFrame, columns: ['experiment_id', 'output_id', 'time', 'replicate', 'intended_output',
        'input', 'observed_fluor']
 
     """
+    # make up some time series input/output patterns
+    times = [1, 2, 3]
+    ts_io = {
+        'ts1': {'i': ['01', '00', '00'],
+                'o': ['0', '1', '1']},
+        'ts2': {'i': ['00', '01', '01'],
+                'o': ['1', '0', '0']}}
+
     details = {
-        'experiment_id' : ['exp1', 'exp2'], # this is a group of time series?
-        'strain': ['UWBF1', 'UWBF2'], # this is the circuit
+        'experiment_id': ['exp1', 'exp2'],  # this is a group of time series?
+        'strain': ['UWBF1', 'UWBF2'],  # this is the circuit
         'output_id': ['ts1', 'ts2'],  # this is one time series?
-        'time' : [1, 2],
+        'time': times,
         'replicate': [1, 2],
-        'intended_output': ['0', '1'],
-        'input': ['00', '01']
     }
 
     keys, values = zip(*details.items())
-    records = [dict(zip(keys, x)) for x in itertools.product(*values,repeat=1)]
+    records = [dict(zip(keys, x)) for x in itertools.product(*values, repeat=1)]
 
     # make some clean 0 = low and 1 = high records, low noise.
     for record in records:
+        record['input'] = ts_io[record['output_id']]['i'][times.index(record['time'])]
+        record['intended_output'] = ts_io[record['output_id']]['o'][times.index(record['time'])]
         if record['intended_output'] == '0':
-            mu, sigma = 100, 10
+            mu, sigma = 100, 25
         else:
-            mu, sigma = 1000, 100
+            mu, sigma = 1000, 250
         observed_fluor = np.random.normal(mu, sigma, 1)[0]
         record.update({'observed_fluor': observed_fluor})
 
@@ -60,6 +73,7 @@ def min_max_diff(data_df, group_cols):
     for specified grouping of columns (exp, ts, etc)
 
     :param data_df: pandas.DataFrame
+    :param group_cols: list of columns to group by
     :return: pandas.DataFrame
     """
 
@@ -73,22 +87,23 @@ def min_max_diff(data_df, group_cols):
         # compute absolute difference
         diff_min_on_max_off_abs = on_min - off_max
         # compute fold change
-        diff_min_on_max_off_fc = on_min / off_max # need to catch zero here
+        diff_min_on_max_off_fc = on_min / off_max  # need to catch zero here
 
         # make record
         record = dict(zip(group_cols, name))
-        record_results = {'off_max':off_max,
-                          'on_min':on_min,
-                          'd_mn1_mx0_abs':diff_min_on_max_off_abs,
+        record_results = {'off_max': off_max,
+                          'on_min': on_min,
+                          'd_mn1_mx0_abs': diff_min_on_max_off_abs,
                           'd_mn1_mx0_fc': diff_min_on_max_off_fc}
         record.update(record_results)
         records.append(record)
 
     records_df = pd.DataFrame(records)
     records_df.sort_values(by=group_cols,
-                             inplace=True)
+                           inplace=True)
 
     return records_df
+
 
 def min_max_diff_strain(data_df):
     """
@@ -141,10 +156,37 @@ def min_max_diff_replicate(data_df):
     return results_df
 
 
+def plot_time_series(data_df):
+     g = sns.FacetGrid(data_df, col=experiment_col, row=strain_col, hue=time_series_col,
+                       margin_titles=True,
+                       sharex=True, sharey=True,
+                       legend_out=True, height=3)
+     #g = g.map(plt.plot, "time", observed_output_col, marker=".")
+     g.map_dataframe(sns.lineplot, x="time",
+                     y=observed_output_col)
+
+     return g.fig
+
+
+def plot_scatter(data_df):
+    g = sns.FacetGrid(data_df, col=experiment_col, row=strain_col, hue=time_series_col,
+                      margin_titles=True,
+                      sharex=True, sharey=True,
+                      legend_out=True, height=3)
+    # g = g.map(plt.plot, "time", observed_output_col, marker=".")
+    g.map_dataframe(sns.lineplot, x="time",
+                    y=observed_output_col)
+
+    return g.fig
+
+
 if __name__ == '__main__':
     data_synth_df = make_synth_data()
     results_strain_df = min_max_diff_strain(data_df=data_synth_df)
     results_timeseries_df = min_max_diff_ts(data_df=data_synth_df)
     results_replicate_df = min_max_diff_replicate(data_df=data_synth_df)
+
+    plot = plot_time_series(data_synth_df)
+    plot.savefig('../../../metrics/output/metrics_fig.png')
 
     print("finished")
