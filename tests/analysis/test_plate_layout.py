@@ -1,7 +1,7 @@
 import os
 import json
 
-from pysd2cat.analysis.plate_layout import solve
+from pysd2cat.analysis.plate_layout import solve, solve1, get_model_pd
 
 def test_toy_problem():
     """
@@ -83,13 +83,15 @@ def check(samples, factors, containers, requirements):
     }
     check_inputs(inputs)
     
-def check_inputs(inputs):
-    model = solve(inputs)
+def check_inputs(inputs, method='solve'):
+    model, variables = eval(method)(inputs)
     if model:
         print(model)
     else:
         print("No solution found")
     assert(model)
+
+    get_model_pd(model, variables)
     
 def test_growth_curve():
     """
@@ -99,5 +101,16 @@ def test_growth_curve():
     with open(scenario_file, 'r') as f:
         inputs = json.load(f)
         check_inputs(inputs)
+    
+    pass
+
+def test_growth_curve1():
+    """
+    Scenario from Y4D growth curves
+    """
+    scenario_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../resources/smt/y4d_gc_smt_inputs.json')
+    with open(scenario_file, 'r') as f:
+        inputs = json.load(f)
+        check_inputs(inputs, method='solve1')
     
     pass
