@@ -25,6 +25,7 @@ def generate_variables1(inputs):
 
     variables = {}
     variables['reverse_index'] = {}
+    #print(samples)
     variables['tau_symbols'] = \
       {
           a : {
@@ -504,6 +505,10 @@ def generate_constraints1(inputs):
     batch_factor = variables['batch_factor']
     column_factor = variables['column_factor']
     
+
+    ## Sample satisfies a requirement
+
+    ## Requirement satisfied by a sample
     
     
     # (4)
@@ -537,7 +542,7 @@ def generate_constraints1(inputs):
     experiment_factors_constraint = \
       And([Implies(tau_symbols[aliquot][x],
                    And([
-                       Or([And(sample_factors[x][factor_id][level],
+                       Or([And(sample_factors[aliquot][x][factor_id][level],
                                exp_factor[factor_id][level])
                            for level in factor['domain']
                             ])
@@ -701,7 +706,7 @@ def solve1(input):
     if not input['samples']:
         containers = input['containers']
         aliquots = [a for c in containers for a in containers[c]['aliquots']]
-        input['samples'] = { a : { x : "x{}_{}".format(x, a) for x in range(0, 1) } for a in aliquots }
+        input['samples'] = { a : { x : "x{}_{}".format(x, a) for x in range(0, 2) } for a in aliquots }
     
     variables, constraints = generate_constraints1(input)
     model = get_model(constraints)
@@ -725,6 +730,8 @@ def get_model_pd(model, variables):
     df = pd.DataFrame()
     for sample, info in sample_info.items():
         df = df.append(info, ignore_index=True)
-    l.debug(df.sort_values(by=['aliquot']))
+    df = df.sort_values(by=['aliquot'])
+    l.debug(df)
+    df.to_csv("dan.csv")
 
     

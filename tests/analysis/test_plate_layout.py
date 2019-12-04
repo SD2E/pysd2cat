@@ -8,7 +8,7 @@ def test_toy_problem():
     Small problem with two aliquots.
     """
     ## Symbols denoting the samples
-    samples = ["x1", "x2", "x3", "x4"]
+    samples = {"a1" : {0 : "x0_a1", 1 : "x1_a1"}, "a2" : {0 : "x0_a2", 1: "x1_a2"}}
 
     ## Factor definitions
     factors = { 
@@ -72,16 +72,16 @@ def test_toy_problem():
         }
     ]
 
-    check(samples, factors, containers, requirements)
+    check(samples, factors, containers, requirements, method='solve1')
 
-def check(samples, factors, containers, requirements):
+def check(samples, factors, containers, requirements, method='solve'):
     inputs = {
         "samples" : samples,
         "factors" : factors,
         "containers" : containers,
         "requirements" : requirements
     }
-    check_inputs(inputs)
+    check_inputs(inputs, method=method)
     
 def check_inputs(inputs, method='solve'):
     model, variables = eval(method)(inputs)
