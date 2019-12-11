@@ -508,11 +508,7 @@ def generate_constraints1(inputs):
 
     ## Sample satisfies a requirement
 
-    ## Requirement satisfied by a sample
-    
-    
-    # (4)
-    requirements_constraint = \
+    samples_sat_reqs = \
       And([Implies(tau_symbols[aliquot][x],
                    Or([
                        And([
@@ -520,6 +516,55 @@ def generate_constraints1(inputs):
                                for level in f['values']])
                            for f in r["factors"]]) 
                        for r in requirements]))
+            for aliquot in samples
+            for x in samples[aliquot]])
+
+    l.debug("samples_sat_reqs: %s", samples_sat_reqs)
+    constraints.append(samples_sat_reqs)
+    
+    ## Requirement satisfied by a sample
+    
+
+    def gen_sat_req_exp(r):
+        return And([Or([experiment_factors[factor][level] 
+                    for level in domain])
+                for factor, domain in r.items() if factors[factor]["ftype"] == "experiment"])
+    
+    def gen_sat_req_batch(container, r):
+        return And([Or([batch_factors[factor][container][level] 
+                    for level in domain])
+                for factor, domain in r.items() if factors[factor]["ftype"] == "batch"])
+
+    def gen_sat_req_column(container, column, r):
+        return And([Or([column_factors[factor][container][column][level] 
+                    for level in domain])
+                for factor, domain in r.items() if factors[factor]["ftype"] == "column"])
+
+    def gen_sat_req_aliquot(container, aliquot, r):
+        return And([Or([aliquot_factors[factor][container][aliquot][level] 
+                    for level in domain])
+                for factor, domain in r.items() if factors[factor]["ftype"] == "sample"])
+    
+    def gen_sat_req_sample(aliquot, x, r):
+        return And([Or([sample_factors[factor][aliquot][x][level] 
+                    for level in domain])
+                for factor, domain in r.items() if factors[factor]["ftype"] == "shadow"])
+
+    def gen_sat_req(aliquot, x, r):
+        container = [c for c in containers if aliquot in containers[c]['aliquots']][0]
+        column = [col for col in c['columns'] if aliquot in column][0]
+        return And(gen_sat_req_exp(r),
+                    gen_sat_req_batch(container, r),
+                    gen_sat_req_column(container, column, r),
+                    gen_sat_req_aliquot(container, aliquot, r),
+                    gen_sat_req_sample(aliquot, x, r))
+
+    
+    # (4)
+    requirements_constraint = \
+      And([Implies(tau_symbols[aliquot][x],
+                   Or([gen_sat_req(aliquot, x, r)
+                        for r in requirements]))
             for aliquot in samples
             for x in samples[aliquot]])
     l.debug("requirements_constraint: %s", requirements_constraint)
