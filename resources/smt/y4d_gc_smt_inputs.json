@@ -1,0 +1,266 @@
+{
+    "samples" : null,
+    "factors" : {
+        "recovery_media" : {
+            "domain" : [
+                "sc_media"
+            ],
+            "ftype" : "batch"
+        }, 
+        "strain" : {
+            "domain" : [
+                "UWBF_24959",
+                "UWBF_24960",
+                "UWBF_24961",
+                "UWBF_24962",
+                "UWBF_24963",
+                "UWBF_22800",
+                "UWBF_22801",
+                "UWBF_25784",
+                "UWBF_23970",
+                "UWBF_24864"
+            ],
+            "ftype" : "sample"
+        },
+        "timepoint": {
+            "domain": [
+                "1",
+               "3"
+            ],
+            "ftype": "shadow"
+        },
+        "temperature" : {
+            "domain" : [ "30"],
+            "ftype" : "batch"
+        },
+        "measurement_type" : {
+            "domain" : [ "PLATE_READER", "FLOW"],
+            "ftype" : "shadow"
+        },
+        "replicate" : {
+            "domain" : [
+              "1",
+              "2",
+              "3",
+              "4",
+              "5",
+              "6",
+              "7",
+              "8",
+              "9",
+              "10",
+              "11",
+              "12"
+            ],
+            "ftype" : "sample"
+        }
+    },
+    "containers" : { "422936.1" : {
+                        "aliquots" : {
+                            "a1" : { "strain" : "UWBF_24959" },
+                            "a2" : { "strain" : "UWBF_24959" },
+                            "a3" : { "strain" : "UWBF_24959" },
+                            "a4" : { "strain" : "UWBF_24959" },
+                            "a5" : { "strain" : "UWBF_24959" },
+                            "a6" : { "strain" : "UWBF_24959" },
+                            "a7" : { "strain" : "UWBF_24959" },
+                            "a8" : { "strain" : "UWBF_24959" },
+                            "a9" : { "strain" : "UWBF_24959" },
+                            "a10" : { "strain" : "UWBF_24959" },
+                            "a11" : { "strain" : "UWBF_24959" },
+                            "a12" : { "strain" : "UWBF_24959" },
+                            "b1" : { "strain" : "UWBF_24960" },
+                            "b2" : { "strain" : "UWBF_24960" },
+                            "b3" : { "strain" : "UWBF_24960" },
+                            "b4" : { "strain" : "UWBF_24960" },
+                            "b5" : { "strain" : "UWBF_24960" },
+                            "b6" : { "strain" : "UWBF_24960" },
+                            "b7" : { "strain" : "UWBF_24960" },
+                            "b8" : { "strain" : "UWBF_24960" },
+                            "b9" : { "strain" : "UWBF_24960" },
+                            "b10" : { "strain" : "UWBF_24960" },
+                            "b11" : { "strain" : "UWBF_24960" },
+                            "b12" : { "strain" : "UWBF_24960" },
+                            "c1" : { "strain" : "UWBF_24961" },
+                            "c2" : { "strain" : "UWBF_24961" },
+                            "c3" : { "strain" : "UWBF_24961" },
+                            "c4" : { "strain" : "UWBF_24961" },
+                            "c5" : { "strain" : "UWBF_24961" },
+                            "c6" : { "strain" : "UWBF_24961" },
+                            "c7" : { "strain" : "UWBF_24961" },
+                            "c8" : { "strain" : "UWBF_24961" },
+                            "c9" : { "strain" : "UWBF_24961" },
+                            "c10" : { "strain" : "UWBF_24961" },
+                            "c11" : { "strain" : "UWBF_24961" },
+                            "c12" : { "strain" : "UWBF_24961" },
+                            "d1" : { "strain" : "UWBF_24962" },
+                            "d2" : { "strain" : "UWBF_24962" },
+                            "d3" : { "strain" : "UWBF_24962" },
+                            "d4" : { "strain" : "UWBF_24962" },
+                            "d5" : { "strain" : "UWBF_24962" },
+                            "d6" : { "strain" : "UWBF_24962" },
+                            "d7" : { "strain" : "UWBF_24962" },
+                            "d8" : { "strain" : "UWBF_24962" },
+                            "d9" : { "strain" : "UWBF_24962" },
+                            "d10" : { "strain" : "UWBF_24962" },
+                            "d11" : { "strain" : "UWBF_24962" },
+                            "d12" : { "strain" : "UWBF_24962" },
+                            "e1" : { "strain" : "UWBF_24963" },
+                            "e2" : { "strain" : "UWBF_24963" },
+                            "e3" : { "strain" : "UWBF_24963" },
+                            "e4" : { "strain" : "UWBF_24963" },
+                            "e5" : { "strain" : "UWBF_24963" },
+                            "e6" : { "strain" : "UWBF_24963" },
+                            "e7" : { "strain" : "UWBF_24963" },
+                            "e8" : { "strain" : "UWBF_24963" },
+                            "e9" : { "strain" : "UWBF_24963" },
+                            "e10" : { "strain" : "UWBF_24963" },
+                            "e11" : { "strain" : "UWBF_24963" },
+                            "e12" : { "strain" : "UWBF_24963" },
+                            "f1" : { "strain" : "UWBF_22800" },
+                            "f2" : { "strain" : "UWBF_22800" },
+                            "f3" : { "strain" : "UWBF_22800" },
+                            "f4" : { "strain" : "UWBF_22801" },
+                            "f5" : { "strain" : "UWBF_22801" },
+                            "f6" : { "strain" : "UWBF_22801" },
+                            "f7" : { "strain" : "UWBF_24864" },
+                            "f8" : { "strain" : "UWBF_24864" },
+                            "f9" : { "strain" : "UWBF_24864" },
+                            "f10" : { "strain" : "UWBF_23970" },
+                            "f11" : { "strain" : "UWBF_23970" },
+                            "f12" : { "strain" : "UWBF_23970" },
+                            "g1" : { "strain" : "UWBF_25784" },
+                            "g2" : { "strain" : "UWBF_25784" },
+                            "g3" : { "strain" : "UWBF_25784" },
+                            "g4" : { "strain" : "UWBF_25784" },
+                            "g5" : { "strain" : "UWBF_25784" },
+                            "g6" : { "strain" : "UWBF_25784" },
+                            "g7" : { "strain" : "UWBF_25784" },
+                            "g8" : { "strain" : "UWBF_25784" },
+                            "g9" : { "strain" : "UWBF_25784" },
+                            "g10" : { "strain" : "UWBF_25784" },
+                            "g11" : { "strain" : "UWBF_25784" },
+                            "g12" : { "strain" : "UWBF_25784" }
+                        },
+        "columns" : {
+            "col1" : ["a1", "b1", "c1", "d1", "e1", "f1", "g1"],
+            "col2" : ["a2", "b2", "c2", "d2", "e2", "f2", "g2"],
+            "col3" : ["a3", "b3", "c3", "d3", "e3", "f3", "g3"],
+            "col4" : ["a4", "b4", "c4", "d4", "e4", "f4", "g4"],
+            "col5" : ["a5", "b5", "c5", "d5", "e5", "f5", "g5"],
+            "col6" : ["a6", "b6", "c6", "d6", "e6", "f6", "g6"],
+            "col7" : ["a7", "b7", "c7", "d7", "e7", "f7", "g7"],
+            "col8" : ["a8", "b8", "c8", "d8", "e8", "f8", "g8"],
+            "col9" : ["a9", "b9", "c9", "d9", "e9", "f9", "g9"],
+            "col10" : ["a10", "b10", "c10", "d10", "e10", "f10", "g10"],
+            "col11" : ["a11", "b11", "c11", "d11", "e11", "f11", "g11"],
+            "col12" : ["a12", "b12", "c12", "d12", "e12", "f12", "g12"]            
+        }
+    } 
+                 },
+    "requirements" : [
+      {
+        "factors": [
+          {
+            "factor": "timepoint",
+            "values": [
+              "1",
+               "3"
+            ]
+          },
+          {
+            "factor": "measurement_type",
+            "values": [
+              "PLATE_READER"
+            ]
+          },
+          {
+            "factor": "strain",
+            "values": [
+              "UWBF_24959",
+              "UWBF_24960",
+              "UWBF_24961",
+                "UWBF_24962",
+              "UWBF_24963",                
+              "UWBF_25784"
+            ]
+          },
+          {
+            "factor": "temperature",
+            "values": [
+              "30"
+            ]
+          },
+          {
+            "factor": "recovery_media",
+            "values": [
+              "sc_media"
+            ]
+          },
+          {
+            "factor": "replicate",
+            "values": [
+              "1",
+              "2",
+              "3",
+              "4",
+              "5",
+              "6",
+              "7",
+              "8",
+              "9",
+              "10",
+              "11",
+              "12"
+            ]
+          }
+        ]
+      },
+      {
+        "factors": [
+          {
+            "factor": "timepoint",
+            "values": [
+              "1",
+               "3"
+            ]
+          },
+          {
+            "factor": "measurement_type",
+            "values": [
+              "PLATE_READER"
+            ]
+          },
+          {
+            "factor": "strain",
+            "values": [
+              "UWBF_22800",
+              "UWBF_22801",
+                "UWBF_23970",
+                "UWBF_24864"
+            ]
+          },
+          {
+            "factor": "temperature",
+            "values": [
+              "30"
+            ]
+          },
+          {
+            "factor": "recovery_media",
+            "values": [
+              "sc_media"
+            ]
+          },
+          {
+            "factor": "replicate",
+            "values": [
+              "1",
+              "2",
+              "3"
+            ]
+          }
+        ]
+      }
+    ]
+}
