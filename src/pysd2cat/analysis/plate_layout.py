@@ -42,6 +42,18 @@ def generate_variables1(inputs):
                 variables['reverse_index'][var] = {}
             variables['reverse_index'][var].update({"sample": "x{}_{}".format(sample, aliquot), "aliquot" : aliquot})
             
+    variables['aliquot_factors'] = \
+      {
+          a : {
+              factor_id : {
+                  level : Symbol("{}({})={}".format(factor_id, a, level))
+                  for level in factor['domain']
+                  }
+              for factor_id, factor in factors.items() if factor['ftype'] == "aliquot"                
+            }
+            for a in samples
+      }
+    
     variables['sample_factors'] = \
       {
           a : {
@@ -50,7 +62,7 @@ def generate_variables1(inputs):
                     level : Symbol("{}(x{}_{})={}".format(factor_id, sample, a, level))
                     for level in factor['domain']
                     }
-                  for factor_id, factor in factors.items()
+                  for factor_id, factor in factors.items() if factor['ftype'] == "sample"
                 }
                 for sample in samples[a]
             }
@@ -500,157 +512,72 @@ def generate_constraints1(inputs):
 
 
     tau_symbols = variables['tau_symbols']
+    aliquot_factors = variables['aliquot_factors']
     sample_factors = variables['sample_factors']
     exp_factor = variables['exp_factor']
     batch_factor = variables['batch_factor']
     column_factor = variables['column_factor']
+
+    ## CS
+
+    def cs_factor_level(factor, levels):
+          return Or([level_symbol for level, level_symbol in levels.items()])
     
-
-    ## Sample satisfies a requirement
-
-    samples_sat_reqs = \
-      And([Implies(tau_symbols[aliquot][x],
-                   Or([
-                       And([
-                           Or([sample_factors[aliquot][x][f['factor']][level]                           
-                               for level in f['values']])
-                           for f in r["factors"]]) 
-                       for r in requirements]))
-            for aliquot in samples
-            for x in samples[aliquot]])
-
-    l.debug("samples_sat_reqs: %s", samples_sat_reqs)
-    constraints.append(samples_sat_reqs)
+    def cs_factors_level(factors):
+        return And([cs_factor_level(factor_id, levels)
+                    for factor_id, levels in factors.items()])
     
-    ## Requirement satisfied by a sample
+    def cs_experiment_factors(exp_factor):
+        return cs_factors_level(exp_factor)
+
+    def cs_sample_factors(sample_factor, aliquot):
+        return And([cs_factors_level(sample_factor[aliquot][sample])
+                    for sample in samples[aliquot]])
+            
+    def cs_aliquot_factors(aliquot_factors, column):
+        return And([And(cs_factors_level(aliquot_factors[aliquot]),
+                        cs_sample_factors(sample_factors, aliquot))
+                    for aliquot in column])
     
-
-    def gen_sat_req_exp(r):
-        return And([Or([experiment_factors[factor][level] 
-                    for level in domain])
-                for factor, domain in r.items() if factors[factor]["ftype"] == "experiment"])
-    
-    def gen_sat_req_batch(container, r):
-        return And([Or([batch_factors[factor][container][level] 
-                    for level in domain])
-                for factor, domain in r.items() if factors[factor]["ftype"] == "batch"])
-
-    def gen_sat_req_column(container, column, r):
-        return And([Or([column_factors[factor][container][column][level] 
-                    for level in domain])
-                for factor, domain in r.items() if factors[factor]["ftype"] == "column"])
-
-    def gen_sat_req_aliquot(container, aliquot, r):
-        return And([Or([aliquot_factors[factor][container][aliquot][level] 
-                    for level in domain])
-                for factor, domain in r.items() if factors[factor]["ftype"] == "sample"])
-    
-    def gen_sat_req_sample(aliquot, x, r):
-        return And([Or([sample_factors[factor][aliquot][x][level] 
-                    for level in domain])
-                for factor, domain in r.items() if factors[factor]["ftype"] == "shadow"])
-
-    def gen_sat_req(aliquot, x, r):
-        container = [c for c in containers if aliquot in containers[c]['aliquots']][0]
-        column = [col for col in c['columns'] if aliquot in column][0]
-        return And(gen_sat_req_exp(r),
-                    gen_sat_req_batch(container, r),
-                    gen_sat_req_column(container, column, r),
-                    gen_sat_req_aliquot(container, aliquot, r),
-                    gen_sat_req_sample(aliquot, x, r))
+    def cs_column_factors(column_factor, container):
+        def get_column_factors(column_factors, col):
+            return { factor_id : { level : columns[col] for level, columns in levels.items() } for factor_id, levels in column_factors.items() }
+        
+        return And([And(cs_factors_level(get_column_factors(column_factor, column)),
+                        cs_aliquot_factors(aliquot_factors, container['columns'][column]))
+                    for column in container['columns']])
 
     
-    # (4)
-    requirements_constraint = \
-      And([Implies(tau_symbols[aliquot][x],
-                   Or([gen_sat_req(aliquot, x, r)
-                        for r in requirements]))
-            for aliquot in samples
-            for x in samples[aliquot]])
-    l.debug("requirements_constraint: %s", requirements_constraint)
-    constraints.append(requirements_constraint)
+    def cs_batch_factors(batch_factors, containers):
+        def get_batch_factors(batch_factors, container):
+            return { factor_id : { level : containers[container] for level, containers in levels.items() } for factor_id, levels in batch_factors.items() }
+        
+        return And([And(cs_factors_level(get_batch_factors(batch_factors, container)),
+                        cs_column_factors(column_factor, containers[container]))
+                    for container in containers])
+          
 
-    # (5)
+    
+    condition_space_constraint = \
+      And(cs_experiment_factors(exp_factor),
+         cs_batch_factors(batch_factor, containers)
+          #cs_aliquot_factors(),
+          #cs_sample_factors()
+              )
+    l.debug("CS: %s", condition_space_constraint)
+    constraints.append(condition_space_constraint)
+    
+
+    # ALQ
     aliquot_properties_constraint = \
-      And([Implies(tau_symbols[aliquot][x],
-                   And([sample_factors[aliquot][x][factor][level] 
-                        for factor, level in aliquot_properties.items()]))
+      And([
+                   And([aliquot_factors[aliquot][factor][level] 
+                        for factor, level in aliquot_properties.items()])
                for _, c in containers.items()
                for aliquot, aliquot_properties in c['aliquots'].items()
-               for x in samples[aliquot]
-
             ])
-    l.debug("aliquot_properties_constraint: %s", aliquot_properties_constraint)
-    constraints.append(aliquot_properties_constraint)
-
-    # (6)
-    experiment_factors_constraint = \
-      And([Implies(tau_symbols[aliquot][x],
-                   And([
-                       Or([And(sample_factors[aliquot][x][factor_id][level],
-                               exp_factor[factor_id][level])
-                           for level in factor['domain']
-                            ])
-                       for factor_id, factor in factors.items() if factor["ftype"] == "experiment"
-                     ]))
-         for aliquot in samples
-         for x in samples[aliquot]])
-    l.debug("experiment_factors_constraint: %s", experiment_factors_constraint)
-    constraints.append(experiment_factors_constraint)
-
-    # (7)
-    batch_factors_constraint = \
-      And([ 
-        Implies(tau_symbols[aliquot][x],
-                And([
-                     Or([And(sample_factors[aliquot][x][factor_id][level],
-                             batch_factor[factor_id][level][container_id])
-                        for level in factor['domain']
-                        ])
-                     for factor_id, factor in factors.items() if factor["ftype"] == "batch"
-                     ]))
-        for container_id, container in containers.items()
-        for aliquot, aliquot_properties in container['aliquots'].items()
-        for x in samples[aliquot]
-        ])
-    l.debug("batch_factors_constraint: %s", batch_factors_constraint)
-    constraints.append(batch_factors_constraint)
-
-    # (8)
-    sample_factors_constraint = \
-    And([
-        Implies(And(tau_symbols[a][x], tau_symbols[a][xp]),                    
-                And([
-                    Or([And(sample_factors[a][x][factor_id][level],
-                            sample_factors[a][xp][factor_id][level])
-                        for level in factor['domain']
-                        ])
-                     for factor_id, factor in factors.items()  if factor["ftype"] == "sample"]))
-        for a in samples
-        for xp in samples[a]
-        for x in samples[a]])
-    l.debug("sample_factors_constraint: %s", sample_factors_constraint)
-    constraints.append(sample_factors_constraint)
-
-    # (9)
-    if len(column_factor) > 0:
-        column_factors_constraint = \
-        And([ 
-            Implies(tau_symbols[a][x], 
-                    And([
-                        Or([And(sample_factors[a][x][factor_id][level],
-                                column_factor[factor_id][level][column_id])
-                            for level in factor['domain']
-                            ])
-                        for factor_id, factor in factors.items() if factor["ftype"] == "column"]))    
-            for container_id, container in containers.items()
-            for column_id, column in container['columns'].items()
-            for a in column
-            for x in samples[a]
-                        
-            ])
-        constraints.append(column_factors_constraint)
-        l.debug("column_factors_constraint: %s", column_factors_constraint)
+    #l.debug("aliquot_properties_constraint: %s", aliquot_properties_constraint)
+    #constraints.append(aliquot_properties_constraint)
 
 
 
@@ -687,44 +614,62 @@ def generate_constraints1(inputs):
                         return False
             return True
         return False ## Couldn't find a container with the aliquot satisfying requirement
+
+    def r_exp_factors(r):
+        return [ f for f in r['factors'] if factors[f['factor']]['ftype'] == "experiment" ]
+    def r_batch_factors(r):
+        return [ f for f in r['factors'] if factors[f['factor']]['ftype'] == "batch" ]
+    def r_column_factors(r):
+        return [ f for f in r['factors'] if factors[f['factor']]['ftype'] == "column" ]
+    def r_aliquot_factors(r):
+        return [ f for f in r['factors'] if factors[f['factor']]['ftype'] == "aliquot" ]
+    def r_sample_factors(r):
+        return [ f for f in r['factors'] if factors[f['factor']]['ftype'] == "sample" ]
     
-    # (13) 
+    def req_experiment_factors(r_exp_factors):
+        return And([And([exp_factors[factor['factor']][level]
+                        for level in factor['values']])
+                    for factor in r_exp_factors])
+
+    def req_batch_factors(r_batch_factors, containers):
+        return And([And([Or([batch_factor[factor["factor"]][level][container_id]
+                            for container_id, container in containers.items()])
+                        for level in factor['values']])
+                    for factor in r_batch_factors])
+
+
     satisfy_every_requirement = \
     And([
-        And([
-            Or([
-                And([sample_factors[a][x][factor][level]
-                    for factor, level in xr.items()])
-                for a in samples if aliquot_can_satisfy_requirement(a, xr)
-                for x in samples[a]]) 
-            for xr in expand_requirement(r)])
+        And(
+            req_experiment_factors(r_exp_factors(r)),
+            req_batch_factors(r_batch_factors(r), containers))
         for r in requirements])
     l.debug("satisfy_every_requirement: %s", satisfy_every_requirement)
     constraints.append(satisfy_every_requirement)
 
     ## Factor level assignments are mutex
-    factor_mutex = \
-      And([
-          And([
-            Or(Not(sample_factors[a][x][factor_id][level1]),
-                Not(sample_factors[a][x][factor_id][level2]))
-            for level1 in factor['domain']
-            for level2 in factor['domain'] if level2 != level1])
-          for factor_id, factor in factors.items()
-          for a in samples
-          for x in samples[a]])
-    l.debug("factor_mutex: %s", factor_mutex)
-    constraints.append(factor_mutex)
+#    factor_mutex = \
+#      And([
+#          And([
+#            Or(Not(sample_factors[a][x][factor_id][level1]),
+#                Not(sample_factors[a][x][factor_id][level2]))
+#            for level1 in factor['domain']
+#            for level2 in factor['domain'] if level2 != level1])
+#          for factor_id, factor in factors.items()
+#          for a in samples
+#          for x in samples[a]])
+    #l.debug("factor_mutex: %s", factor_mutex)
+    #constraints.append(factor_mutex)
 
 
     ## Each sample factor has a value
-    sample_factor_values = \
-      And([Or([sample_factors[a][x][factor_id][level1]
-            for level1 in factor['domain']])
-        for factor_id, factor in factors.items()
-        for a in samples
-        for x in samples[a]])
-    constraints.append(sample_factor_values)
+ #   sample_factor_values = \
+ #     And([Or([sample_factors[a][x][factor_id][level1]
+ #           for level1 in factor['domain']])
+ #       for factor_id, factor in factors.items()
+ #       for a in samples
+ #       for x in samples[a]])
+    #constraints.append(sample_factor_values)
 
     f = And(constraints)
     #l.debug("Constraints: %s", f)
