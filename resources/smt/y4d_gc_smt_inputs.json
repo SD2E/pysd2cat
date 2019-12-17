@@ -20,14 +20,14 @@
                 "UWBF_23970",
                 "UWBF_24864"
             ],
-            "ftype" : "sample"
+            "ftype" : "aliquot"
         },
         "timepoint": {
             "domain": [
                 "1",
                "3"
             ],
-            "ftype": "shadow"
+            "ftype": "sample"
         },
         "temperature" : {
             "domain" : [ "30"],
@@ -35,7 +35,7 @@
         },
         "measurement_type" : {
             "domain" : [ "PLATE_READER", "FLOW"],
-            "ftype" : "shadow"
+            "ftype" : "sample"
         },
         "replicate" : {
             "domain" : [
@@ -52,7 +52,7 @@
               "11",
               "12"
             ],
-            "ftype" : "sample"
+            "ftype" : "aliquot"
         }
     },
     "containers" : { "422936.1" : {
