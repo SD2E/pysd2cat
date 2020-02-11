@@ -1,5 +1,8 @@
-from pysmt.shortcuts import Symbol, And, Or, Not, Implies, Equals, Iff, is_sat, get_model, GT, GE, LT, Int, String, TRUE
+from pysmt.shortcuts import Symbol, And, Or, Not, Implies, Equals, Iff, is_sat, get_model, GT, GE, LT, LE, Int, String, TRUE, ExactlyOne
 from pysmt.typing import INT, StringType
+from functools import reduce
+
+from pysd2cat.analysis.plate_layout_utils import get_samples_from_condition_set
 
 
 import pandas as pd
@@ -8,7 +11,7 @@ import logging
 
 
 l = logging.getLogger(__file__)
-l.setLevel(logging.DEBUG)
+l.setLevel(logging.INFO)
 
 
 
@@ -40,32 +43,46 @@ def generate_variables1(inputs):
 #            if var not in variables['reverse_index']:                
 #                variables['reverse_index'][var] = {}
 #            variables['reverse_index'][var].update({"sample": "x{}_{}".format(sample, aliquot), "aliquot" : aliquot})
-            
+
+    def get_factor_symbols(factor, prefix, var=None, constraints=None):
+        if factor['dtype'] == "str":
+            if var and constraints:
+                levels = [ constraints[var][factor['name']] ]
+            else:
+                levels = factor['domain']
+            return  {
+                level : Symbol("{}={}".format(prefix, level))
+                for level in factor['domain']
+            }
+        else:
+            # Cannot filter values here because its an int that is yet to be assigned
+            return Symbol(prefix, INT)
+
     variables['aliquot_factors'] = \
       {
           c: {
               a : {
-                  factor_id : {
-                      level : Symbol("{}({}_{})={}".format(factor_id, a, c, level))
-                      for level in factor['domain']
-                  }
+                  factor_id : get_factor_symbols(factor, "{}({}_{})".format(factor_id, a, c))
                   for factor_id, factor in factors.items() if factor['ftype'] == "aliquot"                
               }
               for a in samples[c]
           }
-          for c in samples
+          for c in containers
       }
+    #print( variables['aliquot_factors'])
+
+
     
     variables['sample_factors'] = \
       {
           c : {
               a : {
                   sample: {
-                      factor_id : {
-                          level : Symbol("{}(x{}_{}_{})={}".format(factor_id, sample, a, c, level))
-                          for level in factor['domain']
-                      }
-                      for factor_id, factor in factors.items() if factor['ftype'] == "sample"
+                      factor_id : get_factor_symbols(factor,
+                                                     "{}(x{}_{}_{})".format(factor_id, sample, a, c),
+                                                     var=sample,
+                                                     constraints=inputs['sample_types'])
+                      for factor_id, factor in factors.items() if factor['ftype'] == "sample" 
                   }
                   for sample in samples[c][a]
               }
@@ -73,79 +90,107 @@ def generate_variables1(inputs):
           }
           for c in samples
       }
+    
     for container in variables['sample_factors']:
         for aliquot in variables['sample_factors'][container]: 
             for sample in variables['sample_factors'][container][aliquot]:
                 for factor_id in variables['sample_factors'][container][aliquot][sample]:
-                    for level in variables['sample_factors'][container][aliquot][sample][factor_id]:
-                        var = variables['sample_factors'][container][aliquot][sample][factor_id][level]
+                    if factors[factor_id]['dtype'] == "str":
+                        for level in variables['sample_factors'][container][aliquot][sample][factor_id]:
+                            var = str(variables['sample_factors'][container][aliquot][sample][factor_id][level])
+                            if var not in variables['reverse_index']:                
+                                variables['reverse_index'][var] = {}
+                            variables['reverse_index'][var].update({"type" : "sample", "aliquot" : aliquot, "sample" :  "x{}_{}_{}".format(sample, aliquot, container), "container" : container, factor_id : level})
+                    else:
+                        var = str(variables['sample_factors'][container][aliquot][sample][factor_id])
                         if var not in variables['reverse_index']:                
                             variables['reverse_index'][var] = {}
-                        variables['reverse_index'][var].update({"type" : "sample", "aliquot" : aliquot, "sample" :  "x{}_{}_{}".format(sample, aliquot, container), "container" : container, factor_id : level})
+                        variables['reverse_index'][var].update({"type" : "sample", "aliquot" : aliquot, "sample" :  "x{}_{}_{}".format(sample, aliquot, container), "container" : container, factor_id : None})
+
             for factor_id in variables['aliquot_factors'][container][aliquot]:
-                for level in variables['aliquot_factors'][container][aliquot][factor_id]:
-                    var = variables['aliquot_factors'][container][aliquot][factor_id][level]
+                if factors[factor_id]['dtype'] == "str":
+                    for level in variables['aliquot_factors'][container][aliquot][factor_id]:
+                        var = str(variables['aliquot_factors'][container][aliquot][factor_id][level])
+                        if var not in variables['reverse_index']:                
+                            variables['reverse_index'][var] = {}
+                        variables['reverse_index'][var].update({"type" : "aliquot", "aliquot" : aliquot, "container" : container, factor_id : level})
+                else:
+                    var = str(variables['aliquot_factors'][container][aliquot][factor_id])
                     if var not in variables['reverse_index']:                
                         variables['reverse_index'][var] = {}
-                    variables['reverse_index'][var].update({"type" : "aliquot", "aliquot" : aliquot, "container" : container, factor_id : level})
+                    variables['reverse_index'][var].update({"type" : "aliquot", "aliquot" : aliquot, "container" : container, factor_id : None})
 
         
     values = {}
 
     variables['exp_factor'] = \
       {
-          factor_id : {
-              level : Symbol("{}_exp={}".format(factor_id, level))
-              for level in factor['domain'] 
-              }
-            for factor_id, factor in factors.items() if factor['ftype'] == "experiment"
+          factor_id : get_factor_symbols(factor, "{}_exp".format(factor_id))
+          for factor_id, factor in factors.items() if factor['ftype'] == "experiment"
       }
     for exp_factor in variables['exp_factor']:
-        for level in variables['exp_factor'][exp_factor]:
-            var = variables['exp_factor'][exp_factor][level]
+        if factors[exp_factor]['dtype'] == "str":
+            for level in variables['exp_factor'][exp_factor]:
+                var = str(variables['exp_factor'][exp_factor][level])
+                if var not in variables['reverse_index']:
+                    variables['reverse_index'][var] = {}
+                variables['reverse_index'][var].update({"type" : "experiment", exp_factor : level})
+        else:
+            var = str(variables['exp_factor'][exp_factor])
             if var not in variables['reverse_index']:
                 variables['reverse_index'][var] = {}
-            variables['reverse_index'][var].update({"type" : "experiment", exp_factor : level})
+            variables['reverse_index'][var].update({"type" : "experiment", exp_factor : None})
+
             
     variables['batch_factor'] = \
       {
-          factor_id : {
-                level : {
-                    container : Symbol("{}_{}_batch={}".format(factor_id, container, level))
-                    for container in containers
-                    }
-                  for level in factor['domain']   
-              }
+          container : {
+              factor_id : get_factor_symbols(factor, "{}_{}_batch".format(factor_id, container))
               for factor_id, factor in factors.items() if factor['ftype'] == "batch"
+              }
+              for container in containers                          
       }
-    for batch_factor in variables['batch_factor']:
-        for level in variables['batch_factor'][batch_factor]:
-            for container in variables['batch_factor'][batch_factor][level]:
-                var = variables['batch_factor'][batch_factor][level][container]
+      
+    for container  in variables['batch_factor']:
+        for batch_factor  in variables['batch_factor'][container]:
+            if factors[batch_factor]['dtype'] == "str":
+                for level in variables['batch_factor'][container][batch_factor]:
+                    var = str(variables['batch_factor'][container][batch_factor][level])
+                    if var not in variables['reverse_index']:
+                        variables['reverse_index'][var] = {}
+                    variables['reverse_index'][var].update({"type" : "batch", "container" : container, batch_factor : level})
+            else:
+                var = str(variables['batch_factor'][container][batch_factor])
                 if var not in variables['reverse_index']:
                     variables['reverse_index'][var] = {}
-                variables['reverse_index'][var].update({"type" : "batch", "container" : container, batch_factor : level})
+                variables['reverse_index'][var].update({"type" : "batch", "container" : container, batch_factor : None})
+
 
     variables['column_factor'] = \
       {
-          factor_id : {
-              level : {
-                  col : Symbol("{}_{}_col={}".format(factor_id, col, level))  
-                  for _, container in containers.items()
-                  for col in container['columns']
-                  }
-                  for level in factor['domain']   
+          col : {
+            factor_id : get_factor_symbols(factor, "{}_{}_col".format(factor_id, col))
+            for factor_id, factor in factors.items() if factor['ftype'] == "column"
             }
-          for factor_id, factor in factors.items() if factor['ftype'] == "column"
+        for _, container in containers.items()
+        for col in container['columns']    
       }
-    for column_factor in variables['column_factor']:
-        for level in variables['column_factor'][column_factor]:
-            for column in variables['column_factor'][column_factor][level]:
-                var = variables['column_factor'][column_factor][level][column]
+    for column in variables['column_factor']:
+        for column_factor in variables['column_factor'][column]:
+            if factors[column_factor]['dtype'] == "str":
+                for level in variables['column_factor'][column][column_factor]:
+                    var = variables['column_factor'][column][column_factor][level]
+                    if var not in variables['reverse_index']:
+                        variables['reverse_index'][var] = {}
+                    container = [ c for c in containers if column in containers[c]['columns']][0]
+                    variables['reverse_index'][var].update({"type" : "column", "column" : column, "container" : container, column_factor : level})
+            else:
+                var = variables['column_factor'][column][column_factor]
                 if var not in variables['reverse_index']:
                     variables['reverse_index'][var] = {}
                 container = [ c for c in containers if column in containers[c]['columns']][0]
-                variables['reverse_index'][var].update({"type" : "column", "column" : column, "container" : container, column_factor : level})
+                variables['reverse_index'][var].update({"type" : "column", "column" : column, "container" : container, column_factor : None})
+
 
     l.debug("Variables: %s", variables)
     l.debug("Values: %s", values)
@@ -468,7 +513,6 @@ def generate_constraints(inputs):
     l.debug("satisfy_every_requirement: %s", satisfy_every_requirement)
     constraints.append(satisfy_every_requirement)
 
-#print(sample_factors_constraint)
 
 
     ## Factor level assignments are mutex
@@ -579,22 +623,40 @@ def generate_constraints1(inputs):
         return False ## Couldn't find a container with the aliquot satisfying requirement
 
     def mutex(levels):
-          return And([Or(Not(level1_symbol), Not(level2_symbol))
-                            for level1, level1_symbol in levels.items()
-                            for level2, level2_symbol in levels.items() if level2 != level1])
+          return ExactlyOne([y for x,y in levels.items()])
+#          return And([Or(Not(level1_symbol), Not(level2_symbol))
+#                            for level1, level1_symbol in levels.items()
+#                            for level2, level2_symbol in levels.items() if level2 != level1])
     
     def cs_factor_level(factor, levels):
           return And(Or([level_symbol for level, level_symbol in levels.items()]), mutex(levels))
-    
-    def cs_factors_level(factors):
-        return And([cs_factor_level(factor_id, levels)
-                    for factor_id, levels in factors.items()])
+
+    def cs_factor_bounds(factor_id, symbol, levels):
+        return And(GE(symbol, Int(levels[0])),
+                   LE(symbol, Int(levels[1])))
+      
+    def cs_factors_level(factor_symbols, var=None, constraints=None):
+        factor_clauses = []
+        for factor_id, symbols in factor_symbols.items():
+            if factors[factor_id]['dtype'] == "str":
+                # Already filtered the levels for Bools    
+                factor_clauses.append(cs_factor_level(factor_id, symbols))
+            else:
+                # Need to filter levels for ints
+                if var and constraints:
+                    levels = [constraints[var][factor_id], constraints[var][factor_id]]
+                else:
+                    levels = factors[factor_id]['domain']
+                factor_clauses.append(cs_factor_bounds(factor_id, symbols, levels))
+        return And(factor_clauses)
     
     def cs_experiment_factors(exp_factor):
         return cs_factors_level(exp_factor)
 
     def cs_sample_factors(sample_factor, container_id, container, aliquot):
-        return And([cs_factors_level(sample_factor[container_id][aliquot][sample])
+        return And([cs_factors_level(sample_factor[container_id][aliquot][sample],
+                                     var=sample,
+                                     constraints=inputs['sample_types'])
                     for sample in samples[container_id][aliquot]])
             
     def cs_aliquot_factors(aliquot_factors, container_id, container, column):
@@ -604,7 +666,8 @@ def generate_constraints1(inputs):
     
     def cs_column_factors(column_factor, container_id, container):
         def get_column_factors(column_factors, col):
-            return { factor_id : { level : columns[col] for level, columns in levels.items() } for factor_id, levels in column_factors.items() }
+            return column_factors[col]
+            #return { factor_id : { level : columns[col] for level, columns in levels.items() } for factor_id, levels in column_factors.items() }
         
         return And([And(cs_factors_level(get_column_factors(column_factor, column)),
                         cs_aliquot_factors(aliquot_factors, container_id, container, container['columns'][column]))
@@ -613,7 +676,8 @@ def generate_constraints1(inputs):
     
     def cs_batch_factors(batch_factors, containers):
         def get_batch_factors(batch_factors, container):
-            return { factor_id : { level : containers[container] for level, containers in levels.items() } for factor_id, levels in batch_factors.items() }
+            return batch_factors[container]
+            #return { factor_id : { level : containers[container] for level, containers in levels.items() } for factor_id, levels in batch_factors.items() }
         
         return And([And(cs_factors_level(get_batch_factors(batch_factors, container_id)),
                         cs_column_factors(column_factor, container_id, container))
@@ -640,9 +704,7 @@ def generate_constraints1(inputs):
                for aliquot, aliquot_properties in c['aliquots'].items()
             ])
     #l.debug("aliquot_properties_constraint: %s", aliquot_properties_constraint)
-    #constraints.append(aliquot_properties_constraint)
-
-
+    constraints.append(aliquot_properties_constraint)
 
     def factor_cross_product(factors, cross_product):
         if len(factors) == 0:
@@ -674,9 +736,17 @@ def generate_constraints1(inputs):
         return [ f for f in r['factors'] if factors[f['factor']]['ftype'] == "aliquot" ]
     def r_sample_factors(r):
         return [ f for f in r['factors'] if factors[f['factor']]['ftype'] == "sample" ]
+
+
+    def get_req_const(factors_of_type, factor_id, level):            
+        if factors[factor_id]['dtype'] == "str":
+            pred = factors_of_type[factor_id][level]
+        else:
+            pred = Equals(factors_of_type[factor_id], Int(level))
+        return pred
     
     def req_experiment_factors(r_exp_factors):
-        return And([And([exp_factors[factor['factor']][level]
+        return And([And([get_req_const(exp_factors, factor['factor'], level)
                         for level in factor['values']])
                     for factor in r_exp_factors])
 
@@ -685,17 +755,12 @@ def generate_constraints1(inputs):
         l.debug("factors: %s, aliquots: %s", r_sample_factors, samples)
         l.debug("|cases| = %s, |samples| = %s", len(cases), len(samples))
         assert(len(cases) <= len(samples))
-        clause = And([Or([And([sample_factors[container][aliquot][sample][factor][level]
-                             for factor, level in case.items()])
+        
+        clause = And([Or([And([get_req_const(sample_factors[container][aliquot][sample], factor_id, level)
+                             for factor_id, level in case.items()])
                         for sample in samples])
                 for case in cases])
         return clause
-
-#            return And([And([Or([sample_factors[aliquot][sample][factor["factor"]][level]
-#                                for sample in samples])
-#                            for level in factor['values']])
-#                        for factor in r_sample_factors])
-
    
     def req_aliquot_factors(r, r_aliquot_factors, container, aliquots):
         """
@@ -705,8 +770,8 @@ def generate_constraints1(inputs):
         l.debug("factors: %s, aliquots: %s", r_aliquot_factors, aliquots)
         l.debug("|cases| = %s, |aliquots| = %s", len(cases), len(aliquots))
         assert(len(cases) <= len(aliquots))
-        clause = And([Or([And(And([aliquot_factors[container][aliquot][factor][level]
-                                   for factor, level in case.items()]),
+        clause = And([Or([And(And([get_req_const(aliquot_factors[container][aliquot], factor_id, level)
+                                   for factor_id, level in case.items()]),
                               req_sample_factors(r_sample_factors(r), samples[container][aliquot], aliquot, container))
                         for aliquot in aliquots \
                               if aliquot_can_satisfy_requirement(aliquot, [{"factor" : factor, "values" : [level]}
@@ -719,8 +784,8 @@ def generate_constraints1(inputs):
         if len(r_column_factors) > 0:
             cases = expand_requirement(r_column_factors)
             assert(len(cases) <= len(columns))
-            clause = And([Or([And(And([column_factor[factor][level][column]
-                                   for factor, level in case.items()]),
+            clause = And([Or([And(And([get_req_const(column_factor[column], factor_id, level)
+                                   for factor_id, level in case.items()]),
                               req_aliquot_factors(r, r_aliquot_factors(r), container, columns[column]))
                         for column in columns])
                 for case in cases])
@@ -737,8 +802,8 @@ def generate_constraints1(inputs):
         cases = expand_requirement(r_batch_factors)
         assert(len(cases) <= len(containers))
 
-        clause = And([Or([And(And([batch_factor[factor][level][container_id]
-                                   for factor, level in case.items()]),
+        clause = And([Or([And(And([get_req_const(batch_factor[container_id], factor_id, level)            
+                                   for factor_id, level in case.items()]),
                               req_column_factors(r, r_column_factors(r), container_id, container['columns']))
                         for container_id, container in containers.items()])
                     for case in cases])
@@ -795,6 +860,19 @@ def solve(input):
     model = get_model(constraints)
     return model, variables
 
+def get_sample_types(sample_factors, requirements):
+    """
+    Get the number of unique assignments to the sample factors in the requirements
+    """
+    experiment_design = pd.DataFrame()
+
+    for condition_set in requirements:       
+        samples = get_samples_from_condition_set(sample_factors, condition_set)
+        l.debug("Condition set resulted in %s samples", len(samples))
+        experiment_design = experiment_design.append(samples, ignore_index=True)
+
+    return experiment_design.drop_duplicates()
+    
 def solve1(input):
     """
     Convert input to encoding and invoke solver.  Return model if exists.
@@ -802,20 +880,29 @@ def solve1(input):
 
     if not input['samples']:
         containers = input['containers']
+
+        sample_factors = { x : y for x, y in input['factors'].items() if y['ftype'] == 'sample' }
+        sample_types = get_sample_types(sample_factors, input['requirements'])
+        num_samples = len(sample_types)
+        #num_samples=18
+        #print("# samples per aliquot: %s", num_samples)
+
         input['samples'] = {
             c: {
                 a : {
-                    x : "x{}_{}_{}".format(x, a, c) for x in range(0, 10) }
+                    x : "x{}_{}_{}".format(x, a, c) for x in range(0, num_samples) }
                 for a in containers[c]['aliquots'] }
             for c in containers }
-    
+
+        input['sample_types'] = { i : x for i, x in enumerate(sample_types.to_dict('records'))}
+        
     variables, constraints = generate_constraints1(input)
-    model = get_model(constraints)
+    model = get_model(constraints, solver_name="msat")
     return model, variables
 
 
 
-def get_model_pd(model, variables):
+def get_model_pd(model, variables, factors):
 
 
     experiment_df = pd.DataFrame()
@@ -824,11 +911,23 @@ def get_model_pd(model, variables):
     aliquot_df = pd.DataFrame()
     sample_df = pd.DataFrame()
 
-    def info_to_df(info):
-        info_df = pd.DataFrame()
-        return info_df.append(info, ignore_index=True)
+    def info_to_df(info, value):
+        def sub_factor_value(x, value):
+            for col in x.index:
+                if col in factors:
+#                    if col == "temperature":
+#                        print("Set %s = %s", col, value)
+                    x[col] = int(value.constant_value())
+            return x
 
-    def merge_info_df(df, info, on):
+        
+        info_df = pd.DataFrame()
+        df = info_df.append(info, ignore_index=True)
+        if value.is_int_constant():
+            df = df.apply(lambda x: sub_factor_value(x, value), axis=1)            
+        return df
+
+    def merge_info_df(df, info, value, on):
         if len(df) > 0:
             #l.debug("Merge L: %s", df)
             #l.debug("Merge R: %s", info_to_df(info))
@@ -836,34 +935,37 @@ def get_model_pd(model, variables):
             #l.debug("onon %s", onon.values)
             #df = df.merge(info_to_df(info),  how='outer', on=list(onon.values))#, suffixes=('', '_y'))
             if on:
-                df = df.set_index(on).combine_first(info_to_df(info).set_index(on)).reset_index()
+                df = df.set_index(on).combine_first(info_to_df(info, value).set_index(on)).reset_index()
             else:
-                df = df.combine_first(info_to_df(info))
+                df = df.combine_first(info_to_df(info, value))
             #to_drop = [x for x in df if x.endswith('_y')]
             #df = df.drop(to_drop, axis=1)
 
             #l.debug("Merge O: %s", df)
         else:
-            df = df.append(info, ignore_index=True)
+            df = df.append(info_to_df(info, value), ignore_index=True)
         return df
-    
+
     for var, value in model:
-        if value.is_true():
-            if var in variables['reverse_index']:
+        if value.is_true() or value.is_int_constant():
+            if str(var) in variables['reverse_index']:
                 l.debug("{} = {}".format(var, value))
-                info = variables['reverse_index'][var]
+                info = variables['reverse_index'][str(var)]
+                
                # l.debug("info = %s", info)
                 if info['type'] == 'aliquot':
-                    aliquot_df = merge_info_df(aliquot_df, info, ["aliquot", "container"])
+                    aliquot_df = merge_info_df(aliquot_df, info, value, ["aliquot", "container"])
                 elif info['type'] == 'sample':
-                    sample_df = merge_info_df(sample_df, info, "sample")
+                    sample_df = merge_info_df(sample_df, info, value, "sample")
                 elif info['type'] == 'batch':
-                    batch_df = merge_info_df(batch_df, info, "container")
+                    batch_df = merge_info_df(batch_df, info, value, "container")
+                    #print(var, value, value.is_int_constant())
+                    #print(batch_df)
                 elif info['type'] == 'columm':
-                    column_df = merge_info_df(column_df, info, "column")
+                    column_df = merge_info_df(column_df, info, value, "column")
                 elif info['type'] == 'experiment':
                     l.debug("info: %s", info)
-                    experiment_df = experiment_df(experiment_df, info, None)
+                    experiment_df = experiment_df(experiment_df, info, value, None)
             
     l.debug("aliquot_df %s", aliquot_df)
     l.debug("sample_df %s", sample_df)
@@ -899,5 +1001,6 @@ def get_model_pd(model, variables):
 #    df = df.sort_values(by=['aliquot'])
     #l.debug(df.loc[df.aliquot=='a5'])
     df.to_csv("dan.csv")
+    return df
 
     
