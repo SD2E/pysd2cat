@@ -895,9 +895,12 @@ def solve1(input):
             for c in containers }
 
         input['sample_types'] = { i : x for i, x in enumerate(sample_types.to_dict('records'))}
-        
+
+    print("Generating Constraints ...")
     variables, constraints = generate_constraints1(input)
-    model = get_model(constraints, solver_name="msat")
+
+    print("Solving ...")
+    model = get_model(constraints, solver_name="z3")
     return model, variables
 
 
