@@ -16,6 +16,7 @@ setup(name='pysd2cat',
                       "pandas",
                       "scikit-learn",
                       "flowcytometrytools",
+                      "pysbol>=2.3.3",
                       "pysmt"],
       tests_require=["pytest"],
       zip_safe=False)

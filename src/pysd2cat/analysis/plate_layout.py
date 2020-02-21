@@ -1,5 +1,5 @@
-from pysmt.shortcuts import Symbol, And, Or, Not, Implies, Equals, Iff, is_sat, get_model, GT, GE, LT, LE, Int, String, TRUE, ExactlyOne
-from pysmt.typing import INT, StringType
+from pysmt.shortcuts import Symbol, And, Or, Not, Implies, Equals, Iff, is_sat, get_model, GT, GE, LT, LE, Int, Real, String, TRUE, ExactlyOne
+from pysmt.typing import INT, StringType, REAL
 from functools import reduce
 
 from pysd2cat.analysis.plate_layout_utils import get_samples_from_condition_set
@@ -46,7 +46,7 @@ def generate_variables1(inputs):
 
     def get_factor_symbols(factor, prefix, var=None, constraints=None):
         if factor['dtype'] == "str":
-            if var and constraints:
+            if var and constraints and var in constraints and constraints[var]:
                 levels = [ constraints[var][factor['name']] ]
             else:
                 levels = factor['domain']
@@ -55,8 +55,8 @@ def generate_variables1(inputs):
                 for level in factor['domain']
             }
         else:
-            # Cannot filter values here because its an int that is yet to be assigned
-            return Symbol(prefix, INT)
+            # Cannot filter values here because its an real that is yet to be assigned
+            return Symbol(prefix, REAL)
 
     variables['aliquot_factors'] = \
       {
@@ -69,7 +69,7 @@ def generate_variables1(inputs):
           }
           for c in containers
       }
-    #print( variables['aliquot_factors'])
+    #l.info( variables['aliquot_factors'])
 
 
     
@@ -632,8 +632,8 @@ def generate_constraints1(inputs):
           return And(Or([level_symbol for level, level_symbol in levels.items()]), mutex(levels))
 
     def cs_factor_bounds(factor_id, symbol, levels):
-        return And(GE(symbol, Int(levels[0])),
-                   LE(symbol, Int(levels[1])))
+        return And(GE(symbol, Real(levels[0])),
+                   LE(symbol, Real(levels[1])))
       
     def cs_factors_level(factor_symbols, var=None, constraints=None):
         factor_clauses = []
@@ -643,7 +643,7 @@ def generate_constraints1(inputs):
                 factor_clauses.append(cs_factor_level(factor_id, symbols))
             else:
                 # Need to filter levels for ints
-                if var and constraints:
+                if var and constraints and var in constraints and constraints[var]:
                     levels = [constraints[var][factor_id], constraints[var][factor_id]]
                 else:
                     levels = factors[factor_id]['domain']
@@ -694,7 +694,7 @@ def generate_constraints1(inputs):
     l.debug("CS: %s", condition_space_constraint)
     constraints.append(condition_space_constraint)
     
-
+    #l.info(containers)
     # ALQ
     aliquot_properties_constraint = \
       And([
@@ -742,7 +742,7 @@ def generate_constraints1(inputs):
         if factors[factor_id]['dtype'] == "str":
             pred = factors_of_type[factor_id][level]
         else:
-            pred = Equals(factors_of_type[factor_id], Int(level))
+            pred = Equals(factors_of_type[factor_id], Real(level))
         return pred
     
     def req_experiment_factors(r_exp_factors):
@@ -882,11 +882,29 @@ def solve1(input):
         containers = input['containers']
 
         sample_factors = { x : y for x, y in input['factors'].items() if y['ftype'] == 'sample' }
-        sample_types = get_sample_types(sample_factors, input['requirements'])
-        num_samples = len(sample_types)
-        #num_samples=18
-        #print("# samples per aliquot: %s", num_samples)
+        non_sample_factors = {x : y for x, y in input['factors'].items() if y['ftype'] != 'sample'}
+        l.info("sample_factors: %s", sample_factors)
 
+        ## Get the requirements for each sample in the experiment
+        sample_types = get_sample_types(input['factors'], input['requirements'])
+
+        ## Get the number samples with identical sample factors 
+        unique_samples = sample_types.pivot_table(index=list(sample_factors.keys()), aggfunc='size')
+        l.info(unique_samples)
+
+        ## Get the number of samples needed for each aliquot
+        aliquot_samples =  sample_types.pivot_table(index=list(non_sample_factors.keys()), aggfunc='size')
+        l.info(aliquot_samples)
+
+        ## Get the samples in common with all aliquots
+        sample_groups = sample_types.groupby(list(non_sample_factors.keys()))
+        common_samples = sample_types[list(sample_factors.keys())].drop_duplicates()#.reset_index()
+        num_samples = aliquot_samples.max()
+        l.info("num_samples: %s", num_samples)
+        for g, df in sample_groups:
+            common_samples = common_samples.merge(df[list(sample_factors.keys())], on=list(sample_factors.keys()), how="inner")#.reset_index()
+        l.info(common_samples)
+        
         input['samples'] = {
             c: {
                 a : {
@@ -894,12 +912,15 @@ def solve1(input):
                 for a in containers[c]['aliquots'] }
             for c in containers }
 
-        input['sample_types'] = { i : x for i, x in enumerate(sample_types.to_dict('records'))}
+        input['sample_types'] = { i : x for i, x in enumerate(common_samples.to_dict('records'))}
+        for i in range(len(common_samples), num_samples):
+            l.info("Adding Free sample %s", i)
+            input['sample_types'][i] = None
 
-    print("Generating Constraints ...")
+    l.info("Generating Constraints ...")
     variables, constraints = generate_constraints1(input)
 
-    print("Solving ...")
+    l.info("Solving ...")
     model = get_model(constraints, solver_name="z3")
     return model, variables
 
@@ -918,15 +939,18 @@ def get_model_pd(model, variables, factors):
         def sub_factor_value(x, value):
             for col in x.index:
                 if col in factors:
-#                    if col == "temperature":
-#                        print("Set %s = %s", col, value)
-                    x[col] = int(value.constant_value())
+                    #if col == "temperature":
+                    #l.debug("Set %s = %s", col, value)
+                    if value.is_int_constant():
+                        x[col] = int(value.constant_value())
+                    elif value.is_real_constant():
+                        x[col] = float(value.constant_value())
             return x
 
         
         info_df = pd.DataFrame()
         df = info_df.append(info, ignore_index=True)
-        if value.is_int_constant():
+        if value.is_int_constant() or value.is_real_constant():
             df = df.apply(lambda x: sub_factor_value(x, value), axis=1)            
         return df
 
@@ -950,7 +974,7 @@ def get_model_pd(model, variables, factors):
         return df
 
     for var, value in model:
-        if value.is_true() or value.is_int_constant():
+        if value.is_true() or value.is_int_constant() or value.is_real_constant():
             if str(var) in variables['reverse_index']:
                 l.debug("{} = {}".format(var, value))
                 info = variables['reverse_index'][str(var)]
