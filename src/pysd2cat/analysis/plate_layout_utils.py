@@ -15,7 +15,7 @@ def get_samples_from_condition_set(factors, condition_set, parameters = None):
     if not condition_set_is_singletons(factors, condition_set):
         samples = condition_set_cross_product(factors, condition_set)
     else:
-        samples = pd.DataFrame({ factor['factor'] : factor['values'] for factor in condition_set['factors']})
+        samples = pd.DataFrame({ factor['factor'] : factor['values'] for factor in condition_set['factors'] if factor['factor'] in factors})
 
 
     if 'key' in samples.columns:

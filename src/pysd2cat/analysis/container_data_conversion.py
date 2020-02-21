@@ -4,7 +4,7 @@ by the SAT problem generator.
 """
 
 import string
-
+import math
 
 class ColumnNotExistError(Exception):
     pass
@@ -37,12 +37,12 @@ def container_well_idx_name(col_count, well_idx):
     return "{}{}".format(row, col)
 
 
-def aliquot_dict(well_map, aliquots_df, well_idx):
+def aliquot_dict(well_map, aliquots_df, well_idx, strain_name="Name"):
     """
     Create a dictionary of aliquot info for the given well in the container.
     """
     # aliquot_info = aliquots_df.loc[well_idx]
-    return {"strain": well_map[well_idx]}
+    return {"strain": aliquots_df.at[well_idx,strain_name]}
 
 
 def column_dict(col_count, well_idxs):
@@ -62,17 +62,50 @@ def column_dict(col_count, well_idxs):
     }
 
 
-def container_to_dict(container):
+def drop_nan_strain_aliquots(c2d):
+    """
+    Remove aliquots whose strain is nan
+    """
+    aliquots = {}
+    dropped_aliquots = []
+    for aliquot_id, aliquot in c2d['aliquots'].items():
+        #print(str(type(aliquot['strain'])) + " " + str(aliquot['strain']))
+        if type(aliquot['strain']) is float and math.isnan(aliquot['strain']):
+            dropped_aliquots.append(aliquot_id)            
+        else:
+            aliquots[aliquot_id] = aliquot
+    columns = {}
+    for col_id, col in c2d['columns'].items():
+        col_aliquots = []
+        for aliquot in col:
+            if not aliquot in dropped_aliquots:
+                col_aliquots.append(aliquot)
+        if len(col_aliquots) > 0:
+            columns[col_id] = col_aliquots
+    return {
+        "aliquots" : aliquots,
+        "columns" : columns
+        }
+
+def container_to_dict(container, strain_name="Name", drop_nan_strain=True, convert_none_strain_to_mediacontrol=True):
     """
     Convert a transcriptic container object into a dict format
     expected by SAT problem generator
     """
     col_count = container.attributes['container_type']['col_count']
     well_map = container.well_map
-    return {
+    c2d = {
         "aliquots": {
-            container_well_idx_name(col_count, well_idx): aliquot_dict(well_map, container.aliquots, well_idx)
+            container_well_idx_name(col_count, well_idx): aliquot_dict(well_map, container.aliquots, well_idx, strain_name=strain_name)
             for well_idx in well_map.keys()
         },
         "columns": column_dict(col_count, well_map.keys())
     }
+
+    if drop_nan_strain:
+        c2d = drop_nan_strain_aliquots(c2d)
+    if convert_none_strain_to_mediacontrol:
+        for aliquot_id, aliquot in c2d['aliquots'].items():
+            if 'strain' in aliquot and not aliquot['strain']:
+                aliquot['strain'] = "MediaControl"
+    return c2d
