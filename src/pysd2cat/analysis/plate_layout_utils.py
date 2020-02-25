@@ -6,6 +6,20 @@ l = logging.getLogger(__file__)
 l.setLevel(logging.INFO)
 
 
+def get_column_id(column):
+    """
+    Convert colX to X
+    """
+    return int(column.split("col")[1])
+
+def get_column_name(col, container_id):
+    return "{}_{}".format(col, container_id)
+
+
+def get_column_factors(column_factors, col, container_id):
+    col_name = get_column_name(col, container_id)
+    l.debug("column_factors: %s, %s", col, column_factors[col_name])
+    return column_factors[col_name]
 
 def get_samples_from_condition_set(factors, condition_set, parameters = None):
     """
