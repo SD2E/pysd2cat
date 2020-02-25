@@ -109,3 +109,14 @@ def container_to_dict(container, strain_name="Name", drop_nan_strain=True, conve
             if 'strain' in aliquot and not aliquot['strain']:
                 aliquot['strain'] = "MediaControl"
     return c2d
+
+def generate_container(num_aliquots, strain_name="Name", dimensions=(8, 12)):
+    well_map = { i : {} for i in range(0, num_aliquots)  }
+    col_count = dimensions[1]
+    return {
+        "aliquots" : {
+            container_well_idx_name(col_count, well_idx): {}
+            for well_idx in well_map.keys()
+        },
+        "columns" : column_dict(col_count, well_map.keys())
+        }
