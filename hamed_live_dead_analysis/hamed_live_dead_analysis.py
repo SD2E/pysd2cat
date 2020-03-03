@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
+from matplotlib.ticker import PercentFormatter
 from sklearn.metrics import confusion_matrix
 from scipy.stats import wasserstein_distance
 from sklearn.model_selection import train_test_split
@@ -13,7 +14,7 @@ pd.set_option('display.width', 10000)
 pd.set_option('display.max_colwidth', -1)
 
 
-def conf_matrix_and_clustermap(leaderboard, rl1s=True, percent_train_data=0.01):
+def conf_matrix_and_clustermap(leaderboard, rl1s=True, percent_train_data=0.01, normalize='true'):
     if rl1s:
         rl1s = "RL1s Used"
     else:
@@ -42,7 +43,8 @@ def conf_matrix_and_clustermap(leaderboard, rl1s=True, percent_train_data=0.01):
 
     cm = pd.DataFrame(confusion_matrix(y_true=preds["(conc, time)"],
                                        y_pred=preds["(conc, time)_predictions"],
-                                       labels=confusion_matrix_labels),
+                                       labels=confusion_matrix_labels,
+                                       normalize=normalize),
                       columns=confusion_matrix_labels,
                       index=confusion_matrix_labels)
     cm["(conc, time)"] = cm.index
@@ -69,10 +71,14 @@ def conf_matrix_and_clustermap(leaderboard, rl1s=True, percent_train_data=0.01):
     ax2 = cmap.ax_heatmap
     ax2.set_xlabel('Predicted labels')
     ax2.set_ylabel('True labels')
+    cbar = ax2.collections[0].colorbar
+    cbar.ax.yaxis.set_major_formatter(PercentFormatter(1, 0))
     if rl1s == "RL1s Used":
-        ax2.set_title('Confusion Matrix: {} of Training Data Used, RL1s included in features.'.format(percent_train_data))
+        ax2.set_title('Confusion Matrix: {} of Training Data Used, RL1s included in features. '
+                      'Normalize = {}'.format(percent_train_data, normalize))
     elif rl1s == "RL1s Not Used":
-        ax2.set_title('Confusion Matrix: {} of Training Data Used, RL1s Not included in features.'.format(percent_train_data))
+        ax2.set_title('Confusion Matrix: {} of Training Data Used, RL1s Not included in features. '
+                      'Normalize = {}'.format(percent_train_data, normalize))
     else:
         raise ValueError("rl1s must be equal to 'RL1s Used' or 'RL1s Not Used'")
     ax2.set_xticklabels(ax2.get_xmajorticklabels(), rotation=90, fontsize=7)
@@ -121,16 +127,16 @@ def main():
     # plt.show()
 
     # # Create confusion matrices and clustermaps
-    conf_matrix_and_clustermap(leaderboard, True, 0.01)
-    # conf_matrix_and_clustermap(leaderboard, True, 0.40)
-    # conf_matrix_and_clustermap(leaderboard, False, 0.01)
-    # conf_matrix_and_clustermap(leaderboard, False, 0.40)
+    conf_matrix_and_clustermap(leaderboard, True, 0.01, 'true')
+    # conf_matrix_and_clustermap(leaderboard, True, 0.40, 'true')
+    # conf_matrix_and_clustermap(leaderboard, False, 0.01, 'true')
+    # conf_matrix_and_clustermap(leaderboard, False, 0.40, 'true')
 
     # Wasserstein Distance
-    train_bank = pd.read_csv("train_bank.csv")
-    print("Shape of train_bank: {}".format(train_bank.shape))
-    print()
-    wasserstein_heatmap(train_bank, 0.01)
+    # train_bank = pd.read_csv("train_bank.csv")
+    # print("Shape of train_bank: {}".format(train_bank.shape))
+    # print()
+    # wasserstein_heatmap(train_bank, 0.01)
     # wasserstein_heatmap(train_bank, 0.40)
 
 
