@@ -6,6 +6,14 @@ by the SAT problem generator.
 import string
 import math
 
+import logging
+
+
+l = logging.getLogger(__file__)
+l.setLevel(logging.INFO)
+
+
+
 class ColumnNotExistError(Exception):
     pass
 
@@ -17,6 +25,12 @@ def well_column(col_count, well_idx):
     """
     return well_idx % col_count
 
+def well_row(row_length, well_idx):
+    """
+    Zero-based row number of the given zero-based well index
+    for a container with the given the row length
+    """
+    return well_idx // row_length 
 
 def container_well_idx_name(col_count, well_idx):
     """
@@ -62,6 +76,22 @@ def column_dict(col_count, well_idxs):
     }
 
 
+def row_dict(row_length, well_idxs):
+    """
+    Create a dictionary of the rows in the container
+    """
+    result = {row: [] for row in range(row_length)}
+
+    for well_idx in well_idxs:
+        row = well_row(row_length, well_idx)
+        result[row].append(container_well_idx_name(row_length, well_idx))
+
+    return {
+        "row{}".format(row + 1): wells
+        for row, wells in result.items()
+        if len(wells) > 0
+    }
+
 def drop_nan_strain_aliquots(c2d):
     """
     Remove aliquots whose strain is nan
@@ -82,9 +112,18 @@ def drop_nan_strain_aliquots(c2d):
                 col_aliquots.append(aliquot)
         if len(col_aliquots) > 0:
             columns[col_id] = col_aliquots
+    rows = {}
+    for row_id, row in c2d['rows'].items():
+        row_aliquots = []
+        for aliquot in row:
+            if not aliquot in dropped_aliquots:
+                row_aliquots.append(aliquot)
+        if len(row_aliquots) > 0:
+            rows[row_id] = row_aliquots
     return {
         "aliquots" : aliquots,
-        "columns" : columns
+        "columns" : columns,
+        "rows" : rows
         }
 
 def container_to_dict(container, strain_name="Name", drop_nan_strain=True, convert_none_strain_to_mediacontrol=True):
@@ -99,7 +138,8 @@ def container_to_dict(container, strain_name="Name", drop_nan_strain=True, conve
             container_well_idx_name(col_count, well_idx): aliquot_dict(well_map, container.aliquots, well_idx, strain_name=strain_name)
             for well_idx in well_map.keys()
         },
-        "columns": column_dict(col_count, well_map.keys())
+        "columns": column_dict(col_count, well_map.keys()),
+        "rows": row_dict(col_count, well_map.keys())
     }
 
     if drop_nan_strain:
@@ -110,13 +150,59 @@ def container_to_dict(container, strain_name="Name", drop_nan_strain=True, conve
                 aliquot['strain'] = "MediaControl"
     return c2d
 
-def generate_container(num_aliquots, strain_name="Name", dimensions=(8, 12)):
+def generate_container(num_aliquots, batch_id, strain_name="Name", dimensions=(8, 12)):
     well_map = { i : {} for i in range(0, num_aliquots)  }
     col_count = dimensions[1]
-    return {
-        "aliquots" : {
+    row_count = dimensions[0]
+
+    aliquots = {
             container_well_idx_name(col_count, well_idx): {}
             for well_idx in well_map.keys()
-        },
-        "columns" : column_dict(col_count, well_map.keys())
+        }
+
+    use_aliquot_cheats = False
+    if use_aliquot_cheats:
+        none_replicate = (int(batch_id)  * 46)+1
+
+        def key_in_cols(key, cols):
+            return len([x for x in cols if x in key]) > 0
+
+        def get_row_replicate(key, replicates):
+            return [v for k, v in replicates.items() if k in key ][0]
+        
+        strain_cols = ["3", "4", "5", "6", "7", "8"]
+        #strain_cols = ["3", "4", "5"]
+        row_replicates = {"a" : 1, "b" : 2, "c" : 3, "d" : 4,
+                         "e" : 1, "f" : 2, "g" : 3, "h" : 4
+                         }
+            
+        for k, v in aliquots.items():
+            if not key_in_cols(k, strain_cols) and k != "a1" and k != "b1":
+                pass
+#    #        if  "11" in k or "12" in k:
+#                v['strain'] = "None"
+#                v['replicate'] = none_replicate
+                none_replicate += 1
+            elif key_in_cols(k, strain_cols):
+#                v['replicate'] = get_row_replicate(k, row_replicates)
+#                pass
+
+                if batch_id == "1":
+                    v['strain'] = "Bacillus subtilis 168 Marburg"
+                else:
+                    v['strain'] = "MG1655_WT"
+#            elif "1" in k and "a" in k:
+#                v['strain'] = "MediaControl"
+#                v['replicate'] = 1
+#            elif "1" in k and "b" in k:
+#                v['strain'] = "MediaControl"
+#                v['replicate'] = 2
+
+
+    l.info(aliquots)
+            
+    return {
+        "aliquots" : aliquots,
+        "columns" : column_dict(col_count, well_map.keys()),
+        "rows" : row_dict(col_count, well_map.keys())
         }
