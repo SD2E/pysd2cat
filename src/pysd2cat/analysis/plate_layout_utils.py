@@ -48,6 +48,7 @@ def get_row_factors(row_factors, row, container_id):
     l.debug("row_factors: %s, %s", row, row_factors[row_name])
     return row_factors[row_name]
 
+
 def get_samples_from_condition_set(factors, condition_set, parameters = None, use_tbd=False):
     """
     Compute factorial experiment from condition_set and parameters.

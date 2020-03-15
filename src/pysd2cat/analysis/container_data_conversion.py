@@ -51,12 +51,48 @@ def container_well_idx_name(col_count, well_idx):
     return "{}{}".format(row, col)
 
 
+def custom_map_values(aliquot_dict):
+    def value_map(k, v):
+        if k == "Ethanol_concentration":
+            if "%" in v:
+                return float(v.split("%")[0])
+            elif "No" in v:
+                return 0.0
+        elif k == "Sytox_concentration":
+            if v == "Sytox":
+                return 5.0
+            else:
+                return 0.0
+        elif k == "strain":
+            if v == "E. Coli MG1655":
+                return "MG1655_WT"
+        return v
+        
+    return { k : value_map(k, v) for k, v in aliquot_dict.items()}
+
 def aliquot_dict(well_map, aliquots_df, well_idx, strain_name="Name"):
     """
     Create a dictionary of aliquot info for the given well in the container.
     """
     # aliquot_info = aliquots_df.loc[well_idx]
-    return {"strain": aliquots_df.at[well_idx,strain_name]}
+
+    if not well_idx in aliquots_df.index:
+        return {}
+    
+    ## Handle case where other factors are embedded in the strain_name
+    if ":" in strain_name and ";" in strain_name:
+        aliquot_property = strain_name.split(":")[0].strip()
+        factor_ids = [x.strip() for x in strain_name.split(":")[1].split(";")]
+        property_value = aliquots_df.at[well_idx,aliquot_property]
+        property_values = [x.strip() for x in property_value.split(";")]
+        return custom_map_values(dict(zip(factor_ids, property_values)))
+        
+    else:
+        strain = aliquots_df.at[well_idx,strain_name]
+        if strain:
+            return {"strain": strain}
+        else:
+            return {}
 
 
 def column_dict(col_count, well_idxs):
@@ -100,7 +136,7 @@ def drop_nan_strain_aliquots(c2d):
     dropped_aliquots = []
     for aliquot_id, aliquot in c2d['aliquots'].items():
         #print(str(type(aliquot['strain'])) + " " + str(aliquot['strain']))
-        if type(aliquot['strain']) is float and math.isnan(aliquot['strain']):
+        if 'strain' in aliquot and type(aliquot['strain']) is float and math.isnan(aliquot['strain']):
             dropped_aliquots.append(aliquot_id)            
         else:
             aliquots[aliquot_id] = aliquot
@@ -126,13 +162,19 @@ def drop_nan_strain_aliquots(c2d):
         "rows" : rows
         }
 
-def container_to_dict(container, strain_name="Name", drop_nan_strain=True, convert_none_strain_to_mediacontrol=True):
+def container_to_dict(container, strain_name="Name", drop_nan_strain=True, convert_none_strain_to_mediacontrol=False):
     """
     Convert a transcriptic container object into a dict format
     expected by SAT problem generator
     """
     col_count = container.attributes['container_type']['col_count']
     well_map = container.well_map
+    well_count = container.container_type.well_count
+
+    for i in range(0, well_count):
+        if i not in well_map:
+            well_map[i] = None
+    
     c2d = {
         "aliquots": {
             container_well_idx_name(col_count, well_idx): aliquot_dict(well_map, container.aliquots, well_idx, strain_name=strain_name)
@@ -141,13 +183,16 @@ def container_to_dict(container, strain_name="Name", drop_nan_strain=True, conve
         "columns": column_dict(col_count, well_map.keys()),
         "rows": row_dict(col_count, well_map.keys())
     }
-
+    #l.info(c2d)
     if drop_nan_strain:
         c2d = drop_nan_strain_aliquots(c2d)
     if convert_none_strain_to_mediacontrol:
         for aliquot_id, aliquot in c2d['aliquots'].items():
-            if 'strain' in aliquot and not aliquot['strain']:
+            #if 'strain' in aliquot and not aliquot['strain']:
+            if aliquot_id == "a11" or aliquot_id == "a12":
                 aliquot['strain'] = "MediaControl"
+                #else:
+                #aliquot['strain'] = "None"
     return c2d
 
 def generate_container(num_aliquots, batch_id, strain_name="Name", dimensions=(8, 12)):
@@ -206,3 +251,16 @@ def generate_container(num_aliquots, batch_id, strain_name="Name", dimensions=(8
         "columns" : column_dict(col_count, well_map.keys()),
         "rows" : row_dict(col_count, well_map.keys())
         }
+
+def get_strain_count(container):
+    strain_counts = { None : 0 }
+    for aliquot, properties in container['aliquots'].items():
+        if 'strain' in properties:
+            strain = properties['strain']
+            if strain in strain_counts:
+                strain_counts[strain] += 1
+            else:
+                strain_counts[strain] = 1
+        else:
+            strain_counts[None] += 1
+    return strain_counts
