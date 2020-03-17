@@ -36,12 +36,10 @@ def main():
     print(train_percents_to_try)
     print()
 
-    current_path = os.getcwd()
-    print("initializing TestHarness object with output_location equal to {}".format(current_path))
-    print()
-    th = TestHarness(output_location=current_path)
+    def run_models_varying_train_amounts(list_of_train_percents, features_to_use, output_path, col_to_predict):
+        print("initializing TestHarness object with output_location equal to {} \n".format(output_path))
+        th = TestHarness(output_location=output_path)
 
-    def run_models_varying_train_amounts(list_of_train_percents, features_to_use):
         for p in list_of_train_percents:
             if p == 1.0:
                 train_df = train_bank.copy()
@@ -52,14 +50,18 @@ def main():
             th.run_custom(function_that_returns_TH_model=random_forest_classification, dict_of_function_parameters={},
                           training_data=train_df,
                           testing_data=test_df, data_and_split_description="{}".format(p),
-                          cols_to_predict='(conc, time)', feature_cols_to_use=features_to_use,
+                          cols_to_predict=col_to_predict, feature_cols_to_use=features_to_use,
                           index_cols=["arbitrary_index"], normalize=True, feature_cols_to_normalize=features_to_use,
                           feature_extraction=False,
                           predict_untested_data=False)
 
+    current_path = os.getcwd()
+    ethanol_path = os.path.join(current_path, "ethanol_classes_results")
+
     percents_1_and_40 = [0.01, 0.40]
     print(percents_1_and_40)
-    run_models_varying_train_amounts(percents_1_and_40, feature_cols_2)
+    # run_models_varying_train_amounts(percents_1_and_40, feature_cols_2, current_path, '(conc, time)')
+    # run_models_varying_train_amounts(percents_1_and_40, feature_cols_2, ethanol_path, 'kill_volume')
 
 
 if __name__ == '__main__':
