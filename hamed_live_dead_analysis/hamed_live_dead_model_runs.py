@@ -61,7 +61,7 @@ def main():
     percents_1_and_40 = [0.01, 0.40]
     print(percents_1_and_40)
     # run_models_varying_train_amounts(percents_1_and_40, feature_cols_2, current_path, '(conc, time)')
-    # run_models_varying_train_amounts(percents_1_and_40, feature_cols_2, ethanol_path, 'kill_volume')
+    # run_models_varying_train_amounts(percents_1_and_40, feature_cols_1, ethanol_path, 'kill_volume')
 
 
 if __name__ == '__main__':
