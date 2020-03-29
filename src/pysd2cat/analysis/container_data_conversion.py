@@ -55,7 +55,7 @@ def custom_map_values(aliquot_dict):
     def value_map(k, v):
         if k == "Ethanol_concentration":
             if "%" in v:
-                return float(v.split("%")[0])
+                return float(v.split("%")[0])*10.0
             elif "No" in v:
                 return 0.0
         elif k == "Sytox_concentration":

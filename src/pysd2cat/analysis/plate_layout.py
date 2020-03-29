@@ -1,4 +1,4 @@
-from pysmt.shortcuts import Symbol, And, Or, Not, Implies, Equals, Iff, is_sat, get_model, GT, GE, LT, LE, Int, Real, String, TRUE, ExactlyOne
+from pysmt.shortcuts import Symbol, And, Or, Not, Implies, Equals, Iff, is_sat, get_model, GT, GE, LT, LE, Int, Real, String, TRUE, ExactlyOne, get_unsat_core
 from pysmt.typing import INT, StringType, REAL
 from functools import reduce
 
@@ -766,7 +766,7 @@ def generate_constraints1(inputs):
                               for column in container['columns']]))
                          for factor_id, factor in factors.items() if factor['ftype'] == "column"])
                     )
-        l.debug("column clause: %s", clause)
+        #l.debug("column clause: %s", clause)
         return clause
 
     def cs_row_factors(row_factor, container_id, container):
@@ -1253,10 +1253,21 @@ def solve1(input, pick_container_assignment=False, hand_coded_constraints=None):
 
     if hand_coded_constraints:
         for hc_c in hand_coded_constraints:
+            l.info("hand coded constraint: %s", hc_c)
             constraints = And(eval(hc_c), constraints)
     
     l.info("Solving ...")
     model = get_model(constraints)
+
+    if model is None:
+        from pysmt.rewritings import conjunctive_partition
+        conj = conjunctive_partition(constraints)
+        ucore = get_unsat_core(conj)
+        l.info("UNSAT-Core size '%d'" % len(ucore))
+        for f in ucore:
+            l.info(f.serialize())
+
+    
     return model, variables
 
 
