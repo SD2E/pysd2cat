@@ -11,22 +11,13 @@ pd.set_option('display.width', 10000)
 pd.set_option('display.max_colwidth', -1)
 
 
+# TODO: put all data csvs in a data folder
 def main():
-    full_df_cleaned = pd.read_csv("full_live_dead_df_cleaned.csv")
-    print("Shape of full_df_cleaned: {}".format(full_df_cleaned.shape))
-
     feature_cols_1 = ["FSC-A", "FSC-H", "FSC-W", "SSC-A", "SSC-H", "SSC-W", "BL1-H", "BL1-W", "BL1-A", "RL1-H", "RL1-W", "RL1-H"]
     feature_cols_2 = ["FSC-A", "FSC-H", "FSC-W", "SSC-A", "SSC-H", "SSC-W", "BL1-H", "BL1-W", "BL1-A"]
 
-    # The following is commented out because it only needed to be ran once.
-    # I did this because splitting takes a while to run,
-    # so I saved the splits as csv's and they are read them in each time the code is run.
-    # train_bank, test_df = train_test_split(full_df_cleaned, test_size=0.3, random_state=5, stratify=full_df_cleaned[['(conc, time)']])
-    # train_bank.to_csv("train_bank.csv", index=False)
-    # test_df.to_csv("test_df.csv", index=False)
-
-    train_bank = pd.read_csv("train_bank.csv")
-    test_df = pd.read_csv("test_df.csv")
+    train_bank = pd.read_csv("balanced_train_bank.csv")
+    test_df = pd.read_csv("balanced_test_df.csv")
     print("Shape of train_bank: {}".format(train_bank.shape))
     print("Shape of test_df: {}".format(test_df.shape))
 
@@ -58,10 +49,16 @@ def main():
     current_path = os.getcwd()
     ethanol_path = os.path.join(current_path, "ethanol_classes_results")
 
-    percents_1_and_40 = [0.01, 0.40]
-    print(percents_1_and_40)
-    # run_models_varying_train_amounts(percents_1_and_40, feature_cols_2, current_path, '(conc, time)')
-    # run_models_varying_train_amounts(percents_1_and_40, feature_cols_1, ethanol_path, 'kill_volume')
+    conc_time_path = os.path.join(current_path, "conc_time_results")
+    conc_path = os.path.join(current_path, "conc_results")
+
+    # percents_1_and_40 = [0.01, 0.40]
+    custom_percents = [0.01, 0.1, 0.50, 1.0]
+    print(custom_percents)
+    # run_models_varying_train_amounts(custom_percents, feature_cols_1, conc_time_path, '(conc, time)')
+    # run_models_varying_train_amounts(custom_percents, feature_cols_2, conc_time_path, '(conc, time)')
+    # run_models_varying_train_amounts(custom_percents, feature_cols_1, conc_path, 'kill_volume')
+    # run_models_varying_train_amounts(custom_percents, feature_cols_2, conc_path, 'kill_volume')
 
 
 if __name__ == '__main__':
