@@ -12,7 +12,7 @@ import logging
 
 
 l = logging.getLogger(__file__)
-l.setLevel(logging.DEBUG)
+l.setLevel(logging.INFO)
 
 
 
@@ -1135,8 +1135,9 @@ def get_container_assignment(input):
     l.debug("container_assignment: %s", container_assignment)
     return container_assignment
 
-def fill_empty_aliquots(factors, requirements, num_fill):
-    if num_fill > 0:
+def fill_empty_aliquots(factors, requirements, num_fill, num_blank_required):
+    if num_fill - num_blank_required > 0:
+        ## There are blank wells left that are not specifically required
         constraint = {
                     "factors": [
                         {
@@ -1147,12 +1148,16 @@ def fill_empty_aliquots(factors, requirements, num_fill):
                         },
                         {
                             "factor": "replicate",
-                            "values": [i for i in range(1, num_fill+1)]
+                            "values": [i for i in range(1, num_fill+1-num_blank_required)]
                         }
                     ]
                 }
         new_requirements = requirements + [constraint]
-
+        l.info("new_requirement: %s", constraint)
+    else:
+        new_requirements = requirements
+        
+    if num_fill > 0:
         new_factors = factors.copy()
         if "None" not in new_factors['strain']['domain']:
             new_factors['strain']['domain'].append("None")
@@ -1160,10 +1165,10 @@ def fill_empty_aliquots(factors, requirements, num_fill):
 
         l.info("new_factors: %s", new_factors['strain']['domain'])
         l.info("replicate_domain: %s", new_factors['replicate']['domain'])
-        l.info("new_requirement: %s", constraint)
-        return new_factors, new_requirements
     else:
-        return factors, requirements
+        new_factors = factors
+
+    return new_factors, new_requirements
 
 def solve1(input, pick_container_assignment=False, hand_coded_constraints=None):
     """
@@ -1196,6 +1201,15 @@ def solve1(input, pick_container_assignment=False, hand_coded_constraints=None):
 
         l.debug("strains unique to containers: %s", container_strains.difference(requirement_strains))
         l.debug("strains unique to requirements: %s", requirement_strains.difference(container_strains))
+      
+
+        ## Strains in requirements need to be in the condition space
+        for requirement in input['requirements']:
+            for factor in requirement['factors']:
+                if factor['factor'] == "strain":
+                    for level in factor["values"]:
+                        if level not in input['factors']['strain']['domain']:
+                            input['factors']['strain']['domain'].append(level)
         
         ## Get the number samples with identical sample factors 
         unique_samples = sample_types.pivot_table(index=list(sample_factors.keys()), aggfunc='size')
@@ -1206,8 +1220,23 @@ def solve1(input, pick_container_assignment=False, hand_coded_constraints=None):
         l.debug("Required aliquots: %s", aliquot_samples)
 
         ## Num MediaControl wells in requirements
-        num_media_control = len(sample_types.loc[sample_types.strain=="MediaControl"].drop(columns=list(sample_factors.keys())).drop_duplicates())
+        num_media_control_required = len(sample_types.loc[sample_types.strain=="MediaControl"].drop(columns=list(sample_factors.keys())).drop_duplicates())
+        num_media_wells_allocated = sum([c["MediaControl"] for c_id, c in strain_counts.items() if "MediaControl" in c])
+        num_media_wells_needed = num_media_control_required - num_media_wells_allocated
 
+        ## Determine how many blank wells are required
+        num_blank_required = len(sample_types.loc[sample_types.strain==""].drop(columns=list(sample_factors.keys())).drop_duplicates())
+        ## Convert blank well requirements to "None" strain
+        for requirement in input['requirements']:
+            for factor in requirement['factors']:
+                if factor['factor'] == "strain" and "" in factor["values"]:
+                    factor["values"] = [ x if x != "" else "None" for x in factor["values"] ]
+        
+        
+        ## Add MediaControl to strain domain if it is part of a container, but not specifically required
+        if num_media_wells_allocated > 0:
+            input['factors']['strain']['domain'].append("MediaControl")
+        
         ## Required batches
         batch_factors = [ x for x, y in input['factors'].items() if y['ftype'] == 'batch' ]
         batches = sample_types[batch_factors].drop_duplicates()
@@ -1217,14 +1246,14 @@ def solve1(input, pick_container_assignment=False, hand_coded_constraints=None):
         ## Check how many aliquots are needed and ensure that containers will provide that many
         num_container_aliquots = sum([len(container['aliquots']) for container_id, container in containers.items()])
         num_empty_wells = sum([c["None"] for c_id, c in strain_counts.items() if "None" in c]) + sum([c[None] for c_id, c in strain_counts.items() if None in c])
-        num_media_wells = sum([c["MediaControl"] for c_id, c in strain_counts.items() if "MediaControl" in c])
-        num_empty_for_none = (num_empty_wells + num_media_wells) - num_media_control
+
+        num_empty_for_none = num_empty_wells - num_media_control_required
         l.info("# container aliquots = %s, num_aliquots needed = %s, empty = %s", num_container_aliquots, len(aliquot_samples), num_empty_for_none)
         assert(num_container_aliquots >= len(aliquot_samples))
         
         ## Fill requirements with empty samples to place in unused aliquots
         num_unused_aliquots = num_container_aliquots -  num_empty_wells
-        input['factors'], input['requirements'] = fill_empty_aliquots(input['factors'], input['requirements'], num_empty_for_none)
+        input['factors'], input['requirements'] = fill_empty_aliquots(input['factors'], input['requirements'], num_empty_for_none, num_blank_required)
         
         ## Get the samples in common with all aliquots
         sample_groups = sample_types.groupby(list(non_sample_factors.keys()))
