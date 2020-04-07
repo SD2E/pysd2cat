@@ -3,8 +3,6 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 from sklearn.model_selection import train_test_split
-from harness.test_harness_class import TestHarness
-from harness.th_model_instances.hamed_models.random_forest_classification import random_forest_classification
 
 pd.set_option('display.max_columns', 500)
 pd.set_option('display.width', 10000)
