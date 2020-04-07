@@ -55,7 +55,7 @@ def custom_map_values(aliquot_dict):
     def value_map(k, v):
         if k == "Ethanol_concentration":
             if "%" in v:
-                return float(v.split("%")[0])*10.0
+                return float(v.split("%")[0])
             elif "No" in v:
                 return 0.0
         elif k == "Sytox_concentration":
@@ -137,7 +137,9 @@ def drop_nan_strain_aliquots(c2d):
     for aliquot_id, aliquot in c2d['aliquots'].items():
         #print(str(type(aliquot['strain'])) + " " + str(aliquot['strain']))
         if 'strain' in aliquot and type(aliquot['strain']) is float and math.isnan(aliquot['strain']):
-            dropped_aliquots.append(aliquot_id)            
+            #dropped_aliquots.append(aliquot_id)
+            aliquots[aliquot_id] = aliquot
+            del aliquots[aliquot_id]['strain']
         else:
             aliquots[aliquot_id] = aliquot
     columns = {}
