@@ -1153,7 +1153,7 @@ def fill_empty_aliquots(factors, requirements, num_fill, num_blank_required):
                     ]
                 }
         new_requirements = requirements + [constraint]
-        l.info("new_requirement: %s", constraint)
+        l.debug("new_requirement: %s", constraint)
     else:
         new_requirements = requirements
         
@@ -1163,8 +1163,8 @@ def fill_empty_aliquots(factors, requirements, num_fill, num_blank_required):
             new_factors['strain']['domain'].append("None")
         new_factors['replicate']['domain'] = [1, max(factors['replicate']['domain'][1], num_fill)]
 
-        l.info("new_factors: %s", new_factors['strain']['domain'])
-        l.info("replicate_domain: %s", new_factors['replicate']['domain'])
+        l.debug("new_factors: %s", new_factors['strain']['domain'])
+        l.debug("replicate_domain: %s", new_factors['replicate']['domain'])
     else:
         new_factors = factors
 
@@ -1191,7 +1191,7 @@ def solve1(input, pick_container_assignment=False, hand_coded_constraints=None):
 
         sample_factors = { x : y for x, y in input['factors'].items() if y['ftype'] == 'sample' }
         non_sample_factors = {x : y for x, y in input['factors'].items() if y['ftype'] != 'sample'}
-        l.info("sample_factors: %s", sample_factors)
+        l.debug("sample_factors: %s", sample_factors)
 
         ## Get the requirements for each sample in the experiment
         sample_types = get_sample_types(input['factors'], input['requirements'])
@@ -1294,7 +1294,7 @@ def solve1(input, pick_container_assignment=False, hand_coded_constraints=None):
         ucore = get_unsat_core(conj)
         l.info("UNSAT-Core size '%d'" % len(ucore))
         for f in ucore:
-            l.info(f.serialize())
+            l.debug(f.serialize())
 
     
     return model, variables
