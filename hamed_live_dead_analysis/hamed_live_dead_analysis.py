@@ -9,6 +9,8 @@ from sklearn.metrics import confusion_matrix
 from scipy.stats import wasserstein_distance
 from sklearn.model_selection import train_test_split
 from six import string_types
+import itertools
+from anonymize_data import ethanol_dict, conc_time_dict
 
 pd.set_option('display.max_columns', 500)
 pd.set_option('display.width', 10000)
@@ -32,7 +34,7 @@ def is_list_of_strings(obj):
         return False
 
 
-def retrieve_preds_and_labels(th_results_path, rl1s=True, percent_train_data=0.4, append_cols=None, run_id=None):
+def retrieve_preds_and_labels(th_results_path, test_df_path, rl1s=True, percent_train_data=0.4, append_cols=None, run_id=None):
     """
 
     :param th_results_path: path to test harness results folder (please include test_harness_results)
@@ -67,7 +69,7 @@ def retrieve_preds_and_labels(th_results_path, rl1s=True, percent_train_data=0.4
         append_cols = make_list_if_not_list(append_cols)
         assert is_list_of_strings(append_cols), "append_cols must be a string or a list of strings"
 
-        test_df = pd.read_csv(os.path.join(CWD, "test_df.csv"))
+        test_df = pd.read_csv(test_df_path)
         relevant_cols = ["arbitrary_index"] + append_cols
         test_df_relevant = test_df[relevant_cols]
         preds_and_labels = pd.merge(preds_and_labels, test_df_relevant, on="arbitrary_index")
@@ -80,6 +82,9 @@ def retrieve_preds_and_labels(th_results_path, rl1s=True, percent_train_data=0.4
 
 
 def make_confusion_matrix(preds_and_labels, target_col, normalize='true', label_order=None):
+    # If you get the following error:
+    # "ValueError: At least one label specified must be in y_true"
+    # then probably your value for label_order is incorrect.
     if label_order is None:
         label_order = ["(0.0, 1)", "(140.0, 1)", "(210.0, 1)", "(280.0, 1)", "(1120.0, 1)",
                        "(0.0, 2)", "(140.0, 2)", "(210.0, 2)", "(280.0, 2)", "(1120.0, 2)",
@@ -127,7 +132,7 @@ def make_confusion_matrix(preds_and_labels, target_col, normalize='true', label_
     return cm, cm_info
 
 
-def make_clustermap(cm, plot_title, color_by_cols=None, color_rows=False):
+def make_clustermap(cm, plot_title, color_by_cols=None, color_rows=False, rotate_x_labels=90):
     color_by_cols = make_list_if_not_list(color_by_cols)
     assert is_list_of_strings(color_by_cols), "append_cols must be a string or a list of strings"
 
@@ -158,7 +163,7 @@ def make_clustermap(cm, plot_title, color_by_cols=None, color_rows=False):
     cbar = ax2.collections[0].colorbar
     cbar.ax.yaxis.set_major_formatter(PercentFormatter(1, 0))
     ax2.set_title(plot_title)
-    ax2.set_xticklabels(ax2.get_xmajorticklabels(), rotation=90, fontsize=7)
+    ax2.set_xticklabels(ax2.get_xmajorticklabels(), rotation=rotate_x_labels, fontsize=7)
     ax2.set_yticklabels(ax2.get_ymajorticklabels(), rotation=0, fontsize=7)
     cmap.ax_col_dendrogram.set_visible(False)
     plt.show()
@@ -195,8 +200,35 @@ def histogram_of_confusion_regions(preds_and_labels, target_col, cm, top_n=3, ex
         plt.show()
 
 
-def conc_and_time_vs_conc_matrix():
-    pass
+def detailed_confusion_matrix(preds_and_labels, target_col, detail_col, normalize='true'):
+    pred_labels = list(preds_and_labels["{}_predictions".format(target_col)].unique())
+    true_labels = list(preds_and_labels[target_col].unique())
+    detail_labels = list(preds_and_labels[detail_col].unique())
+    pred_labels.sort(), true_labels.sort(), detail_labels.sort(key=int)
+    matrix = pd.DataFrame(columns=pred_labels, index=itertools.product(true_labels, detail_labels))
+
+    # see if you can do this with apply or something else instead
+    # can probably do this all much easier with crosstab
+    for c in matrix.columns:
+        for t in true_labels:
+            for d in detail_labels:
+                pred_rows = preds_and_labels.loc[preds_and_labels["{}_predictions".format(target_col)] == c]
+                num_preds = len(pred_rows)
+                num_correct = len(pred_rows.loc[(pred_rows[target_col] == t) & (pred_rows[detail_col] == d)])
+                # is this the right type of normalization?
+                matrix[c][(t, d)] = (float(num_correct) / num_preds)
+    matrix = matrix.astype(float)
+    # print(matrix)
+
+    ax = plt.axes()
+    hmap = sns.heatmap(matrix, xticklabels=True, yticklabels=True, cmap="Greens", vmin=0.0, vmax=0.1)
+    ax.set_title('Predicted Ethanol Concentration vs. True Ethanol Concentration and Timepoint')
+    # ax.set_xticklabels(ax.get_xmajorticklabels(), rotation=90, fontsize=7)
+    ax.set_yticklabels(ax.get_ymajorticklabels(), rotation=0, fontsize=7)
+    # cmap.ax_col_dendrogram.set_visible(False)
+    ax.set_xlabel('Predicted labels')
+    ax.set_ylabel('True labels')
+    plt.show()
 
 
 def wasserstein_heatmap(train_bank, percent_train_data=0.01):
@@ -227,58 +259,24 @@ def main():
     # ------------------------------------------------------------------------------------------------------------------
     # initial groupings analysis:
 
-    # # create plot of percent train data vs. performance
-    # ax1 = plt.subplot()
-    # sns.scatterplot(leaderboard["Data and Split Description"], leaderboard["Balanced Accuracy"],
-    #                 hue=leaderboard["RL1s"], ax=ax1)
-    # ax1.set_xlabel("Percent of Training Data Used")
-    # plt.ylim(0, 1)
-    # plt.show()
-
-    # # Create confusion matrices and clustermaps:
-    # conf_matrix_and_clustermap(leaderboard, True, 0.01, 'true')
-    # conf_matrix_and_clustermap(leaderboard, True, 0.40, 'true')
-    # conf_matrix_and_clustermap(leaderboard, False, 0.01, 'true')
-    # conf_matrix_and_clustermap(leaderboard, False, 0.40, 'true')
-
     # Wasserstein Distance
-    # train_bank = pd.read_csv("train_bank.csv")
-    # print("Shape of train_bank: {}".format(train_bank.shape))
-    # print()
-    # wasserstein_heatmap(train_bank, 0.01)
-    # wasserstein_heatmap(train_bank, 0.40)
+    """
+    train_bank = pd.read_csv("train_bank.csv")
+    print("Shape of train_bank: {}".format(train_bank.shape))
+    print()
+    wasserstein_heatmap(train_bank, 0.01)
+    wasserstein_heatmap(train_bank, 0.40)
+    """
 
-    # ------------------------------------------------------------------------------------------------------------------
-    # ethanol groupings analysis:
-
-    # create plot of percent train data vs. performance
-    # ax1 = plt.subplot()
-    # sns.scatterplot(e_leaderboard["Data and Split Description"], e_leaderboard["Balanced Accuracy"],
-    #                 hue=e_leaderboard["RL1s"], ax=ax1, s=55)
-    # ax1.set_xlabel("Percent of Training Data Used")
-    # plt.ylim(0, 1)
-    # plt.show()
-
-    # Create ethanol-grouped confusion matrices and clustermaps:
-    # cm_labels = [0.0, 140.0, 210.0, 280.0, 1120.0]
-    # conf_matrix_and_clustermap(e_leaderboard, True, 0.40, 'true', cm_labels,
-    #                            os.path.join(os.getcwd(), "ethanol_classes_results"), cbar=False)
-
-    # conf_matrix_and_clustermap(leaderboard, True, 0.01, 'true')
-
-    # ------------------------------------------------------------------------------------------------------------------
-    # ------------------------------------------------------------------------------------------------------------------
-    # ------------------------------------------------------------------------------------------------------------------
-    # ------------------------------------------------------------------------------------------------------------------
     # ------------------------------------------------------------------------------------------------------------------
 
     conc_time_results_path = os.path.join(CWD, "conc_time_results/test_harness_results")
     conc_results_path = os.path.join(CWD, "conc_results/test_harness_results")
 
-    conc_time_results = retrieve_preds_and_labels(th_results_path=conc_time_results_path,
-                                                  rl1s=True, percent_train_data=1.0)
-    conc_results = retrieve_preds_and_labels(th_results_path=conc_results_path,
-                                             rl1s=True, percent_train_data=1.0, append_cols="(conc, time)")
+    # conc_time_results = retrieve_preds_and_labels(th_results_path=conc_time_results_path,
+    #                                               rl1s=True, percent_train_data=1.0)
+    # conc_results = retrieve_preds_and_labels(th_results_path=conc_results_path,
+    #                                          rl1s=True, percent_train_data=1.0, append_cols=["(conc, time)", "RL1-A"])
 
     # ------------------------------------------------------------------------------------------------------------------
     # conc_time analysis
@@ -311,10 +309,76 @@ def main():
     # plt.ylim(0, 1)
     # plt.show()
 
-    label_order = [0.0, 140.0, 210.0, 280.0, 1120.0]
-    cm, cm_info = make_confusion_matrix(conc_results, "kill_volume", "true", label_order)
+    # label_order = [0.0, 140.0, 210.0, 280.0, 1120.0]
+    # cm, cm_info = make_confusion_matrix(conc_results, "kill_volume", "true", label_order)
     # make_clustermap(cm, cm_info, "kill_volume", False)
-    histogram_of_confusion_regions(conc_results, "kill_volume", cm, 3, "kill_volume")
+    # histogram_of_confusion_regions(conc_results, "kill_volume", cm, 3, "kill_volume")
+    # detailed_confusion_matrix(conc_results, "kill_volume", "time")
+
+    # ------------------------------------------------------------------------------------------------------------------
+
+    # anonymizing dfs/plots here:
+    # anonymized_conc_results = conc_results.copy()
+    # anonymized_conc_results["conc"] = anonymized_conc_results["conc"].astype(float)
+    # to_replace = ["kill_volume", "kill_volume_predictions", "conc"]
+    # for col in to_replace:
+    #     anonymized_conc_results[col] = anonymized_conc_results[col].map(ethanol_dict)
+    #
+    # anonymized_conc_time_results = conc_time_results.copy()
+    # to_replace = ["(conc, time)", "(conc, time)_predictions"]
+    # for col in to_replace:
+    #     anonymized_conc_time_results[col] = anonymized_conc_time_results[col].map(conc_time_dict)
+
+    # label_order = [0, 1, 2, 3, 4]
+    # cm, cm_info = make_confusion_matrix(anonymized_conc_results, "kill_volume", "true", label_order)
+    # cm_info = "Row-Normalized Confusion Matrix of Predicting Ethanol Concentration"
+    # make_clustermap(cm, cm_info, "kill_volume", False, rotate_x_labels=0)
+    # histogram_of_confusion_regions(anonymized_conc_results, "kill_volume", cm, 3, "kill_volume")
+    # detailed_confusion_matrix(anonymized_conc_results, "kill_volume", "time")
+
+    # TODO: fix initial data so it's all tuples instead of strings, makes all this downstream stuff easier
+    # label_order = list(anonymized_conc_time_results["(conc, time)"].unique())
+    # label_order = sorted(label_order, key=lambda x: (int(x.split(", ", 1)[0].split("(", 1)[1]),
+    #                                                  int(x.split(", ", 1)[1].split(")", 1)[0])))
+    # cm, cm_info = make_confusion_matrix(anonymized_conc_time_results, "(conc, time)", "true", label_order=label_order)
+    # cm_info = "Row-Normalized Confusion Matrix of Predicting (Ethanol Concentration, Time-point)"
+    # make_clustermap(cm, cm_info, ["conc", "time"], True)
+
+    # TODO: make confusion matrices also output a dataframe with values per confusion region
+    # ------------------------------------------------------------------------------------------------------------------
+    # print(conc_results)
+    # true_c = 1120.0
+    # true_t = "1"
+    # pred_c = 280.0
+    #
+    # conf_region = conc_results.loc[(conc_results["kill_volume"] == true_c) &
+    #                                (conc_results["time"] == true_t) &
+    #                                (conc_results["kill_volume_predictions"] == pred_c)]
+    # print(conf_region)
+    #
+    # sns.set()
+    # conf_region["RL1-A"].hist()
+    # plt.title("RL1-A distribution for confusion region: true_c = {}, true_t = {}, pred_c = {}".format(true_c, true_t, pred_c))
+    # plt.show()
+
+    # ------------------------------------------------------------------------------------------------------------------
+
+    yeast_results = retrieve_preds_and_labels(th_results_path="new_results/test_harness_results",
+                                              test_df_path="datasets/yeast_normalized_test_df.csv",
+                                              append_cols=["time_point"],
+                                              run_id="weXr7qkbY38Or")
+    basc_results = retrieve_preds_and_labels(th_results_path="new_results/test_harness_results",
+                                             test_df_path="datasets/basc_normalized_test_df.csv",
+                                             append_cols=["time_point"],
+                                             run_id="wb1r3yVbD1EVr")
+    ecoli_results = retrieve_preds_and_labels(th_results_path="new_results/test_harness_results",
+                                              test_df_path="datasets/ecoli_normalized_test_df.csv",
+                                              append_cols=["time_point"],
+                                              run_id="8y5zDzAbDNjkg")
+
+    print(ecoli_results)
+
+    detailed_confusion_matrix(yeast_results, "ethanol", "time_point")
 
 
 if __name__ == '__main__':
