@@ -14,6 +14,10 @@ def main():
     df.rename(columns={"ethanol_concentration": "ethanol"}, inplace=True)
     df["time_point"] = ((df["time_point"] - 22) * 2).astype(int)
 
+    # getting rid of the 35.0 ethanol concentration because there aren't many samples/events
+    # for that concentration, both in basc and ecoli.
+    df = df.loc[df["ethanol"] != 35.0]
+
     df_basc = df.loc[df["strain"] == "Bacillus subtilis 168 Marburg"]
     df_ecoli = df.loc[df["strain"] == "MG1655_WT"]
 

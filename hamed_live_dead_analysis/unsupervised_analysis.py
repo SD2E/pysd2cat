@@ -58,9 +58,7 @@ def main():
     else:
         raise NotImplementedError()
 
-
     organism = "ecoli"
-
 
     if organism == "yeast":
         train_df = yeast_train_bank
