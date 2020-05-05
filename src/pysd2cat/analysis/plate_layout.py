@@ -1,5 +1,8 @@
+import json
+import numpy as np
 from pysmt.shortcuts import Symbol, And, Or, Not, Implies, Equals, Iff, is_sat, get_model, GT, GE, LT, LE, Int, Real, String, TRUE, ExactlyOne, get_unsat_core
-from pysmt.typing import INT, StringType, REAL
+from pysmt.typing import INT, REAL
+from pysmt.rewritings import conjunctive_partition
 from functools import reduce
 
 from pysd2cat.analysis.plate_layout_utils import get_samples_from_condition_set, get_column_name, get_column_factors, get_column_id, get_row_name, get_row_factors, get_row_id, get_aliquot_row, get_aliquot_col
@@ -12,7 +15,7 @@ import logging
 
 
 l = logging.getLogger(__file__)
-l.setLevel(logging.INFO)
+l.setLevel(logging.DEBUG)
 
 
 
@@ -25,6 +28,7 @@ def generate_variables1(inputs):
     samples = inputs['samples']
     factors = inputs['factors']
     containers = inputs['containers']
+    aliquot_symmetry_samples = inputs['aliquot_symmetry_samples']
     aliquots = [a for c in containers for a in containers[c]['aliquots']]
 
     variables = {}
@@ -149,7 +153,7 @@ def generate_variables1(inputs):
 
 
     container_assignment = inputs['container_assignment']
-    l.info("container_assignment: %s", container_assignment)
+    l.debug("container_assignment: %s", container_assignment)
             
     variables['batch_factor'] = \
       {
@@ -652,7 +656,7 @@ def generate_constraints1(inputs):
     factors = inputs['factors']
     containers = inputs['containers']
     requirements = inputs['requirements']
-
+    aliquot_symmetry_samples = inputs['aliquot_symmetry_samples']
     aliquots = [a for c in containers for a in containers[c]['aliquots']]
 
 
@@ -673,6 +677,7 @@ def generate_constraints1(inputs):
         Are the aliquot properties consistent with requirement?
         Both are a conjunction of factor assignments, so make
         sure that aliquot is a subset of the requirement.
+
         """
 
         requirement_factors = [f['factor'] for f in requirement]
@@ -680,6 +685,7 @@ def generate_constraints1(inputs):
         c = containers[container_id]
         #l.debug("Can sat? %s %s %s", container_id, aliquot, requirement)
         aliquot_properties = c['aliquots'][aliquot]
+        
         for factor, level in aliquot_properties.items():
             #l.debug("checking: %s %s", factor, level)
             if factor in requirement_factors:
@@ -687,16 +693,13 @@ def generate_constraints1(inputs):
                 if level not in requirement_levels[factor]:
                     #l.debug("no")
                     return False
+
+
         #l.debug("yes")
         return True
         #l.debug("no")
         #return False ## Couldn't find a container with the aliquot satisfying requirement
 
-    def mutex(levels):
-          return 
-#          return And([Or(Not(level1_symbol), Not(level2_symbol))
-#                            for level1, level1_symbol in levels.items()
-#                            for level2, level2_symbol in levels.items() if level2 != level1])
     
     def cs_factor_level(levels):
           return  ExactlyOne(levels)
@@ -729,7 +732,7 @@ def generate_constraints1(inputs):
                 else:
                     levels = factors[factor_id]['domain']
                 if na_level:
-                    factor_clauses.append(Or(na_level, cs_factor_bounds(factor_id, symbols, levels)))
+                    factor_clauses.append(ExactlyOne(na_level, cs_factor_bounds(factor_id, symbols, levels)))
                 else:
                     factor_clauses.append(cs_factor_bounds(factor_id, symbols, levels))
                     
@@ -743,7 +746,8 @@ def generate_constraints1(inputs):
                                      var=sample,
                                      constraints=inputs['sample_types'])
                     for sample in samples[container_id][aliquot]])
-            
+
+    
     def cs_aliquot_factors(aliquot_factors, container_id, container, column):
         return And([And(cs_factors_level(aliquot_factors[container_id][aliquot]),
                         cs_sample_factors(sample_factors, container_id, container, aliquot))
@@ -771,8 +775,7 @@ def generate_constraints1(inputs):
 
     def cs_row_factors(row_factor, container_id, container):
         
-        clause = And([And(cs_factors_level(get_row_factors(row_factor, row, container_id))
-                        )
+        clause = And([cs_factors_level(get_row_factors(row_factor, row, container_id))                        
                     for row in container['rows']])
         #l.debug("column clause: %s", clause)
         return clause
@@ -799,6 +802,42 @@ def generate_constraints1(inputs):
          )
     #l.debug("CS: %s", condition_space_constraint)
     constraints.append(condition_space_constraint)
+
+
+    def eq_factor(container1, aliquot1, container2, aliquot2, factor_id):
+        """
+        Get constraint that equates the value of factor_id for both aliquots
+        """
+            
+        factor_symbols1 = aliquot_factors[container1][aliquot1][factor_id]
+        factor_symbols2 = aliquot_factors[container2][aliquot2][factor_id]
+        if factors[factor_id]['dtype'] == "str":
+            common_levels = frozenset(factor_symbols1.keys()).intersection(factor_symbols2.keys())
+            constraint = \
+              Or([And(factor_symbols1[level], factor_symbols2[level])
+                  for level in common_levels
+                ])
+        else:
+            constraint = Equals(factor_symbols1, factor_symbols2)
+        #l.debug("%s %s %s %s", factor_id, container1, aliquot1, aliquot2)
+        return constraint
+        
+    
+    ### If you assign an aliquot, then no other aliquot is identical.
+    ### For each aliquot in same batch
+    aliquot_assigned_constraint = \
+      And([
+          Not(And([eq_factor(container_id1, aliquot1, container_id1, aliquot2, factor_id)
+              for factor_id, factor in factors.items() if factor['ftype'] == "aliquot"]))
+           for container_id1, container1 in containers.items()
+           for aliquot1 in container1['aliquots']
+#           for container_id2, container2 in containers.items()
+           for aliquot2 in container1['aliquots'] if aliquot1 < aliquot2
+           #and container_id1 == container_id2           
+            ])
+    #constraints.append(aliquot_assigned_constraint)
+
+
     
     
     #l.info(containers)
@@ -848,8 +887,11 @@ def generate_constraints1(inputs):
 
     def expand_requirement(factors):
         #factors = requirement['factors']
-        expansion = factor_cross_product(factors.copy(), [{}])
-        return expansion
+        if len(factors) == 0:
+            return []
+        else:
+            expansion = factor_cross_product(factors.copy(), [{}])
+            return expansion
 
 
     def r_exp_factors(r):
@@ -892,12 +934,28 @@ def generate_constraints1(inputs):
                         return False
             return True
         
-        clause = And([Or([And([get_req_const(sample_factors[container][aliquot][sample], factor_id, level)
+        clause = And([ExactlyOne([And([get_req_const(sample_factors[container][aliquot][sample], factor_id, level)
                              for factor_id, level in case.items()])
                         for sample in samples if  sample_consistent_with_case(sample, case)])
                 for case in cases])
         return clause
-   
+
+
+    def case_consistent_with_container(case, container_id):
+        """
+        If using a container_assignment, indicate whether the case is consistent with it
+        """
+        if container_assignment:
+            container_levels = container_assignment[container_id]
+            for factor, level in case.items():
+                if factor in container_levels:
+                    if level != container_levels[factor]:
+                        return False
+            return True
+        else:
+            return True
+
+        
     def req_aliquot_factors(r, r_aliquot_factors, containers):
         """
         Disjunction over aliquots, conjunction over factors and levels
@@ -907,10 +965,6 @@ def generate_constraints1(inputs):
         cases = expand_requirement(reqs)
         r_aliquot_factors_ids = [x['factor'] for x in r_aliquot_factors]
         r_batch_factor_ids = [x['factor'] for x in req_batch_factors]
-        #aliquots = container['aliquots']
-        #l.debug("factors: %s, aliquots: %s", r_aliquot_factors, aliquots)
-        #l.debug("|cases| = %s, |aliquots| = %s", cases, len(aliquots))
-        #assert(len(cases) <= len(aliquots))
         
         ## Is it an unsatisfiable requirement?
         for case in cases:
@@ -927,8 +981,8 @@ def generate_constraints1(inputs):
         
         clause = \
           And([ ## Must satisfy all cases
-              Or([ ## A container must satisfy the case
-                  Or([ ## An aliquot in the container must satisfy case
+              ExactlyOne([ ## A container must satisfy the case
+                  ExactlyOne([ ## An aliquot in the container must satisfy case
                       ## Aliquot must satisfy:
                       And(
                           ## Satisfy aliquot factors
@@ -947,7 +1001,7 @@ def generate_constraints1(inputs):
                         for aliquot in container['aliquots'] \
                               if aliquot_can_satisfy_requirement(aliquot, container_id, [{"factor" : factor, "values" : [level]}
                                                                                for factor, level in case.items()])])
-                        for container_id, container in containers.items()])
+                        for container_id, container in containers.items() if case_consistent_with_container(case, container_id)])
                 for case in cases])
         return clause            
 
@@ -1000,29 +1054,7 @@ def generate_constraints1(inputs):
         cases = expand_requirement(r_batch_factors)
         assert(len(cases) <= len(containers))
 
-        def consitent_with_container(case, container_id, container_assignment):
-            if container_assignment:
-                l.debug("Is consistent_with_container? %s %s", case, container_assignment[container_id])
-                for factor_id, level in case.items():
-                    if factor_id in container_assignment[container_id] and container_assignment[container_id][factor_id] != level:
-                        return False
-            return True
-        
-        clause = \
-          And([
-              #And(
-                  ## There exists a container that satisfies batch factors in case
-                  #Or([
-                  #    # Batch factors
-                  #    And([get_req_const(batch_factor[container_id], factor_id, level)            
-                  #         for factor_id, level in case.items()])                         
-                  #    for container_id, container in containers.items() if consitent_with_container(case, container_id, container_assignment)]),
-                  ## There exists aliquots that satisfy the requirement
-                  ## FIXME if there are no batch factors in case, then make sure that aliquots across all containers satisfy requirement
-                  ##       otherwise, ensure that the aliquots satisfy the case are from the container satisfying the case.
-                  req_aliquot_factors(r, r_aliquot_factors(r), containers)
-                  #)
-                for case in cases])
+        clause = req_aliquot_factors(r, r_aliquot_factors(r), containers)               
         return clause            
 
     l.info("Encoding %s requirements", len(requirements))
@@ -1037,6 +1069,42 @@ def generate_constraints1(inputs):
     #l.debug("satisfy_every_requirement: %s", satisfy_every_requirement)
     constraints.append(satisfy_every_requirement)
 
+
+
+    def get_aliquot_replicates(container_id, aliquot):
+        reps = aliquot_symmetry_samples.loc[(aliquot_symmetry_samples.aliquot == aliquot) &
+                                                   (aliquot_symmetry_samples.container == container_id)].drop(columns=['aliquot', 'container'])
+        rep_records = json.loads(reps.to_json(orient='records'))
+        #l.debug("rep_records for %s %s: %s", container_id, aliquot, rep_records)
+        return rep_records
+
+    def get_factor_vars(factor, container_id, aliquot):
+        ftype = factors[factor]['ftype']
+        if ftype == "experiment":
+            return exp_factors
+        elif ftype == "batch":
+            return batch_factor[container_id]
+        elif ftype == "aliquot":
+            return aliquot_factors[container_id][aliquot]
+        elif ftype == "column":
+            column = get_aliquot_col(aliquot, containers[container_id])
+            return column_factor[get_column_name(column, container_id)]
+        elif ftype == "row":
+            row = get_aliquot_row(aliquot, containers[container_id])
+            return row_factor[get_row_name(row, container_id)]
+    
+    ## Replicate symmetry
+    replicate_symmetry_constraint = \
+      And([ #For Every Container, Every Aliquot
+          ExactlyOne([ #There is a set of possible replicates
+             And([ # That has the following assignments
+                  get_req_const(get_factor_vars(factor, container_id, aliquot), factor, level)
+                  for factor, level in case.items()])
+              for case in get_aliquot_replicates(container_id, aliquot)])
+           for container_id, container in containers.items()
+           for aliquot in container['aliquots']])
+    # l.debug(replicate_symmetry_constraint)
+    constraints.append(replicate_symmetry_constraint)
 
     ## Column reagents are set to zero if every aliquot in the column is empty
     if "None" in factors['strain']['domain']:
@@ -1135,9 +1203,12 @@ def get_container_assignment(input):
     l.debug("container_assignment: %s", container_assignment)
     return container_assignment
 
-def fill_empty_aliquots(factors, requirements, num_fill, num_blank_required):
-    if num_fill - num_blank_required > 0:
+def fill_empty_aliquots(factors, requirements, batch_aliquots):
+    none_aliquots = batch_aliquots.loc[batch_aliquots.strain == "None"]
+    batch_factors = [ x for x, y in input['factors'].items() if y['ftype'] == 'batch' ]
+    if len(none_aliquots) > 0:
         ## There are blank wells left that are not specifically required
+        none_by_batch = none_aliquots.groupby(batch_factors)
         constraint = {
                     "factors": [
                         {
@@ -1148,7 +1219,7 @@ def fill_empty_aliquots(factors, requirements, num_fill, num_blank_required):
                         },
                         {
                             "factor": "replicate",
-                            "values": [i for i in range(1, num_fill+1-num_blank_required)]
+                            "values": [i for i in range(1, none_aliquots.replicate.max())]
                         }
                     ]
                 }
@@ -1170,7 +1241,59 @@ def fill_empty_aliquots(factors, requirements, num_fill, num_blank_required):
 
     return new_factors, new_requirements
 
-def solve1(input, pick_container_assignment=False, hand_coded_constraints=None):
+
+def get_aliquot_symmetry_samples(samples, factors, containers):
+    """
+    For each aliquot, pick representative from each symmetry group to use.
+    """
+    l.debug("Getting Symmetry Groups from: %s", samples)
+
+    non_replicate_factors = [x for x in samples.columns if x != "replicate" ]
+
+    l.debug("non_replicate_factors: %s", non_replicate_factors)
+    
+    num_aliquots = sum([len(c['aliquots']) for _, c in containers.items()])
+    
+    def replicate_replicates(replicates):
+        #l.debug("replicates: %s", replicates)
+        rep_reps = [ x  for _ in range(int(np.ceil(num_aliquots/len(replicates)))) for x in replicates.replicate]
+        replicates = replicates.drop(columns=['replicate']).drop_duplicates()
+        replicates.loc[:, 'key'] = 0
+        #l.debug("replicates: %s", rep_reps)
+        new_reps = pd.DataFrame({'replicate' : rep_reps[0:num_aliquots]})
+        new_reps.loc[:,'key'] = 0
+        #l.debug("replicates: %s", new_reps)
+        new_reps = new_reps.merge(replicates, on='key').drop(columns=['key']).reset_index()
+        new_reps.loc[:,'index'] = new_reps.index
+        #l.debug("replicates: %s", new_reps)
+        return new_reps
+                         
+    
+    sample_groups = samples.drop_duplicates().groupby(non_replicate_factors).apply(replicate_replicates)
+    # l.debug(sample_groups)
+#    for g, gr in sample_groups:
+#        l.debug("sample groups: %s %s", g, gr)
+
+    
+    
+    aliquot_symmetry_samples = pd.DataFrame()
+    for container_id, container in containers.items():
+        c_df = pd.DataFrame({ "aliquot" : list(container['aliquots'].keys())})
+        c_df.loc[:, "container"] = container_id
+        aliquot_symmetry_samples = aliquot_symmetry_samples.append(c_df, ignore_index = True)
+    aliquot_symmetry_samples.loc[:,'index'] = aliquot_symmetry_samples.index
+
+    # l.debug(aliquot_symmetry_samples)
+
+    aliquot_symmetry_samples = aliquot_symmetry_samples.merge(sample_groups, on='index').drop(columns=['index'])
+    pd.set_option("display.max_rows", 1000)
+    l.debug(aliquot_symmetry_samples)
+    pd.set_option("display.max_rows", 100)
+
+    
+    return aliquot_symmetry_samples
+
+def solve1(input, pick_container_assignment=True, hand_coded_constraints=None):
     """
     Convert input to encoding and invoke solver.  Return model if exists.
     """
@@ -1181,7 +1304,7 @@ def solve1(input, pick_container_assignment=False, hand_coded_constraints=None):
         input['container_assignment'] = None
 
     containers = input['containers']
-    l.debug(containers)
+    # l.debug(containers)
     strain_counts = { k : get_strain_count(v) for k, v in containers.items()}
     l.debug("container strain count: %s", strain_counts)
     container_strains = set([x for _, s in strain_counts.items() for x in s])
@@ -1211,57 +1334,38 @@ def solve1(input, pick_container_assignment=False, hand_coded_constraints=None):
                         if level not in input['factors']['strain']['domain']:
                             input['factors']['strain']['domain'].append(level)
         
-        ## Get the number samples with identical sample factors 
-        unique_samples = sample_types.pivot_table(index=list(sample_factors.keys()), aggfunc='size')
+        ## Get the number samples with identical sample factors
+        if len(list(sample_factors.keys())) > 0 and len(sample_types.dropna()) > 0:
+            unique_samples = sample_types.pivot_table(index=list(sample_factors.keys()), aggfunc='size')
+        else:
+            unique_samples = pd.DataFrame()
         #l.debug(unique_samples)
 
         ## Get the number of samples needed for each aliquot
-        aliquot_samples =  sample_types.fillna(value=0).pivot_table(index=list(non_sample_factors.keys()), aggfunc='size', fill_value=1)
+        if len(sample_types.dropna()) > 0:
+            aliquot_samples =  sample_types.fillna(value=0).pivot_table(index=list(non_sample_factors.keys()), aggfunc='size', fill_value=1)
+        else:
+            aliquot_samples = pd.DataFrame()
         l.debug("Required aliquots: %s", aliquot_samples)
 
-        ## Num MediaControl wells in requirements
-        num_media_control_required = len(sample_types.loc[sample_types.strain=="MediaControl"].drop(columns=list(sample_factors.keys())).drop_duplicates())
-        num_media_wells_allocated = sum([c["MediaControl"] for c_id, c in strain_counts.items() if "MediaControl" in c])
-        num_media_wells_needed = num_media_control_required - num_media_wells_allocated
-
-        ## Determine how many blank wells are required
-        num_blank_required = len(sample_types.loc[sample_types.strain==""].drop(columns=list(sample_factors.keys())).drop_duplicates())
-        ## Convert blank well requirements to "None" strain
-        for requirement in input['requirements']:
-            for factor in requirement['factors']:
-                if factor['factor'] == "strain" and "" in factor["values"]:
-                    factor["values"] = [ x if x != "" else "None" for x in factor["values"] ]
-        
-        
-        ## Add MediaControl to strain domain if it is part of a container, but not specifically required
-        if num_media_wells_allocated > 0:
-            input['factors']['strain']['domain'].append("MediaControl")
-        
         ## Required batches
-        batch_factors = [ x for x, y in input['factors'].items() if y['ftype'] == 'batch' ]
-        batches = sample_types[batch_factors].drop_duplicates()
-        l.debug("Required batches: %s", batches)
-
-
-        ## Check how many aliquots are needed and ensure that containers will provide that many
-        num_container_aliquots = sum([len(container['aliquots']) for container_id, container in containers.items()])
-        num_empty_wells = sum([c["None"] for c_id, c in strain_counts.items() if "None" in c]) + sum([c[None] for c_id, c in strain_counts.items() if None in c])
-
-        num_empty_for_none = num_empty_wells - num_media_control_required
-        l.info("# container aliquots = %s, num_aliquots needed = %s, empty = %s", num_container_aliquots, len(aliquot_samples), num_empty_for_none)
-        assert(num_container_aliquots >= len(aliquot_samples))
         
-        ## Fill requirements with empty samples to place in unused aliquots
-        num_unused_aliquots = num_container_aliquots -  num_empty_wells
-        input['factors'], input['requirements'] = fill_empty_aliquots(input['factors'], input['requirements'], num_empty_for_none, num_blank_required)
-        
+
+        input = preprocess_containers(input, sample_types, strain_counts, sample_factors, aliquot_samples, input['container_assignment'])
+               
         ## Get the samples in common with all aliquots
-        sample_groups = sample_types.groupby(list(non_sample_factors.keys()))
-        common_samples = sample_types[list(sample_factors.keys())].drop_duplicates()#.reset_index()
-        num_samples = aliquot_samples.max()
+        sample_groups = sample_types.dropna().groupby(list(non_sample_factors.keys()))
+        common_samples = sample_types[list(sample_factors.keys())].dropna().drop_duplicates()#.reset_index()
+        if len(aliquot_samples) > 0:
+            num_samples = aliquot_samples.max()
+        else:
+            num_samples = 0
         l.info("num_samples: %s", num_samples)
-        for g, df in sample_groups:
-            common_samples = common_samples.merge(df[list(sample_factors.keys())], on=list(sample_factors.keys()), how="inner")#.reset_index()
+        if len(sample_groups) > 0:
+            for g, df in sample_groups:
+                common_samples = common_samples.merge(df[list(sample_factors.keys())], on=list(sample_factors.keys()), how="inner")#.reset_index()
+        else:
+            common_samples = pd.DataFrame()
         l.debug(common_samples)
         
         input['samples'] = {
@@ -1277,6 +1381,10 @@ def solve1(input, pick_container_assignment=False, hand_coded_constraints=None):
             l.debug("Adding Free sample %s", i)
             input['sample_types'][i] = None
 
+
+        input['aliquot_symmetry_samples'] = get_aliquot_symmetry_samples(get_sample_types(input['factors'], input['requirements'])[list(non_sample_factors.keys())].dropna(axis='columns'), non_sample_factors, containers)
+        
+            
     l.info("Generating Constraints ...")
     variables, constraints = generate_constraints1(input)
 
@@ -1289,7 +1397,7 @@ def solve1(input, pick_container_assignment=False, hand_coded_constraints=None):
     model = get_model(constraints)
 
     if model is None:
-        from pysmt.rewritings import conjunctive_partition
+
         conj = conjunctive_partition(constraints)
         ucore = get_unsat_core(conj)
         l.info("UNSAT-Core size '%d'" % len(ucore))
@@ -1299,7 +1407,99 @@ def solve1(input, pick_container_assignment=False, hand_coded_constraints=None):
     
     return model, variables
 
+def preprocess_containers(input, sample_types, strain_counts, sample_factors, aliquot_samples, container_assignment):
+    """
+    Update factors so that they can express what is in a container.
+    Determine how many wells are to be occupied by MediaControl.
+    Determine how many wells are to be empty.
+    Update factors and requirements to ensure each well is assigned.
+    """
 
+    containers = input['containers']
+    num_container_aliquots = sum([len(container['aliquots']) for container_id, container in containers.items()])
+    num_empty_wells = sum([c["None"] for c_id, c in strain_counts.items() if "None" in c]) + sum([c[None] for c_id, c in strain_counts.items() if None in c])
+    num_strains_present = num_container_aliquots - num_empty_wells
+    num_strain_unallocated = len(aliquot_samples) - num_strains_present
+
+    
+    ### Update Factors and Requirements, (mostly) independent of containers ####
+
+    ## Num MediaControl wells in requirements
+    num_media_control_required = len(sample_types.loc[sample_types.strain=="MediaControl"].drop(columns=list(sample_factors.keys())).drop_duplicates().dropna())
+    
+    ## Add MediaControl to strain domain if it is part of a container, but not specifically required
+    num_media_wells_allocated = sum([c["MediaControl"] for c_id, c in strain_counts.items() if "MediaControl" in c])
+    if num_media_wells_allocated > 0 and "MediaControl" not in input['factors']['strain']['domain']:
+        input['factors']['strain']['domain'].append("MediaControl")
+
+    num_media_wells_needed = num_media_control_required - num_media_wells_allocated
+
+    ## Convert blank well requirements to "None" strain
+    for requirement in input['requirements']:
+        for factor in requirement['factors']:
+            if factor['factor'] == "strain" and "" in factor["values"]:
+                factor["values"] = [ x if x != "" else "None" for x in factor["values"] ]
+
+
+    batch_factors = [ x for x, y in input['factors'].items() if y['ftype'] == 'batch' ]
+    batches = sample_types[batch_factors].drop_duplicates().dropna()
+    l.debug("Required batches: %s", batches)
+
+                
+    ## Check how many aliquots are needed and ensure that containers will provide that many
+#    l.info("# container aliquots = %s, num_aliquots needed = %s, empty = %s", num_container_aliquots, len(aliquot_samples), num_empty_for_none)
+#    assert(num_container_aliquots >= len(aliquot_samples))
+
+    def compute_num_empty_per_batch(batch):
+        """
+        Num empty per batch is:
+        (#aliquots in containers for batch) -  (num_required non empty)
+        """
+        l.debug("Computing empties for batch: %s", batch)
+        ## Get the containers for the batch
+        container_indices = batch.container.astype(str).unique()
+        num_aliquots_for_batch = sum([ len(containers[c]['aliquots']) for c in container_indices])
+
+        ## Get num non empty required
+        num_non_empty = len(batch)
+        num_empty = num_aliquots_for_batch - num_non_empty
+
+        empties = pd.DataFrame({"replicate" : [x+1 for x in range(0, num_empty)]})
+        empties.loc[:,"strain"] = "None"
+        batch = batch.drop(columns=batch_factors+['container']).append(empties)
+        l.debug("Done Computing empties for batch: %s", batch)
+        return batch
+
+    batch_aliquots = sample_types.drop(columns=sample_factors).drop_duplicates()
+    batch_containers = pd.read_json(json.dumps(container_assignment), orient='index')
+    batch_containers['container'] = batch_containers.index
+    #l.debug("batch_containers: %s", batch_containers)
+    batch_aliquots = batch_aliquots.merge(batch_containers, on=batch_factors, how='inner')
+    #l.debug("batch_aliquots: %s", batch_aliquots)
+    batch_aliquots = batch_aliquots.groupby(batch_factors)
+    #l.debug("Batch aliquots:")
+    #for g, ba in batch_aliquots:
+    #   l.debug(g)
+    #   l.debug(ba)
+
+    batch_aliquots = batch_aliquots.apply(compute_num_empty_per_batch).reset_index()
+    
+    l.debug("Batch aliquots: %s", batch_aliquots)
+#    for g, ba in batch_aliquots:
+#       l.debug(g)
+#       l.debug(ba)
+                        
+    ## Fill requirements with empty samples to place in unused aliquots
+    #num_empty_for_none = num_empty_wells - num_media_control_required - num_strain_unallocated
+    #num_blank_required = len(sample_types.loc[sample_types.strain==""].drop(columns=list(sample_factors.keys())).drop_duplicates().dropna())
+    input['factors'], input['requirements'] = fill_empty_aliquots(input['factors'],
+                                                                  input['requirements'],
+                                                                  batch_aliquots
+                                                                  #num_empty_for_none,
+                                                                  #num_blank_required
+                                                                      )
+
+    return input
 
 def get_model_pd(model, variables, factors):
 

@@ -53,6 +53,7 @@ def get_samples_from_condition_set(factors, condition_set, parameters = None, us
     """
     Compute factorial experiment from condition_set and parameters.
     """
+    l.debug(factors)
     l.debug(condition_set)
     if not condition_set_is_singletons(factors, condition_set):
         samples = condition_set_cross_product(factors, condition_set)
@@ -60,6 +61,10 @@ def get_samples_from_condition_set(factors, condition_set, parameters = None, us
         samples = pd.DataFrame({ factor['factor'] : factor['values'] for factor in condition_set['factors'] if factor['factor'] in factors})
 
     l.debug(samples)
+
+#    if len(samples) == 0:
+#        # There are no elements of condition_set that refer to factors
+#        return samples
     
     if 'key' in samples.columns:
         samples = samples.drop(columns=['key'])
@@ -84,9 +89,8 @@ def get_samples_from_condition_set(factors, condition_set, parameters = None, us
         for factor in factors:
             if factor not in samples.columns:
                 l.debug("adding %s", factor)
-                samples.loc[:, factor] = None
-        
-
+                if len(samples) > 0:
+                    samples.loc[:, factor] = None      
     
     return samples
 
