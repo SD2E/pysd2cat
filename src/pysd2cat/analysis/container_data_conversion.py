@@ -246,7 +246,7 @@ def generate_container(num_aliquots, batch_id, strain_name="Name", dimensions=(8
 #                v['replicate'] = 2
 
 
-    l.info(aliquots)
+    #l.info(aliquots)
             
     return {
         "aliquots" : aliquots,
