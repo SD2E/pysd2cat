@@ -40,6 +40,7 @@ def get_classifier_dataframe(df, data_columns = ['FSC_A', 'SSC_A', 'BL1_A', 'RL1
 
 
 def compute_predicted_output(df, 
+                             training_df=None,
                              data_columns = ['FSC_A', 'SSC_A', 'BL1_A', 'RL1_A', 'FSC_H', 
                                              'SSC_H', 'BL1_H', 'RL1_H', 'FSC_W', 'SSC_W', 
                                              'BL1_W', 'RL1_W'], 
@@ -51,7 +52,10 @@ def compute_predicted_output(df,
                              use_harness=False,
                              description=None):
     ## Build the training/test input
-    c_df = get_classifier_dataframe(df, data_columns = data_columns, strain_col=strain_col, high_control=high_control, low_control=low_control)
+    if training_df is None:
+        c_df = get_classifier_dataframe(df, data_columns = data_columns, strain_col=strain_col, high_control=high_control, low_control=low_control)
+    else:
+        c_df = training_df
     
 
     if use_harness:
@@ -82,6 +86,7 @@ def compute_predicted_output(df,
 
    
 def compute_correctness_classifier(df,
+                             training_df=None,
                              out_dir = '.',
                              mean_output_label='probability_correct',
                              std_output_label='std_probability_correct',
@@ -102,6 +107,7 @@ def compute_correctness_classifier(df,
     df.loc[:,'output'] = pd.to_numeric(df['output'])
     logger.debug("Shape at start: " + str(df.shape) + " strain_col = " + strain_col)
     result_df = compute_predicted_output(df, 
+                                         training_df=training_df,
                                          out_dir=out_dir,
                                          strain_col=strain_col,
                                          high_control=high_control, 
