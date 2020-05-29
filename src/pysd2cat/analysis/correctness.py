@@ -1,5 +1,3 @@
-from harness.test_harness_class import TestHarness
-from harness.th_model_instances.hamed_models.random_forest_classification import random_forest_classification
 from pysd2cat.analysis.Names import Names
 from pysd2cat.analysis import live_dead_classifier as ldc
 import numpy as np

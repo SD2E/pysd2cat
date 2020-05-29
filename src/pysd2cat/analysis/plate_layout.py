@@ -15,7 +15,7 @@ import logging
 
 
 l = logging.getLogger(__file__)
-l.setLevel(logging.DEBUG)
+l.setLevel(logging.INFO)
 
 
 
@@ -791,7 +791,7 @@ def generate_constraints1(inputs):
                         cs_row_factors(row_factor, container_id, container),
                         cs_aliquot_factors(aliquot_factors, container_id, container, container['aliquots'])
                         )
-                    for container_id, container in containers.items()])
+                    for container_id, container in containers.items() if not container_assignment or container_id in container_assignment])
           
 
     
@@ -825,17 +825,17 @@ def generate_constraints1(inputs):
     
     ### If you assign an aliquot, then no other aliquot is identical.
     ### For each aliquot in same batch
-    aliquot_assigned_constraint = \
-      And([
-          Not(And([eq_factor(container_id1, aliquot1, container_id1, aliquot2, factor_id)
-              for factor_id, factor in factors.items() if factor['ftype'] == "aliquot"]))
-           for container_id1, container1 in containers.items()
-           for aliquot1 in container1['aliquots']
-#           for container_id2, container2 in containers.items()
-           for aliquot2 in container1['aliquots'] if aliquot1 < aliquot2
-           #and container_id1 == container_id2           
-            ])
-    #constraints.append(aliquot_assigned_constraint)
+#    aliquot_assigned_constraint = \
+#      And([
+#          Not(And([eq_factor(container_id1, aliquot1, container_id1, aliquot2, factor_id)
+#              for factor_id, factor in factors.items() if factor['ftype'] == "aliquot"]))
+#           for container_id1, container1 in containers.items()
+#           for aliquot1 in container1['aliquots']
+##           for container_id2, container2 in containers.items()
+#           for aliquot2 in container1['aliquots'] if aliquot1 < aliquot2
+#           #and container_id1 == container_id2           
+#            ])
+#    #constraints.append(aliquot_assigned_constraint)
 
 
     
@@ -864,7 +864,7 @@ def generate_constraints1(inputs):
             And([get_req_const(row_factor[get_row_name(get_aliquot_row(aliquot, c), container_id)], factor, level)
                  for factor, level in aliquot_properties.items() if factor in row_factor[get_row_name(get_aliquot_row(aliquot, c), container_id)]])
            )
-           for container_id, c in containers.items()
+           for container_id, c in containers.items() if not container_assignment or container_id in container_assignment
            for aliquot, aliquot_properties in c['aliquots'].items()
         ])
     
@@ -946,6 +946,8 @@ def generate_constraints1(inputs):
         If using a container_assignment, indicate whether the case is consistent with it
         """
         if container_assignment:
+            if container_id not in container_assignment:
+                return False
             container_levels = container_assignment[container_id]
             for factor, level in case.items():
                 if factor in container_levels:
@@ -1073,7 +1075,7 @@ def generate_constraints1(inputs):
 
     def get_aliquot_replicates(container_id, aliquot):
         reps = aliquot_symmetry_samples.loc[(aliquot_symmetry_samples.aliquot == aliquot) &
-                                                   (aliquot_symmetry_samples.container == container_id)].drop(columns=['aliquot', 'container'])
+                                                   (aliquot_symmetry_samples.container == container_id)].drop(columns=['aliquot', 'container', "column"])
         rep_records = json.loads(reps.to_json(orient='records'))
         #l.debug("rep_records for %s %s: %s", container_id, aliquot, rep_records)
         return rep_records
@@ -1092,17 +1094,19 @@ def generate_constraints1(inputs):
         elif ftype == "row":
             row = get_aliquot_row(aliquot, containers[container_id])
             return row_factor[get_row_name(row, container_id)]
-    
+
+    #import pdb; pdb.set_trace()          
     ## Replicate symmetry
     replicate_symmetry_constraint = \
-      And([ #For Every Container, Every Aliquot
+       And([ #For Every Container, Every Aliquot
           ExactlyOne([ #There is a set of possible replicates
              And([ # That has the following assignments
                   get_req_const(get_factor_vars(factor, container_id, aliquot), factor, level)
-                  for factor, level in case.items()])
+                  for factor, level in case.items() if level is not None])
               for case in get_aliquot_replicates(container_id, aliquot)])
-           for container_id, container in containers.items()
+           for container_id, container in containers.items() if not container_assignment or container_id in container_assignment
            for aliquot in container['aliquots']])
+
     # l.debug(replicate_symmetry_constraint)
     constraints.append(replicate_symmetry_constraint)
 
@@ -1114,7 +1118,7 @@ def generate_constraints1(inputs):
                           And([Equals(col_factor_var , Real(0.0))
                                for col_factor_id, col_factor_var in column_factor[get_column_name(column_id, container_id)].items()]))
                for column_id, column_aliquots in container['columns'].items()])
-              for container_id, container in containers.items()])
+              for container_id, container in containers.items() if not container_assignment or container_id in container_assignment])
         constraints.append(no_reagents_for_empty_columns)
 
         ## Row reagents are set to zero if every aliquot in the row is empty
@@ -1124,7 +1128,7 @@ def generate_constraints1(inputs):
                           And([Equals(row_factor_var , Real(0.0))
                                for row_factor_id, row_factor_var in row_factor[get_row_name(row_id, container_id)].items()]))
                for row_id, row_aliquots in container['rows'].items()])
-              for container_id, container in containers.items()])
+              for container_id, container in containers.items() if not container_assignment or container_id in container_assignment])
         constraints.append(no_reagents_for_empty_rows)
       
     ## Factor level assignments are mutex
@@ -1205,34 +1209,26 @@ def get_container_assignment(input):
 
 def fill_empty_aliquots(factors, requirements, batch_aliquots):
     none_aliquots = batch_aliquots.loc[batch_aliquots.strain == "None"]
-    batch_factors = [ x for x, y in input['factors'].items() if y['ftype'] == 'batch' ]
+    batch_factors = [ x for x, y in factors.items() if y['ftype'] == 'batch' ]
+    new_requirements = requirements
     if len(none_aliquots) > 0:
-        ## There are blank wells left that are not specifically required
-        none_by_batch = none_aliquots.groupby(batch_factors)
-        constraint = {
-                    "factors": [
-                        {
-                            "factor": "strain",
-                            "values": [
-                                "None"
-                            ]
-                        },
-                        {
-                            "factor": "replicate",
-                            "values": [i for i in range(1, none_aliquots.replicate.max())]
-                        }
-                    ]
-                }
-        new_requirements = requirements + [constraint]
-        l.debug("new_requirement: %s", constraint)
-    else:
-        new_requirements = requirements
+        batch_nones = none_aliquots.groupby(batch_factors)
+        max_none = 0
+        for b, batch_none in batch_nones:
+            l.debug("Getting constraint for: %s", batch_none)
+            for i, row in batch_none.iterrows():
+                constraint = { "factors" : [ {"factor" : x, "values" : [y] } for x, y in row.items() if type(y) != float or not np.isnan(y) ]}
+                new_requirements += [constraint]
+                l.debug("new_requirement: %s", constraint)
+            max_none = max(max_none, len(batch_none))
+    #else:
+    #    new_requirements = requirements
         
-    if num_fill > 0:
+    if len(none_aliquots) > 0:
         new_factors = factors.copy()
         if "None" not in new_factors['strain']['domain']:
             new_factors['strain']['domain'].append("None")
-        new_factors['replicate']['domain'] = [1, max(factors['replicate']['domain'][1], num_fill)]
+        new_factors['replicate']['domain'] = [1, max(factors['replicate']['domain'][1], max_none)]
 
         l.debug("new_factors: %s", new_factors['strain']['domain'])
         l.debug("replicate_domain: %s", new_factors['replicate']['domain'])
@@ -1242,53 +1238,268 @@ def fill_empty_aliquots(factors, requirements, batch_aliquots):
     return new_factors, new_requirements
 
 
-def get_aliquot_symmetry_samples(samples, factors, containers):
+def get_column_symmetry(samples, factors, containers, container_assignment):
+    #l.debug("Getting Symmetry Groups from: %s", samples)
+
+    ## Symmetry for Columns.  It doesn't matter what column factors are applied to a column, so preselect
+
+
+    ## Get the columns of the containers
+    
+    column_factors = [x for x, y in factors.items() if y['ftype'] == "column" ]
+    batch_factors = [x for x, y in factors.items() if y['ftype'] == "batch" ]
+    container_columns = pd.DataFrame()
+    for container_id, container in containers.items():
+        container_df = pd.DataFrame({"column" : list(container['columns'].keys())})
+        container_df.loc[:,'container'] = container_id
+        container_columns = container_columns.append(container_df, ignore_index=True)
+
+
+    ## Get the number of columns needed for each combination of column factors
+        
+    aliquots_per_column_levels = samples.groupby(batch_factors + column_factors).apply(len)
+    column_size = 8
+    columns_per_column_levels = aliquots_per_column_levels.apply(lambda x: int(np.ceil(x/column_size))).reset_index().rename(columns={0 : "count"})
+
+
+    ## columns_per_column_levels will have one row per batch and column factor combination
+
+
+    ## convert container_assignment to dataframe
+    ca_df = pd.read_json(json.dumps(container_assignment), orient='index').reset_index().rename(columns={"index" : "container"})
+    ca_df["container"] = ca_df["container"].astype(str)
+    
+    ## Do one batch at a time to ensure that columns come from assigned containers
+    possible_column_levels = pd.DataFrame()
+    batches_of_columns_per_column_levels = columns_per_column_levels.groupby(batch_factors)
+    for batch, batch_columns_per_column_levels in batches_of_columns_per_column_levels:
+        ## Get containers that can fulfill batch
+        batch_container_columns = container_columns.merge(ca_df, on='container', how="inner").drop(columns=batch_factors)
+        column_index = 0
+        for _, level in batch_columns_per_column_levels.iterrows():
+            next_column_index = int(column_index+level['count'])
+            level_columns = batch_container_columns.loc[container_columns.index[column_index:next_column_index]]
+            
+            for factor in column_factors:
+                level_columns.loc[:, factor] = level[factor]
+            possible_column_levels = possible_column_levels.append(level_columns, ignore_index=True)
+            column_index = next_column_index
+
+        ## Fill in any remaining columns with NaN
+        level_columns = batch_container_columns.loc[container_columns.index[column_index:]]            
+        for factor in column_factors:
+            level_columns.loc[:, factor] = 0.0
+        possible_column_levels = possible_column_levels.append(level_columns, ignore_index=True)
+
+
+
+
+
+    return possible_column_levels
+    
+
+def _is_compatible(replicate_group, aliquot_and_container_properties):
+    """
+    Are the replicate group properties a superset of the aliquot and container properties?
+    """
+    common_cols = [ x for x in replicate_group.columns if x in aliquot_and_container_properties.columns ]
+    if len(common_cols) > 0:
+        compatible = aliquot_and_container_properties.merge(replicate_group, on=common_cols)
+        return len(compatible) > 0
+    else:
+        return True
+    
+    
+
+def _get_compatible_replicate_groups(aliquot, replicate_groups, container_assignment_df):
+    """
+    Return a groupby object with only groups of replicates that are compatible with the aliquot.
+    """
+
+    aliquot_property_cols = [x for x in aliquot.columns if x not in ['container', 'aliquot']]
+    assigned_container_properties = container_assignment_df.loc[container_assignment_df.container == aliquot.iloc[0].container]
+    if len(aliquot_property_cols) == 0:
+        aliquot_and_container_properties = assigned_container_properties
+    else:
+        aliquot_and_container_properties = pd.concat([assigned_container_properties.reset_index(drop=True), aliquot[aliquot_property_cols].reset_index(drop=True)], axis=1)
+
+    ## Get rid of non-properties
+    for x in ['container', 'index']:
+        if x in aliquot_and_container_properties.columns:
+            aliquot_and_container_properties = aliquot_and_container_properties.drop(columns=[x])
+    
+    ## Need to find groups that are consistent
+    compatible_replicate_groups = replicate_groups.apply(lambda x: _is_compatible(x, aliquot_and_container_properties))
+    compatible_replicate_groups = compatible_replicate_groups.to_frame().reset_index()
+    compatible_replicate_groups = compatible_replicate_groups.loc[compatible_replicate_groups[0] == True].drop(columns=[0])
+    return compatible_replicate_groups
+
+def get_aliquot_symmetry(samples, factors, containers, container_assignment):
+    """
+    For each aliquot, pick the possible replicates of each strain that can be placed in that aliquot.
+    """
+
+    container_aliquots = pd.DataFrame()
+    for container_id, container in containers.items():
+        container_df = pd.read_json(json.dumps(container['aliquots']), orient='index')
+        if len(container_df) == 0:
+            container_df = pd.DataFrame(index=container['aliquots'])
+        container_df.loc[:,'container'] = container_id
+        container_df = container_df.reset_index()
+        container_df = container_df.rename(columns={"index" : "aliquot"})       
+        container_df['column'] = container_df.apply(lambda x: get_aliquot_col(x['aliquot'], containers[x['container']]), axis=1)
+        container_aliquots = container_aliquots.append(container_df, ignore_index=True)
+    
+
+    non_replicate_factors = [x for x in samples.columns if x != "replicate" ]
+    column_factors = [x for x, y in factors.items() if y['ftype'] == "column" ]
+    non_replicate_non_column_factors = [x for x in non_replicate_factors if x not in column_factors]
+
+    
+
+    ## convert container_assignment to dataframe
+    ca_df = pd.read_json(json.dumps(container_assignment), orient='index').reset_index().rename(columns={"index" : "container"})
+    ca_df["container"] = ca_df["container"].astype(str)
+    
+
+    replicate_groups = samples.drop_duplicates().groupby(non_replicate_factors)
+    replicate_groups_dict = dict(list(replicate_groups))
+
+    na_replicate_group = samples[samples.isnull().any(axis=1)]
+    
+    ## For each aliquot, pick a member of each compatible replicate group.  Need to make sure that
+    ## all replicates are represented, so we also need to keep an index into each group to pick the next
+    ## replicate deterministically.
+    replicate_group_index = samples.groupby(non_replicate_factors).apply(lambda x: 0)
+    na_replicate_group_index = 0
+
+    symmetry_break = pd.DataFrame()
+    for _, aliquot in container_aliquots.iterrows():
+#        try:
+        compatible_replicate_groups = _get_compatible_replicate_groups(aliquot.to_frame().transpose(), replicate_groups, ca_df)
+#        except Exception as e:
+#            import pdb, traceback, sys
+#            extype, value, tb = sys.exc_info()
+#            traceback.print_exc()
+#            pdb.post_mortem(tb)
+            
+        aliquot_symmetry_break = pd.DataFrame()
+        for group_key, compatible_group in compatible_replicate_groups.iterrows():
+            ## Get replicate from group
+            group_key = tuple(compatible_group.to_list())
+            replicate_group = replicate_groups_dict[group_key]
+            replicate_idx = replicate_group_index[group_key]
+            replicate = replicate_group.iloc[replicate_idx].to_frame().transpose().infer_objects()
+
+            ## update replicate index
+            if replicate_group_index[group_key] + 1 == len(replicate_group):
+                replicate_group_index[group_key] = 0
+            else:
+                replicate_group_index[group_key] += 1
+            
+            ## Add replicate to symmetry break
+            aliquot_replicate = pd.concat([aliquot.to_frame().transpose().reset_index(drop=True), replicate.reset_index(drop=True)], axis=1).groupby(level=0, axis=1).min()
+            
+            aliquot_symmetry_break = aliquot_symmetry_break.append(aliquot_replicate, ignore_index=True)
+
+        ## Add NaN group replicates
+        if len(na_replicate_group) > 0:
+            replicate_idx = na_replicate_group_index
+            replicate = na_replicate_group.iloc[replicate_idx].to_frame().transpose().infer_objects()
+
+            ## update replicate index
+            if na_replicate_group_index + 1 == len(na_replicate_group):
+                na_replicate_group_index = 0
+            else:
+                na_replicate_group_index += 1
+            
+            ## Add replicate to symmetry break
+            aliquot_replicate = pd.concat([aliquot.to_frame().transpose().reset_index(drop=True), replicate.reset_index(drop=True)], axis=1)
+            aliquot_symmetry_break = aliquot_symmetry_break.append(aliquot_replicate, ignore_index=True)
+
+
+        symmetry_break = symmetry_break.append(aliquot_symmetry_break, ignore_index=True)
+
+    return symmetry_break
+    
+    
+def get_aliquot_symmetry_samples(samples, factors, containers, container_assignment):
     """
     For each aliquot, pick representative from each symmetry group to use.
     """
-    l.debug("Getting Symmetry Groups from: %s", samples)
+    #l.debug("Getting Symmetry Groups from: %s", samples)
 
+   # import pdb; pdb.set_trace()
+    column_symmetry = get_column_symmetry(samples, factors, containers, container_assignment)
+    aliquot_symmetry = get_aliquot_symmetry(samples, factors, containers, container_assignment)
+    na_aliquot_symmetry = aliquot_symmetry[aliquot_symmetry.isnull().any(axis=1)]
+    symmetry = aliquot_symmetry.merge(column_symmetry)
+    symmetry = symmetry.append(na_aliquot_symmetry, ignore_index=True)
+
+    #import pdb; pdb.set_trace()
+    return symmetry
+    
     non_replicate_factors = [x for x in samples.columns if x != "replicate" ]
-
-    l.debug("non_replicate_factors: %s", non_replicate_factors)
-    
-    num_aliquots = sum([len(c['aliquots']) for _, c in containers.items()])
-    
-    def replicate_replicates(replicates):
-        #l.debug("replicates: %s", replicates)
-        rep_reps = [ x  for _ in range(int(np.ceil(num_aliquots/len(replicates)))) for x in replicates.replicate]
-        replicates = replicates.drop(columns=['replicate']).drop_duplicates()
-        replicates.loc[:, 'key'] = 0
-        #l.debug("replicates: %s", rep_reps)
-        new_reps = pd.DataFrame({'replicate' : rep_reps[0:num_aliquots]})
-        new_reps.loc[:,'key'] = 0
-        #l.debug("replicates: %s", new_reps)
-        new_reps = new_reps.merge(replicates, on='key').drop(columns=['key']).reset_index()
-        new_reps.loc[:,'index'] = new_reps.index
-        #l.debug("replicates: %s", new_reps)
-        return new_reps
-                         
-    
-    sample_groups = samples.drop_duplicates().groupby(non_replicate_factors).apply(replicate_replicates)
-    # l.debug(sample_groups)
-#    for g, gr in sample_groups:
-#        l.debug("sample groups: %s %s", g, gr)
-
+    batch_factors = [x for x, y in factors.items() if y['ftype'] == "batch" ]
+    column_factors = [x for x, y in factors.items() if y['ftype'] == "column" ]
     
     
     aliquot_symmetry_samples = pd.DataFrame()
     for container_id, container in containers.items():
-        c_df = pd.DataFrame({ "aliquot" : list(container['aliquots'].keys())})
+        if container_assignment and container_id not in container_assignment:
+            continue
+        
+        #l.debug(container)
+        c_df = pd.read_json(json.dumps(container['aliquots']), orient='index').reset_index()
+        if len(c_df) > 0:
+            c_df = c_df.rename(columns={'index' : 'aliquot'})
+        else:
+            ## The aliquots are empty
+            c_df = pd.DataFrame({"aliquot" : list(container['aliquots'].keys())})
+            c_df['column'] = c_df.apply(lambda x: get_aliquot_col(x['aliquot'], container), axis=1)
+            c_df.loc[:,'key'] = 0
+            strain_df = samples[non_replicate_factors].drop(columns=batch_factors+column_factors).drop_duplicates().fillna(0.0)#pd.DataFrame({"strain": list(samples.strain.unique())})
+            strain_df.loc[:, 'key'] = 0
+            c_df = c_df.merge(strain_df, on="key").drop(columns=['key'])
         c_df.loc[:, "container"] = container_id
         aliquot_symmetry_samples = aliquot_symmetry_samples.append(c_df, ignore_index = True)
-    aliquot_symmetry_samples.loc[:,'index'] = aliquot_symmetry_samples.index
 
-    # l.debug(aliquot_symmetry_samples)
+    
+    num_aliquots = sum([len(c['aliquots']) for _, c in containers.items()])
+    batch_size = samples.groupby(batch_factors)['strain'].agg(len).reset_index().rename(columns={"strain": "size"})
+    
+    def replicate_replicates(replicates):
+        l.debug(replicates)
 
-    aliquot_symmetry_samples = aliquot_symmetry_samples.merge(sample_groups, on='index').drop(columns=['index'])
-    pd.set_option("display.max_rows", 1000)
-    l.debug(aliquot_symmetry_samples)
-    pd.set_option("display.max_rows", 100)
+
+        ## Don't need to replicate replicates, unless there are unallocated wells
+        if len(aliquot_symmetry_samples) > num_aliquots:
+            ## There is more than one possible sample per aliquot, meaning wells aren't allocated yet
+            this_batch_size = batch_size.merge(replicates, on=batch_factors)['size'].unique()[0]
+            rep_reps = [ x  for _ in range(int(np.ceil(this_batch_size/len(replicates)))) for x in replicates.replicate]
+            replicates = replicates.drop(columns=['replicate']).drop_duplicates()
+            new_reps = pd.DataFrame({'replicate' : rep_reps[0:this_batch_size]})
+            return new_reps
+        else:
+            return replicates
+    non_replicate_non_column_factors = [x for x in non_replicate_factors if x not in column_factors]
+    sample_groups = samples.fillna(0.0).drop_duplicates().groupby(non_replicate_non_column_factors).apply(replicate_replicates).reset_index()
+    levels = [x for x in sample_groups.columns if 'level_' in x]
+    if len(levels) > 0:
+        sample_groups = sample_groups.drop(columns=levels)
+    if 'index' in sample_groups.columns:
+        sample_groups = sample_groups.drop(columns=['index'])
+    sample_groups = sample_groups.reset_index(drop=True)
+            
+
+    #import pdb; pdb.set_trace()     
+
+
+    sample_groups = sample_groups.sort_values(by=batch_factors+non_replicate_non_column_factors).reset_index(drop=True)
+    aliquot_sort=[x for x in ['container', 'column'] + non_replicate_factors if x in aliquot_symmetry_samples.columns]
+    aliquot_symmetry_samples = aliquot_symmetry_samples.sort_values(by=aliquot_sort).reset_index(drop=True)
+
+    aliquot_symmetry_samples = aliquot_symmetry_samples.join(sample_groups.drop(columns=non_replicate_factors))
 
     
     return aliquot_symmetry_samples
@@ -1303,6 +1514,11 @@ def solve1(input, pick_container_assignment=True, hand_coded_constraints=None):
     else:
         input['container_assignment'] = None
 
+    unused_containers = [container_id for container_id in input['containers']
+                              if input['container_assignment'] and container_id not in input['container_assignment']]
+    for container_id in unused_containers:
+        del input['containers'][container_id]
+
     containers = input['containers']
     # l.debug(containers)
     strain_counts = { k : get_strain_count(v) for k, v in containers.items()}
@@ -1313,6 +1529,8 @@ def solve1(input, pick_container_assignment=True, hand_coded_constraints=None):
     if not input['samples']:
 
         sample_factors = { x : y for x, y in input['factors'].items() if y['ftype'] == 'sample' }
+        batch_factors = { x : y for x, y in input['factors'].items() if y['ftype'] == 'batch' }
+        
         non_sample_factors = {x : y for x, y in input['factors'].items() if y['ftype'] != 'sample'}
         l.debug("sample_factors: %s", sample_factors)
 
@@ -1381,8 +1599,17 @@ def solve1(input, pick_container_assignment=True, hand_coded_constraints=None):
             l.debug("Adding Free sample %s", i)
             input['sample_types'][i] = None
 
-
-        input['aliquot_symmetry_samples'] = get_aliquot_symmetry_samples(get_sample_types(input['factors'], input['requirements'])[list(non_sample_factors.keys())].dropna(axis='columns'), non_sample_factors, containers)
+#        import pdb; pdb.set_trace() 
+        non_samples = get_sample_types(input['factors'], input['requirements'])[list(non_sample_factors.keys())]
+        #non_samples = non_samples.dropna(axis='columns').drop_duplicates().reset_index(drop=True)
+        non_samples = non_samples.drop_duplicates().reset_index(drop=True)
+        try:
+            input['aliquot_symmetry_samples'] = get_aliquot_symmetry_samples(non_samples, non_sample_factors, containers, input['container_assignment'])
+        except Exception as e:
+            import pdb, traceback, sys
+            extype, value, tb = sys.exc_info()
+            traceback.print_exc()
+            pdb.post_mortem(tb)
         
             
     l.info("Generating Constraints ...")
@@ -1416,6 +1643,7 @@ def preprocess_containers(input, sample_types, strain_counts, sample_factors, al
     """
 
     containers = input['containers']
+    l.debug("containers: %s", containers)
     num_container_aliquots = sum([len(container['aliquots']) for container_id, container in containers.items()])
     num_empty_wells = sum([c["None"] for c_id, c in strain_counts.items() if "None" in c]) + sum([c[None] for c_id, c in strain_counts.items() if None in c])
     num_strains_present = num_container_aliquots - num_empty_wells
@@ -1466,9 +1694,12 @@ def preprocess_containers(input, sample_types, strain_counts, sample_factors, al
 
         empties = pd.DataFrame({"replicate" : [x+1 for x in range(0, num_empty)]})
         empties.loc[:,"strain"] = "None"
-        batch = batch.drop(columns=batch_factors+['container']).append(empties)
+        for factor in batch_factors:
+            empties.loc[:, factor] = batch[factor].unique()[0]
+        batch = batch.drop(columns=['container']).append(empties, ignore_index=True)
         l.debug("Done Computing empties for batch: %s", batch)
         return batch
+
 
     batch_aliquots = sample_types.drop(columns=sample_factors).drop_duplicates()
     batch_containers = pd.read_json(json.dumps(container_assignment), orient='index')
@@ -1481,8 +1712,10 @@ def preprocess_containers(input, sample_types, strain_counts, sample_factors, al
     #for g, ba in batch_aliquots:
     #   l.debug(g)
     #   l.debug(ba)
-
-    batch_aliquots = batch_aliquots.apply(compute_num_empty_per_batch).reset_index()
+    
+    
+    batch_aliquots = batch_aliquots.apply(compute_num_empty_per_batch)
+    batch_aliquots = batch_aliquots.reset_index(drop=True)
     
     l.debug("Batch aliquots: %s", batch_aliquots)
 #    for g, ba in batch_aliquots:
