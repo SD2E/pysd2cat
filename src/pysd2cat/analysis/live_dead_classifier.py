@@ -16,7 +16,7 @@ import logging
 import os
 
 l = logging.getLogger(__file__)
-l.setLevel(logging.DEBUG)
+l.setLevel(logging.INFO)
 
 
 def build_model_pd(classifier_df,
