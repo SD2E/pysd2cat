@@ -5,6 +5,7 @@ by the SAT problem generator.
 
 import string
 import math
+import numpy as np
 
 import logging
 
@@ -89,11 +90,20 @@ def aliquot_dict(well_map, aliquots_df, well_idx, strain_name="Name"):
         
     else:
         strain = aliquots_df.at[well_idx,strain_name]
-        if strain:
-            return {"strain": strain}
-        else:
-            return {}
+        l.debug("strain: %s, strain_property: %s", strain, strain_name)
+        rdict = {}
 
+#        if 'replicate' in aliquots_df.columns:
+#            replicate = aliquots_df.at[well_idx, "replicate"]
+#            if replicate and  ( type(replicate) is not float or ~np.isnan(replicate) ):
+#                rdict["replicate"] = replicate
+        
+        if strain and (type(strain) is not float or  ~np.isnan(strain)):
+            rdict["strain"] =  strain
+        else:
+            rdict["strain"] = "None"
+
+        return rdict
 
 def column_dict(col_count, well_idxs):
     """
@@ -139,7 +149,7 @@ def drop_nan_strain_aliquots(c2d):
         if 'strain' in aliquot and type(aliquot['strain']) is float and math.isnan(aliquot['strain']):
             #dropped_aliquots.append(aliquot_id)
             aliquots[aliquot_id] = aliquot
-            del aliquots[aliquot_id]['strain']
+            del aliquots[aliquot_id]
         else:
             aliquots[aliquot_id] = aliquot
     columns = {}
