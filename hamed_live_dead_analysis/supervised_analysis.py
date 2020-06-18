@@ -66,6 +66,7 @@ def retrieve_preds_and_labels(th_results_path, test_df_path, rl1s=True, percent_
     preds_and_labels["run_id"] = run_id
 
     if append_cols is not None:
+        print("APPEND_COLS IS NOT NONE")
         append_cols = make_list_if_not_list(append_cols)
         assert is_list_of_strings(append_cols), "append_cols must be a string or a list of strings"
 
@@ -156,7 +157,8 @@ def make_clustermap(cm, plot_title, color_by_cols=None, color_rows=False, rotate
         row_colors = None
 
     cmap = sns.clustermap(cm[cm_cols], row_colors=row_colors,
-                          xticklabels=True, yticklabels=True, cmap="Greens")
+                          xticklabels=True, yticklabels=True, cmap="Greens",
+                          row_cluster=True, col_cluster=False)
     ax2 = cmap.ax_heatmap
     ax2.set_xlabel('Predicted labels')
     ax2.set_ylabel('True labels')
@@ -273,8 +275,9 @@ def main():
     conc_time_results_path = os.path.join(CWD, "conc_time_results/test_harness_results")
     conc_results_path = os.path.join(CWD, "conc_results/test_harness_results")
 
-    # conc_time_results = retrieve_preds_and_labels(th_results_path=conc_time_results_path,
-    #                                               rl1s=True, percent_train_data=1.0)
+    conc_time_results = retrieve_preds_and_labels(th_results_path=conc_time_results_path,
+                                                  test_df_path="datasets/yeast_normalized_test_df.csv",
+                                                  rl1s=True, percent_train_data=1.0)
     # conc_results = retrieve_preds_and_labels(th_results_path=conc_results_path,
     #                                          rl1s=True, percent_train_data=1.0, append_cols=["(conc, time)", "RL1-A"])
 
@@ -292,8 +295,8 @@ def main():
     # plt.ylim(0, 1)
     # plt.show()
 
-    # cm, cm_info = make_confusion_matrix(conc_time_results, "(conc, time)", "true", label_order=None)
-    # make_clustermap(cm, cm_info, ["conc", "time"], True)
+    cm, cm_info = make_confusion_matrix(conc_time_results, "(conc, time)", "true", label_order=None)
+    make_clustermap(cm, cm_info, ["conc", "time"], True)
 
     # ------------------------------------------------------------------------------------------------------------------
     # conc analysis
@@ -363,22 +366,22 @@ def main():
 
     # ------------------------------------------------------------------------------------------------------------------
 
-    yeast_results = retrieve_preds_and_labels(th_results_path="new_results/test_harness_results",
-                                              test_df_path="datasets/yeast_normalized_test_df.csv",
-                                              append_cols=["time_point"],
-                                              run_id="weXr7qkbY38Or")
-    basc_results = retrieve_preds_and_labels(th_results_path="new_results/test_harness_results",
-                                             test_df_path="datasets/basc_normalized_test_df.csv",
-                                             append_cols=["time_point"],
-                                             run_id="wb1r3yVbD1EVr")
-    ecoli_results = retrieve_preds_and_labels(th_results_path="new_results/test_harness_results",
-                                              test_df_path="datasets/ecoli_normalized_test_df.csv",
-                                              append_cols=["time_point"],
-                                              run_id="8y5zDzAbDNjkg")
-
-    print(ecoli_results)
-
-    detailed_confusion_matrix(yeast_results, "ethanol", "time_point")
+    # yeast_results = retrieve_preds_and_labels(th_results_path="new_results/test_harness_results",
+    #                                           test_df_path="datasets/yeast_normalized_test_df.csv",
+    #                                           append_cols=["time_point"],
+    #                                           run_id="weXr7qkbY38Or")
+    # basc_results = retrieve_preds_and_labels(th_results_path="new_results/test_harness_results",
+    #                                          test_df_path="datasets/basc_normalized_test_df.csv",
+    #                                          append_cols=["time_point"],
+    #                                          run_id="wb1r3yVbD1EVr")
+    # ecoli_results = retrieve_preds_and_labels(th_results_path="new_results/test_harness_results",
+    #                                           test_df_path="datasets/ecoli_normalized_test_df.csv",
+    #                                           append_cols=["time_point"],
+    #                                           run_id="8y5zDzAbDNjkg")
+    #
+    # print(ecoli_results)
+    #
+    # detailed_confusion_matrix(yeast_results, "ethanol", "time_point")
 
 
 if __name__ == '__main__':

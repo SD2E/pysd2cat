@@ -42,18 +42,44 @@ def plot_flow(df_tot, ets, channel='log_RL1-A', negative_outlier_cutoff=None):
     # plt.show()
 
 
+def plot_flow_2(df_tot):
+    palette = "pastel"
+    g = sns.FacetGrid(df_tot, row="strain", col="time_point", hue='ethanol',
+                      margin_titles=True, palette=palette)
+    g.map(plt.hist, 'log_RL1-A', bins=100, log=True)
+    g.add_legend()
+    plt.savefig("plot_flow_2_{}.png".format(palette))
+
+
 def main():
-    df = pd.read_csv("datasets/yeast_train_bank.csv")
+    organism = "yeast"
+
+    if organism == "yeast":
+        df = pd.read_csv("datasets/yeast_train_bank.csv")
+    elif organism == "basc":
+        df = pd.read_csv("datasets/basc_train_bank.csv")
+    elif organism == "ecoli":
+        df = pd.read_csv("datasets/ecoli_train_bank.csv")
+    else:
+        raise NotImplementedError()
+
     print(df)
     print()
-
     ets = np.array([[0.0, 1, 1],
                     [210.0, 1, 1],
                     [1120.0, 1, 1]])
-
-    plot_flow(df, ets=ets, channel="log_RL1-A", negative_outlier_cutoff=0.1)
+    # plot_flow(df, ets=ets, channel="log_RL1-A", negative_outlier_cutoff=0.1)
     # plot_flow(df, ets=ets, channel="log_RL1-H", negative_outlier_cutoff=None)
     # plot_flow(df, ets=ets, channel="log_RL1-W", negative_outlier_cutoff=None)
+
+    if organism == "yeast":
+        df_2 = df.copy()
+        df_2["strain"] = "yeast"
+        print(df_2.shape)
+        df_2 = df_2.loc[df_2["ethanol"].isin([0.0, 210.0, 1120.0])]
+        df_2 = df_2.loc[df_2["stain"] == 1]
+        print(df_2.shape)
+        plot_flow_2(df_2)
 
 
 # print()
