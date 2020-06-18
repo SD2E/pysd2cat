@@ -27,9 +27,8 @@ def run_models_varying_train_amounts(train_bank, test_df, list_of_train_percents
                       training_data=train_df,
                       testing_data=test_df, data_and_split_description="{}_{}".format(desc, p),
                       cols_to_predict=col_to_predict, feature_cols_to_use=features_to_use,
-                      index_cols=["arbitrary_index"], normalize=True, feature_cols_to_normalize=features_to_use,
-                      feature_extraction=False,
-                      predict_untested_data=False)
+                      index_cols=["arbitrary_index"], normalize=False, feature_cols_to_normalize=features_to_use,
+                      feature_extraction="eli5_permutation", predict_untested_data=False)
 
 
 def main():
@@ -51,7 +50,12 @@ def main():
     yeast_features_1 = ["FSC-A", "FSC-H", "FSC-W", "SSC-A", "SSC-H", "SSC-W", "BL1-H", "BL1-W", "BL1-A", "RL1-A", "RL1-W", "RL1-H"]
     basc_ecoli_features_0 = ["FSC-A", "FSC-H", "FSC-W", "SSC-A", "SSC-H", "SSC-W"]
     basc_ecoli_features_1 = ["FSC-A", "FSC-H", "FSC-W", "SSC-A", "SSC-H", "SSC-W", "RL1-A", "RL1-W", "RL1-H"]
+    yeast_features_0 = ["log_{}".format(x) for x in yeast_features_0]
+    yeast_features_1 = ["log_{}".format(x) for x in yeast_features_1]
+    basc_ecoli_features_0 = ["log_{}".format(x) for x in basc_ecoli_features_0]
+    basc_ecoli_features_1 = ["log_{}".format(x) for x in basc_ecoli_features_1]
 
+    '''
     # set stain here. 0 = don't use stains, 1 = use stains
     stain = 1
 
@@ -76,6 +80,7 @@ def main():
         ecoli_test_df = ecoli_test_df.loc[ecoli_test_df["stain"] == 1]
     else:
         raise NotImplementedError()
+    '''
 
     # train_percents_to_try = list(np.flip(np.linspace(0.1, 1, 10))) + list(np.flip(np.linspace(0.01, 0.09, 9)))
     # train_percents_to_try = [round(x, 2) for x in train_percents_to_try]
@@ -97,10 +102,56 @@ def main():
     # run_models_varying_train_amounts(custom_percents, feature_cols_1, conc_path, 'kill_volume')
     # run_models_varying_train_amounts(custom_percents, feature_cols_2, conc_path, 'kill_volume')
 
-    new_path = os.path.join(current_path, "new_results")
+    # ----------------------------------------------------------------------------------------------------------------
+
+    # new_path = os.path.join(current_path, "log_features_april_23")
     # run_models_varying_train_amounts(yeast_train_bank, yeast_test_df, [0.1], fcols_yeast, new_path, 'ethanol', "yeast")
     # run_models_varying_train_amounts(basc_train_bank, basc_test_df, [1.0], fcols_basc_ecoli, new_path, 'ethanol', "basc")
     # run_models_varying_train_amounts(ecoli_train_bank, ecoli_test_df, [1.0], fcols_basc_ecoli, new_path, 'ethanol', "ecoli")
+
+    cross_path = os.path.join(current_path, "cross_organism_april_23")
+    # run_models_varying_train_amounts(basc_train_bank, ecoli_test_df, [1.0], fcols_basc_ecoli,
+    #                                  cross_path, 'ethanol', "train_basc_test_ecoli")
+    # run_models_varying_train_amounts(ecoli_train_bank, basc_test_df, [1.0], fcols_basc_ecoli,
+    #                                  cross_path, 'ethanol', "train_ecoli_test_basc")
+
+    # ethanol_basc_ecoli_dict = {0.0: 0, 5.0: 1, 10.0: 2, 15.0: 3, 40.0: 4}
+    # ethanol_yeast_dict = {0.0: 0, 140.0: 1, 210.0: 2, 280.0: 3, 1120.0: 4}
+    # basc_train_bank["ethanol"] = basc_train_bank["ethanol"].map(ethanol_basc_ecoli_dict)
+    # basc_test_df["ethanol"] = basc_test_df["ethanol"].map(ethanol_basc_ecoli_dict)
+    # ecoli_train_bank["ethanol"] = ecoli_train_bank["ethanol"].map(ethanol_basc_ecoli_dict)
+    # ecoli_test_df["ethanol"] = ecoli_test_df["ethanol"].map(ethanol_basc_ecoli_dict)
+    # yeast_train_bank["ethanol"] = yeast_train_bank["ethanol"].map(ethanol_yeast_dict)
+    # yeast_test_df["ethanol"] = yeast_test_df["ethanol"].map(ethanol_yeast_dict)
+
+    # run_models_varying_train_amounts(basc_train_bank, yeast_test_df, [1.0], fcols_basc_ecoli,
+    #                                  cross_path, 'ethanol', "train_basc_test_yeast")
+    # run_models_varying_train_amounts(ecoli_train_bank, yeast_test_df, [1.0], fcols_basc_ecoli,
+    #                                  cross_path, 'ethanol', "train_ecoli_test_yeast")
+    #
+    # run_models_varying_train_amounts(yeast_train_bank, basc_test_df, [0.1], fcols_basc_ecoli,
+    #                                  cross_path, 'ethanol', "train_yeast_test_basc")
+    # run_models_varying_train_amounts(yeast_train_bank, ecoli_test_df, [0.1], fcols_basc_ecoli,
+    #                                  cross_path, 'ethanol', "train_yeast_test_ecoli")
+
+    # ----------------------------------------------------------------------------------------------------------------
+    # stain vs. non-stain
+    stain_variants_path = os.path.join(current_path, "stain_variants_results")
+    print(yeast_features_0)
+    print(basc_ecoli_features_0)
+
+    # run_models_varying_train_amounts(yeast_train_bank.loc[yeast_train_bank["stain"] == 0],
+    #                                  yeast_test_df.loc[yeast_test_df["stain"] == 1],
+    #                                  [0.1], yeast_features_0,
+    #                                  stain_variants_path, 'ethanol', "yeast non-stain --> stain")
+    # run_models_varying_train_amounts(basc_train_bank.loc[basc_train_bank["stain"] == 0],
+    #                                  basc_test_df.loc[basc_test_df["stain"] == 1],
+    #                                  [1.0], basc_ecoli_features_0,
+    #                                  stain_variants_path, 'ethanol', "basc non-stain --> stain")
+    # run_models_varying_train_amounts(ecoli_train_bank.loc[ecoli_train_bank["stain"] == 0],
+    #                                  ecoli_test_df.loc[ecoli_test_df["stain"] == 1],
+    #                                  [1.0], basc_ecoli_features_0,
+    #                                  stain_variants_path, 'ethanol', "ecoli non-stain --> stain")
 
 
 if __name__ == '__main__':
