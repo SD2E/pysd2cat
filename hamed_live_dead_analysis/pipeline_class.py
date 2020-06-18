@@ -20,7 +20,7 @@ pd.set_option('display.width', 10000)
 pd.set_option('display.max_colwidth', -1)
 
 # how is this different from os.path.dirname(os.path.realpath(__file__))?
-dir_path = os.getcwd()
+current_dir_path = os.getcwd()
 
 
 # TODO: figure out where/when dataframes should be copied or not
@@ -40,19 +40,25 @@ class LiveDeadPipeline:
         self.y_stain = self.x_stain if y_stain is None else y_stain
 
         self.x_experiment_id = n.exp_dict[(self.x_strain, self.x_treatment)]
-        self.x_data_path = os.path.join(dir_path, n.exp_data_dir, self.x_experiment_id)
+        self.x_data_path = os.path.join(current_dir_path, n.exp_data_dir, self.x_experiment_id)
         self.y_experiment_id = n.exp_dict[(self.y_strain, self.y_treatment)]
-        self.y_data_path = os.path.join(dir_path, n.exp_data_dir, self.y_experiment_id)
+        self.y_data_path = os.path.join(current_dir_path, n.exp_data_dir, self.y_experiment_id)
 
         if (self.x_stain == 0) or (self.y_stain == 0):
             self.feature_cols = n.morph_cols
         else:
             self.feature_cols = n.morph_cols + n.sytox_cols
 
-        self.harness_path = os.path.join(dir_path, n.harness_output_dir)
+        self.harness_path = os.path.join(current_dir_path, n.harness_output_dir)
         self.runs_path = os.path.join(self.harness_path, "test_harness_results/runs")
         self.labeled_data = None
         self.method = None
+
+        self.output_dir_name = "({}_{}_{})_({}_{}_{})".format(self.x_strain, self.x_treatment, self.x_stain,
+                                                              self.y_strain, self.y_treatment, self.y_stain)
+        self.output_path = os.path.join(current_dir_path, n.pipeline_output_dir, self.output_dir_name)
+        if not os.path.exists(self.output_path):
+            os.makedirs(self.output_path)
 
     # ----- Preprocessing -----
 
@@ -245,7 +251,7 @@ class LiveDeadPipeline:
         plt.title("Predicted Live over Time using {}".format(self.method))  # TODO make title more descriptive
         # plt.show()
         # TODO: add make_dir_if_does_not_exist
-        plt.savefig(os.path.join(dir_path, n.pipeline_output_dir,
+        plt.savefig(os.path.join(current_dir_path, n.pipeline_output_dir,
                                  "time_series_({}_{}_{})_({}_{}_{})_{}.png".format(self.x_strain, self.x_treatment, self.x_stain,
                                                                                    self.y_strain, self.y_treatment, self.y_stain,
                                                                                    self.method)))
