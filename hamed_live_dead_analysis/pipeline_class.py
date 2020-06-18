@@ -23,6 +23,7 @@ pd.set_option('display.max_colwidth', -1)
 dir_path = os.getcwd()
 
 
+# TODO: figure out where/when dataframes should be copied or not
 # TODO: add in cross-strain and cross-treatment labeling if it makes sense.
 class LiveDeadPipeline:
     def __init__(self, x_strain=n.yeast, x_treatment=n.ethanol, x_stain=1,
@@ -51,6 +52,7 @@ class LiveDeadPipeline:
         self.harness_path = os.path.join(dir_path, n.harness_output_dir)
         self.runs_path = os.path.join(self.harness_path, "test_harness_results/runs")
         self.labeled_data = None
+        self.method = None
 
     # ----- Preprocessing -----
 
@@ -75,10 +77,10 @@ class LiveDeadPipeline:
         # we want to have the data normalized before model runs because of data visualizations? Or actually is that what we don't want?
         # if we do want normalized, then should be fine to normalize all the data together (before train/test split),
         # because our models will re-normalize after train/test splitting, which should have the same effect (double check this)
-        x_scaler = StandardScaler()
-        y_scaler = StandardScaler()
-        x_df[self.feature_cols] = x_scaler.fit_transform(x_df[self.feature_cols])
-        y_df[self.feature_cols] = y_scaler.fit_transform(y_df[self.feature_cols])
+        # x_scaler = StandardScaler()
+        # y_scaler = StandardScaler()
+        # x_df[self.feature_cols] = x_scaler.fit_transform(x_df[self.feature_cols])
+        # y_df[self.feature_cols] = y_scaler.fit_transform(y_df[self.feature_cols])
         # print(x_df.head())
         # print()
         # print(y_df.head())
@@ -125,7 +127,9 @@ class LiveDeadPipeline:
 
     # ----- Exploratory Methods -----
     def plot_distribution(self, channel=n.sytox_cols[0]):
-        pass
+        sns.distplot(self.x_df[channel], bins=50, color="lightgreen", norm_hist=False, kde=False)
+        plt.title("Histogram of {}".format(channel))
+        plt.show()
 
     def scatterplot(self):
         pass
@@ -158,7 +162,7 @@ class LiveDeadPipeline:
 
     # ----- Labeling methods -----
 
-    def tuple_method(self, live_tuples=None, dead_tuples=None):
+    def condition_method(self, live_conditions=None, dead_conditions=None):
         """
         Define certain tuples of (treatment, time-point) as live or dead.
             E.g. (0-treatment, final timepoint) = live, (max-treatment, final timepoint) = dead
@@ -166,34 +170,35 @@ class LiveDeadPipeline:
         Final product is dataframe with original data and predicted labels, which is set to self.predicted_data
 
 
-        :param live_tuples:
-        :type live_tuples: list of dicts
-        :param dead_tuples:
-        :type dead_tuples: list of dicts
+        :param live_conditions:
+        :type live_conditions: list of dicts
+        :param dead_conditions:
+        :type dead_conditions: list of dicts
         """
-        self.method = "tuple_method"
-        if live_tuples is None:
-            live_tuples = [{self.x_treatment: n.treatments_dict[self.x_treatment][0], n.time: n.timepoints[-1]}]
-        if dead_tuples is None:
-            dead_tuples = [{self.x_treatment: n.treatments_dict[self.x_treatment][-1], n.time: n.timepoints[-1]}]
-        print(live_tuples)
-        print(dead_tuples)
+        self.method = "condition_method"
+        if live_conditions is None:
+            live_conditions = [{self.x_treatment: n.treatments_dict[self.x_treatment][0], n.time: n.timepoints[-1]}]
+        if dead_conditions is None:
+            dead_conditions = [{self.x_treatment: n.treatments_dict[self.x_treatment][-1], n.time: n.timepoints[-1]}]
+        print(live_conditions)
+        print(dead_conditions)
         print()
 
-        # Label points according to live_tuples and dead_tuples
-        # first obtain indexes of the rows that correspond to live_tuples and dead_tuples
+        # Label points according to live_conditions and dead_conditions
+        # first obtain indexes of the rows that correspond to live_conditions and dead_conditions
         live_indexes = []
         dead_indexes = []
-        for lt in live_tuples:
+        for lt in live_conditions:
             live_indexes += list(self.x_df.loc[(self.x_df[list(lt)] == pd.Series(lt)).all(axis=1), n.index])
-        for dt in dead_tuples:
+        for dt in dead_conditions:
             dead_indexes += list(self.x_df.loc[(self.x_df[list(dt)] == pd.Series(dt)).all(axis=1), n.index])
         labeled_indexes = live_indexes + dead_indexes
 
+        # TODO: check if this should call .copy() or not
         labeled_df = self.x_df[self.x_df[n.index].isin(labeled_indexes)]
         labeled_df.loc[labeled_df[n.index].isin(live_indexes), n.label] = 1
         labeled_df.loc[labeled_df[n.index].isin(dead_indexes), n.label] = 0
-        print(labeled_df)
+        print(labeled_df.head())
         # mainly doing this split so Test Harness can run without balking (it expects testing_data)
         train_df, test_df = train_test_split(labeled_df, train_size=0.95, random_state=5,
                                              stratify=labeled_df[[self.x_treatment, n.time, n.label]])
@@ -202,8 +207,21 @@ class LiveDeadPipeline:
         run_id = self.invoke_test_harness(train_df=train_df, test_df=test_df, pred_df=self.y_df)
         self.labeled_data = pd.read_csv(os.path.join(self.runs_path, "run_{}/predicted_data.csv".format(run_id)))
 
-    def thresholding_method(self):
-        pass
+    def thresholding_method(self, channel=n.sytox_cols[0]):
+        """
+        Currently uses arithmetic mean of channel (default RL1-A).
+        Since channels are logged, arithmetic mean is equivalent to geometric mean of original channel values.
+        Final product is dataframe with original data and predicted labels, which is set to self.predicted_data
+        """
+        self.method = "thresholding_method"
+        channel_values = list(self.x_df[channel])
+        threshold = np.array(channel_values).mean()
+
+        labeled_df = self.x_df.copy()
+        labeled_df.loc[labeled_df[channel] >= threshold, n.label_preds] = 1
+        labeled_df.loc[labeled_df[channel] < threshold, n.label_preds] = 0
+        print(labeled_df.head())
+        self.labeled_data = labeled_df
 
     # ----- Performance Evaluation -----
 
@@ -226,7 +244,11 @@ class LiveDeadPipeline:
         sns.lineplot(x=ratio_df[n.time], y=ratio_df[n.percent_live], hue=ratio_df[self.y_treatment], palette=palette)
         plt.title("Predicted Live over Time using {}".format(self.method))  # TODO make title more descriptive
         # plt.show()
-        plt.savefig(os.path.join(dir_path, "time_series_temp.png"))
+        # TODO: add make_dir_if_does_not_exist
+        plt.savefig(os.path.join(dir_path, n.pipeline_output_dir,
+                                 "time_series_({}_{}_{})_({}_{}_{})_{}.png".format(self.x_strain, self.x_treatment, self.x_stain,
+                                                                                   self.y_strain, self.y_treatment, self.y_stain,
+                                                                                   self.method)))
         return ratio_df
 
     def quantitative_metrics(self, labeled_df):
@@ -243,7 +265,7 @@ class LiveDeadPipeline:
         Calls qualitative and quantitative methods for performance evaluation
         """
         ratio_df = self.time_series_plot(self.labeled_data)
-        print(ratio_df)
+        # print(ratio_df)
 
         # self.quantitative_metrics(self.labeled_data)
 
