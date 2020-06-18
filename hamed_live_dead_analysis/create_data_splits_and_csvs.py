@@ -1,4 +1,5 @@
 import os
+import sys
 import numpy as np
 import pandas as pd
 from pathlib import Path
@@ -6,6 +7,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
 
 pd.set_option('display.max_columns', 500)
+pd.set_option('display.max_rows', 500)
 pd.set_option('display.width', 10000)
 pd.set_option('display.max_colwidth', -1)
 
@@ -19,7 +21,7 @@ def main():
     # so it saves the splits as csv's so they can be read in by model code in other modules.
 
     # choose organism
-    organism = "ecoli"
+    organism = "basc"
 
     if organism == "yeast":
         feature_cols = ["FSC-A", "SSC-A", "BL1-A", "RL1-A", "FSC-H", "SSC-H", "BL1-H", "RL1-H", "FSC-W", "SSC-W", "BL1-W", "RL1-W"]
@@ -44,10 +46,6 @@ def main():
     balanced_df = full_df.groupby(["ethanol", "time_point", "stain"]). \
         apply(lambda x: x.sample(min_num_events, random_state=5)).reset_index(drop=True)
     print("Shape of balanced_df: {}".format(balanced_df.shape))
-
-    # # Doing some more data cleaning here:
-    # balanced_df.drop(columns=["(conc, time)"], inplace=True)
-    # print("Shape of balanced_df: {}\n".format(balanced_df.shape))
 
     # Create Log10 features
     logged_feature_cols = ["log_{}".format(f) for f in feature_cols]
