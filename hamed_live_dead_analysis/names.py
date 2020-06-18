@@ -33,11 +33,12 @@ class Names:
         (basc, ethanol): "experiment.transcriptic.r1eaf248xavu8a",
         (ecoli, ethanol): "experiment.transcriptic.r1eaf25ne8ajts"
     }
-    exp_data_dir = "experiment_data"
-    harness_output_dir = "test_harness_outputs"
     # each experiment should have a corresponding folder with the same name as the experiment_id
     # inside the folder you will have data files: dataset, train, test, normalized_train, normalized_test, etc.
     # then the LiveDeadPipeline can call file if it exists or otherwise create it using preprocessing methods
+    exp_data_dir = "experiment_data"
+    harness_output_dir = "test_harness_outputs"
+    pipeline_output_dir = "pipeline_outputs"
 
     num_live = "num_live"
     num_dead = "num_dead"
