@@ -43,3 +43,8 @@ class Names:
     num_live = "num_live"
     num_dead = "num_dead"
     percent_live = "predicted %live"
+
+    # labeling methods:
+    thresholding_method = "thresholding_method"
+    condition_method = "condition_method"
+    cluster_method = "cluster_method"
