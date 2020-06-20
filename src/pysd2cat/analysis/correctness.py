@@ -79,7 +79,10 @@ def compute_predicted_output(df,
         ## Predict label for unseen data
         pred_df = df[data_columns]
         pred_df = ldc.predict_live_dead(pred_df, model, scaler)
-        result_df = df[['output', id_col]]
+        if 'output' in df.columns:
+            result_df = df[['output', id_col]]
+        else:
+            result_df = df[[id_col]]
         result_df.loc[:,'predicted_output'] = pred_df['class_label'].astype(int)
     
     return result_df
