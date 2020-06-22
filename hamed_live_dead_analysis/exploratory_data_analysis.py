@@ -12,7 +12,7 @@ pd.set_option('display.max_columns', 500)
 pd.set_option('display.width', 10000)
 pd.set_option('display.max_colwidth', -1)
 
-
+# TODO: remind myself what this code does
 def plot_flow(df_tot, ets, channel='log_RL1-A', negative_outlier_cutoff=None):
     palette = itertools.cycle(sns.color_palette())
 
