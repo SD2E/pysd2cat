@@ -1,0 +1,12 @@
+Treatment,% Dead,culture vol (ul),Ethanol vol (ul),% Ethanol
+Control 1,0,1000,0,0
+Control 2,0.35,1000,0,0
+Control 3,0.32,1000,0,0
+10% Ethanol,0.17,1000,110,0.1
+20% Ethanol,0.97,1000,250,0.2
+30% Ethanol,1,1000,420,0.3
+40% Ethanol,1,1000,680,0.4
+50% Ethanol,1,1000,1000,0.5
+60% Ethanol,1,1000,1500,0.6
+70% Ethanol,1,1000,2300,0.7
+80% Ethanol,1,1000,4000,0.8
