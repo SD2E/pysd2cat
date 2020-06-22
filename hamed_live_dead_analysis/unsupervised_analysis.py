@@ -94,7 +94,7 @@ def main():
 
     sns.heatmap(frequency_table, cmap="Blues")
     plt.title("{}: Ethanol Concentration vs. {} KMeans Clusters.".format(organism, n_clusters))
-    # plt.show()
+    plt.show()
 
     # TODO: right now I have clustering with a train/test split, and then I'm doing another train/test split on the test set...
     # ---------------------------------- cluster-driven labeling and model run ----------------------------------
@@ -127,38 +127,6 @@ def main():
     #               cols_to_predict=col_to_predict, feature_cols_to_use=yeast_features_1,
     #               index_cols=["arbitrary_index", "ethanol", "time_point"], normalize=False, feature_cols_to_normalize=yeast_features_1,
     #               feature_extraction="eli5_permutation", predict_untested_data=False)
-
-    # ---------------------------------- treatment-driven labeling and model run ----------------------------------
-    treatment_df = test_df.copy()
-    print(treatment_df)
-    print()
-    treatment_labeled = treatment_df.loc[((treatment_df["ethanol"] == 0.0) | (treatment_df["ethanol"] == 1120.0))
-                                         & (treatment_df["time_point"] == 12)]
-    # treatment_unlabled = treatment_df.loc[~(((treatment_df["ethanol"] == 0.0) | (treatment_df["ethanol"] == 1120.0))
-    #                                         & (treatment_df["time_point"] == 12))]
-
-    treatment_labeled.loc[treatment_labeled["ethanol"] == 0.0, "label"] = 1
-    treatment_labeled.loc[treatment_labeled["ethanol"] == 1120.0, "label"] = 0
-    print(treatment_labeled)
-    print()
-    print(treatment_labeled["label"].value_counts(dropna=False))
-    print()
-
-    current_path = os.getcwd()
-    output_path = os.path.join(current_path, "ld_definition_results")
-    print("initializing TestHarness object with output_location equal to {} \n".format(output_path))
-    th = TestHarness(output_location=output_path)
-    col_to_predict = "label"
-    th.run_custom(function_that_returns_TH_model=random_forest_classification, dict_of_function_parameters={},
-                  training_data=treatment_labeled, testing_data=treatment_labeled,
-                  data_and_split_description="Treatment-driven labels",
-                  cols_to_predict=col_to_predict, feature_cols_to_use=yeast_features_1,
-                  index_cols=["arbitrary_index", "ethanol", "time_point"], normalize=False, feature_cols_to_normalize=yeast_features_1,
-                  feature_extraction="eli5_permutation", predict_untested_data=treatment_df)
-
-    # ---------------------------------- stain-driven labeling and model run ----------------------------------
-    # stain_df = test_df.copy()
-    # print(stain_df)
 
 
 if __name__ == '__main__':
