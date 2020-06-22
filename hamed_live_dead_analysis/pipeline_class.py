@@ -300,6 +300,15 @@ class LiveDeadPipeline:
         # self.invoke_test_harness() ?
 
     # ----- Performance Evaluation -----
+    def evaluate_performance(self, labeling_method):
+        """
+        Calls qualitative and quantitative methods for performance evaluation
+        """
+        if labeling_method not in self.labeled_data_dict.keys():
+            raise NotImplementedError("The labeling method you are trying to evaluate has not been run yet."
+                                      "Please run the labeling method first.")
+        ratio_df = self.time_series_plot(labeling_method=labeling_method)
+        self.timeseries_scatter(labeling_method=labeling_method)
 
     def time_series_plot(self, labeling_method):
         """
@@ -336,6 +345,66 @@ class LiveDeadPipeline:
 
         return ratio_df
 
+    def timeseries_scatter(self, labeling_method, xcol="log_SSC-A", ycol="log_RL1-A", sample_fraction=0.1, kdeplot=False):
+        matplotlib.use("tkagg")
+        if labeling_method not in self.labeled_data_dict.keys():
+            raise NotImplementedError("The labeling method you are trying to create a time_series_plot for has not been run yet."
+                                      "Please run the labeling method first.")
+        else:
+            labeled_df = self.labeled_data_dict[labeling_method]
+
+        if xcol not in labeled_df.columns.values:
+            labeled_df = pd.merge(labeled_df, self.y_df[[n.index, xcol]], on=n.index)
+        if ycol not in labeled_df.columns.values:
+            labeled_df = pd.merge(labeled_df, self.y_df[[n.index, ycol]], on=n.index)
+
+        fig, ax = plt.subplots(ncols=len(n.timepoints), nrows=len(n.treatments_dict[self.y_treatment]),
+                               figsize=(4 * len(n.timepoints), 4 * len(n.treatments_dict[self.y_treatment])), dpi=200)
+        # iterate through rows of subplots. Each row corresponds to a treatment concentration
+        for i, row in enumerate(ax):
+            curr_treatment = n.treatments_dict[self.y_treatment][i]  # current treatment conc to deal with
+            # iterate through columns of subplots. Each column corresponds to a time-point
+            for j, col in enumerate(row):
+                curr_time = n.timepoints[j]  # current time-point to deal with
+                subplot_df = labeled_df.loc[(labeled_df[self.y_treatment] == curr_treatment) &
+                                            (labeled_df[n.time] == curr_time)]
+                live_df = subplot_df.loc[subplot_df[n.label_preds] == 1]
+                dead_df = subplot_df.loc[subplot_df[n.label_preds] == 0]
+                live_df = live_df.sample(frac=sample_fraction)
+                dead_df = dead_df.sample(frac=sample_fraction)
+                try:
+                    if kdeplot:
+                        sns.kdeplot(live_df[xcol], live_df[ycol], ax=col, alpha=0.5, cmap="Blues", shade=True, label="Live",
+                                    shade_lowest=False,
+                                    dropna=True)
+                    else:
+                        col.scatter(live_df[xcol], live_df[ycol], c="Blue", label="pred_{}".format("live"),
+                                    s=100, alpha=0.4, marker='o', edgecolor='black', linewidth='0')
+                except Exception as e:
+                    pass
+                try:
+                    if kdeplot:
+                        sns.kdeplot(dead_df[xcol], dead_df[ycol], ax=col, alpha=0.5, cmap="Reds", shade=True, label="Dead",
+                                    shade_lowest=False,
+                                    dropna=True)
+                    else:
+                        col.scatter(dead_df[xcol], dead_df[ycol], c="Red", label="pred_{}".format("dead"),
+                                    s=100, alpha=0.4, marker='o', edgecolor='black', linewidth='0')
+                    col.legend()
+                except Exception as e:
+                    pass
+
+                col.set_xlabel("{}".format(xcol))
+                col.set_ylabel("{}".format(ycol))
+                col.set_xlim(0, 7)
+                col.set_ylim(0, 7)
+
+                col.set_title("Ethanol (uL): " + str(curr_treatment) + " Time (h): " + str(curr_time))
+        plt.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)
+        plt.title(self.y_strain)
+        plt.savefig(os.path.join(self.output_path, "scatter_{}_{}_{}.png".format(labeling_method, xcol, ycol)))
+        plt.close(fig)
+
     def quantitative_metrics(self, labeling_method):
         """
         Takes in a dataframe that has been labeled and runs a consistent supervised model on a train/test split of the now-labeled data.
@@ -344,15 +413,6 @@ class LiveDeadPipeline:
          But if the labels line up with some “ground truth”, then a supervised model should be able to perform better.
          Todo: look into how people evaluate semi-supervised models.
         """
-
-    def evaluate_performance(self, labeling_method):
-        """
-        Calls qualitative and quantitative methods for performance evaluation
-        """
-        if labeling_method not in self.labeled_data_dict.keys():
-            raise NotImplementedError("The labeling method you are trying to evaluate has not been run yet."
-                                      "Please run the labeling method first.")
-        ratio_df = self.time_series_plot(labeling_method=labeling_method)
 
 
 class ComparePipelines:
