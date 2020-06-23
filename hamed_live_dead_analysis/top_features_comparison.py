@@ -22,6 +22,7 @@ def get_timeseries_scatter(df, xcol, ycol, stain, time_points, ethanols, color_c
         for j, col in enumerate(row):
             time_point = time_points[j]
             time = df.loc[df.time_point == time_point].time_point.iloc[0]
+            # just realized that this is wrong! It should be subsetting for time-point too not just ethanol concentration!
             if stain is None:
                 plot_df = df.loc[(df.ethanol == ethanol)]
             else:
