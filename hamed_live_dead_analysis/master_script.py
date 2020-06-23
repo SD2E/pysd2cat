@@ -34,7 +34,8 @@ def main():
     ldp_2 = LiveDeadPipeline(x_strain=n.yeast, x_treatment=n.ethanol, x_stain=0,
                              y_strain=n.yeast, y_treatment=n.ethanol, y_stain=1)
     ldp_2.load_data()
-    ldp_2.plot_distribution(channel=n.sytox_cols[0], plot_x=True, plot_y=True, num_bins=50)
+    ldp_2.plot_distribution(channel=n.sytox_cols[0], plot_x=True, plot_y=True, num_bins=50,
+                            drop_zeros=True)
 
 
 if __name__ == '__main__':
