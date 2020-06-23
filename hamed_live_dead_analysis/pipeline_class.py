@@ -20,7 +20,7 @@ pd.set_option('display.width', 10000)
 pd.set_option('display.max_colwidth', -1)
 
 # how is this different from os.path.dirname(os.path.realpath(__file__))?
-dir_path = os.getcwd()
+current_dir_path = os.getcwd()
 
 
 # TODO: figure out where/when dataframes should be copied or not
@@ -40,19 +40,24 @@ class LiveDeadPipeline:
         self.y_stain = self.x_stain if y_stain is None else y_stain
 
         self.x_experiment_id = n.exp_dict[(self.x_strain, self.x_treatment)]
-        self.x_data_path = os.path.join(dir_path, n.exp_data_dir, self.x_experiment_id)
+        self.x_data_path = os.path.join(current_dir_path, n.exp_data_dir, self.x_experiment_id)
         self.y_experiment_id = n.exp_dict[(self.y_strain, self.y_treatment)]
-        self.y_data_path = os.path.join(dir_path, n.exp_data_dir, self.y_experiment_id)
+        self.y_data_path = os.path.join(current_dir_path, n.exp_data_dir, self.y_experiment_id)
 
         if (self.x_stain == 0) or (self.y_stain == 0):
             self.feature_cols = n.morph_cols
         else:
             self.feature_cols = n.morph_cols + n.sytox_cols
 
-        self.harness_path = os.path.join(dir_path, n.harness_output_dir)
+        self.harness_path = os.path.join(current_dir_path, n.harness_output_dir)
         self.runs_path = os.path.join(self.harness_path, "test_harness_results/runs")
-        self.labeled_data = None
-        self.method = None
+        self.labeled_data_dict = {}
+
+        self.output_dir_name = "({}_{}_{})_({}_{}_{})".format(self.x_strain, self.x_treatment, self.x_stain,
+                                                              self.y_strain, self.y_treatment, self.y_stain)
+        self.output_path = os.path.join(current_dir_path, n.pipeline_output_dir, self.output_dir_name)
+        if not os.path.exists(self.output_path):
+            os.makedirs(self.output_path)
 
     # ----- Preprocessing -----
 
@@ -127,9 +132,11 @@ class LiveDeadPipeline:
 
     # ----- Exploratory Methods -----
     def plot_distribution(self, channel=n.sytox_cols[0]):
+        dp = plt.figure()
         sns.distplot(self.x_df[channel], bins=50, color="lightgreen", norm_hist=False, kde=False)
         plt.title("Histogram of {}".format(channel))
-        plt.show()
+        plt.savefig(os.path.join(self.output_path, "histogram_of_{}.png".format(channel)))
+        plt.close(dp)
 
     def scatterplot(self):
         pass
@@ -175,7 +182,9 @@ class LiveDeadPipeline:
         :param dead_conditions:
         :type dead_conditions: list of dicts
         """
-        self.method = "condition_method"
+        labeling_method_name = inspect.stack()[0][3]
+        print("Starting {} labeling".format(labeling_method_name))
+
         if live_conditions is None:
             live_conditions = [{self.x_treatment: n.treatments_dict[self.x_treatment][0], n.time: n.timepoints[-1]}]
         if dead_conditions is None:
@@ -198,14 +207,16 @@ class LiveDeadPipeline:
         labeled_df = self.x_df[self.x_df[n.index].isin(labeled_indexes)]
         labeled_df.loc[labeled_df[n.index].isin(live_indexes), n.label] = 1
         labeled_df.loc[labeled_df[n.index].isin(dead_indexes), n.label] = 0
-        print(labeled_df.head())
         # mainly doing this split so Test Harness can run without balking (it expects testing_data)
         train_df, test_df = train_test_split(labeled_df, train_size=0.95, random_state=5,
                                              stratify=labeled_df[[self.x_treatment, n.time, n.label]])
 
         # Invoke Test Harness
         run_id = self.invoke_test_harness(train_df=train_df, test_df=test_df, pred_df=self.y_df)
-        self.labeled_data = pd.read_csv(os.path.join(self.runs_path, "run_{}/predicted_data.csv".format(run_id)))
+        labeled_df = pd.read_csv(os.path.join(self.runs_path, "run_{}/predicted_data.csv".format(run_id)))
+        print(labeled_df.head())
+
+        self.labeled_data_dict[labeling_method_name] = labeled_df
 
     def thresholding_method(self, channel=n.sytox_cols[0]):
         """
@@ -213,7 +224,9 @@ class LiveDeadPipeline:
         Since channels are logged, arithmetic mean is equivalent to geometric mean of original channel values.
         Final product is dataframe with original data and predicted labels, which is set to self.predicted_data
         """
-        self.method = "thresholding_method"
+        labeling_method_name = inspect.stack()[0][3]
+        print("Starting {} labeling".format(labeling_method_name))
+
         channel_values = list(self.x_df[channel])
         threshold = np.array(channel_values).mean()
 
@@ -221,17 +234,24 @@ class LiveDeadPipeline:
         labeled_df.loc[labeled_df[channel] >= threshold, n.label_preds] = 1
         labeled_df.loc[labeled_df[channel] < threshold, n.label_preds] = 0
         print(labeled_df.head())
-        self.labeled_data = labeled_df
+
+        self.labeled_data_dict[labeling_method_name] = labeled_df
 
     # ----- Performance Evaluation -----
 
-    def time_series_plot(self, labeled_df):
+    def time_series_plot(self, labeling_method):
         """
         Takes in a dataframe that has been labeled and generates a time-series plot of
         percent alive vs. time, colored by treatment amount.
         This serves as a qualitative metric that allows us to compare different methods of labeling live/dead.
         """
         matplotlib.use("tkagg")
+        if labeling_method not in self.labeled_data_dict.keys():
+            raise NotImplementedError("The labeling method you are trying to create a time_series_plot for has not been run yet."
+                                      "Please run the labeling method first.")
+        else:
+            labeled_df = self.labeled_data_dict[labeling_method]
+
         ratio_df = pd.DataFrame(columns=[self.y_treatment, n.time, n.num_live, n.num_dead, n.percent_live])
         for tr in list(labeled_df[self.y_treatment].unique()):
             for ti in list(labeled_df[n.time].unique()):
@@ -240,18 +260,21 @@ class LiveDeadPipeline:
                 num_dead = len(labeled_df.loc[(labeled_df[self.y_treatment] == tr) & (labeled_df[n.time] == ti) & (
                         labeled_df[n.label_preds] == 0)])
                 ratio_df.loc[len(ratio_df)] = [tr, ti, num_live, num_dead, float(num_live) / (num_live + num_dead)]
-        palette = sns.color_palette("mako_r", 5)
+        palette = sns.color_palette("bright", 5)
+
+        lp = plt.figure()
         sns.lineplot(x=ratio_df[n.time], y=ratio_df[n.percent_live], hue=ratio_df[self.y_treatment], palette=palette)
-        plt.title("Predicted Live over Time using {}".format(self.method))  # TODO make title more descriptive
-        # plt.show()
+        plt.ylim(0, 1)
+        plt.title("Predicted Live over Time using {}\n{}".format(labeling_method, self.output_dir_name))  # TODO make title prettier
+        # lp.set(ylim=(0, 1))
+        # lp.set(title="Predicted Live over Time using {}\n{}".format(labeling_method, self.output_dir_name))  # TODO make title prettier
         # TODO: add make_dir_if_does_not_exist
-        plt.savefig(os.path.join(dir_path, n.pipeline_output_dir,
-                                 "time_series_({}_{}_{})_({}_{}_{})_{}.png".format(self.x_strain, self.x_treatment, self.x_stain,
-                                                                                   self.y_strain, self.y_treatment, self.y_stain,
-                                                                                   self.method)))
+        plt.savefig(os.path.join(self.output_path, "time_series_{}.png".format(labeling_method)))
+        plt.close(lp)
+
         return ratio_df
 
-    def quantitative_metrics(self, labeled_df):
+    def quantitative_metrics(self, labeling_method):
         """
         Takes in a dataframe that has been labeled and runs a consistent supervised model on a train/test split of the now-labeled data.
         The model’s performance will be a quantitative way to see if our labels actually make sense.
@@ -260,14 +283,14 @@ class LiveDeadPipeline:
          Todo: look into how people evaluate semi-supervised models.
         """
 
-    def evaluate_performance(self):
+    def evaluate_performance(self, labeling_method):
         """
         Calls qualitative and quantitative methods for performance evaluation
         """
-        ratio_df = self.time_series_plot(self.labeled_data)
-        # print(ratio_df)
-
-        # self.quantitative_metrics(self.labeled_data)
+        if labeling_method not in self.labeled_data_dict.keys():
+            raise NotImplementedError("The labeling method you are trying to evaluate has not been run yet."
+                                      "Please run the labeling method first.")
+        ratio_df = self.time_series_plot(labeling_method=labeling_method)
 
 
 class ComparePipelines:

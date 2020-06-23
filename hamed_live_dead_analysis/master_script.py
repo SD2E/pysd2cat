@@ -17,10 +17,11 @@ def main():
     ldp = LiveDeadPipeline(x_strain=n.yeast, x_treatment=n.ethanol, x_stain=1,
                            y_strain=None, y_treatment=None, y_stain=1)
     ldp.load_data()
-    # ldp.plot_distribution()
-    # ldp.condition_method()
+    ldp.plot_distribution(channel=n.sytox_cols[0])
     ldp.thresholding_method()
-    ldp.evaluate_performance()
+    # ldp.condition_method()
+    ldp.evaluate_performance(n.thresholding_method)
+    # ldp.evaluate_performance(n.condition_method)
 
 
 if __name__ == '__main__':
