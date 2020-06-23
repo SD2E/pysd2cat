@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
+from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
 from hamed_live_dead_analysis.names import Names as n
@@ -48,6 +49,8 @@ class LiveDeadPipeline:
             self.feature_cols = n.morph_cols
         else:
             self.feature_cols = n.morph_cols + n.sytox_cols
+        self.feature_cols = self.feature_cols
+        print(self.feature_cols)
 
         self.harness_path = os.path.join(current_dir_path, n.harness_output_dir)
         self.runs_path = os.path.join(self.harness_path, "test_harness_results/runs")
@@ -197,10 +200,10 @@ class LiveDeadPipeline:
         # first obtain indexes of the rows that correspond to live_conditions and dead_conditions
         live_indexes = []
         dead_indexes = []
-        for lt in live_conditions:
-            live_indexes += list(self.x_df.loc[(self.x_df[list(lt)] == pd.Series(lt)).all(axis=1), n.index])
-        for dt in dead_conditions:
-            dead_indexes += list(self.x_df.loc[(self.x_df[list(dt)] == pd.Series(dt)).all(axis=1), n.index])
+        for lc in live_conditions:
+            live_indexes += list(self.x_df.loc[(self.x_df[list(lc)] == pd.Series(lc)).all(axis=1), n.index])
+        for dc in dead_conditions:
+            dead_indexes += list(self.x_df.loc[(self.x_df[list(dc)] == pd.Series(dc)).all(axis=1), n.index])
         labeled_indexes = live_indexes + dead_indexes
 
         # TODO: check if this should call .copy() or not
@@ -229,6 +232,7 @@ class LiveDeadPipeline:
 
         channel_values = list(self.x_df[channel])
         threshold = np.array(channel_values).mean()
+        print("threshold used = {}".format(threshold))
 
         labeled_df = self.x_df.copy()
         labeled_df.loc[labeled_df[channel] >= threshold, n.label_preds] = 1
@@ -236,6 +240,64 @@ class LiveDeadPipeline:
         print(labeled_df.head())
 
         self.labeled_data_dict[labeling_method_name] = labeled_df
+
+    def cluster_method(self, n_clusters=4):
+        """
+        TODO: review this method's code
+        """
+        labeling_method_name = inspect.stack()[0][3]
+        print("Starting {} labeling".format(labeling_method_name))
+
+        x_scaler = StandardScaler()
+        y_scaler = StandardScaler()
+        scaled_x_df = self.x_df.copy()
+        scaled_y_df = self.y_df.copy()
+        scaled_x_df[self.feature_cols] = x_scaler.fit_transform(scaled_x_df[self.feature_cols])
+        scaled_y_df[self.feature_cols] = y_scaler.fit_transform(scaled_x_df[self.feature_cols])
+
+        c_model = KMeans(n_clusters=n_clusters, random_state=5)
+        c_model.fit(scaled_x_df[self.feature_cols])
+
+        # wrote these 2 lines in a way to make sure that original non-normalized features are kept in labeled_df
+        labeled_df = self.y_df.copy()
+        labeled_df[n.cluster_preds] = c_model.predict(scaled_y_df[self.feature_cols])
+
+        normalize = "all"
+        frequency_table = pd.crosstab(index=labeled_df[self.y_treatment],
+                                      columns=labeled_df[n.cluster_preds],
+                                      normalize=normalize)
+        print(frequency_table)
+        print()
+
+        # Define live/dead based on clustering results
+        # I define the "live" cluster to be the one with the largest number of points belonging to the 0.0 treatment level
+        # All other clusters are defined to be "dead"
+        live_clusters = frequency_table.idxmax(axis=1)[0]
+        dead_clusters = [x for x in list(frequency_table.columns.values) if x != live_clusters]
+        if len(dead_clusters) == 1:
+            dead_clusters = dead_clusters[0]
+        print("live_cluster: {}".format(live_clusters))
+        print("dead_clusters: {}".format(dead_clusters))
+        print()
+
+        hm = plt.figure()
+        sns.heatmap(frequency_table, cmap="Blues")
+        plt.xlabel("Cluster")
+        plt.title("{}: {} Concentration vs. {} KMeans Clusters.".format(self.y_strain, self.y_treatment, n_clusters))
+        plt.text(0.99, 0.99, "live_clusters: {}\ndead_clusters: {}".format(live_clusters, dead_clusters),
+                 ha='right', va='top', fontsize=10, transform=hm.transFigure)
+        plt.savefig(os.path.join(self.output_path, "cluster_heatmap_with_{}_clusters.png".format(n_clusters)))
+        plt.close(hm)
+
+        # Add labels based on cluster-derived live/dead definitions.
+        labeled_df[n.label_preds] = 0  # dead
+        labeled_df.loc[labeled_df[n.cluster_preds] == live_clusters, n.label_preds] = 1  # live
+        print(labeled_df[n.label_preds].value_counts(dropna=False))
+        print()
+        print(labeled_df.head())
+
+        self.labeled_data_dict[labeling_method_name] = labeled_df
+        # self.invoke_test_harness() ?
 
     # ----- Performance Evaluation -----
 

@@ -4,6 +4,7 @@ class Names:
     stain = "stain"
     label = "label"
     label_preds = "label_predictions"
+    cluster_preds = "cluster_predictions"
     data_file_name = "pipeline_data.csv"
 
     # strains
@@ -23,9 +24,11 @@ class Names:
     # feature columns
     morph_cols = ["FSC-A", "FSC-H", "FSC-W", "SSC-A", "SSC-H", "SSC-W"]
     sytox_cols = ["RL1-A", "RL1-H", "RL1-W"]
+    bl_cols = ["BL1-A", "BL1-H", "BL1-W"]
     # mito_cols = None
     morph_cols = ["log_{}".format(x) for x in morph_cols]
     sytox_cols = ["log_{}".format(x) for x in sytox_cols]
+    bl_cols = ["log_{}".format(x) for x in bl_cols]
 
     # experiment dictionary
     exp_dict = {
