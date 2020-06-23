@@ -326,18 +326,19 @@ class LiveDeadPipeline:
         if labeling_method not in self.labeled_data_dict.keys():
             raise NotImplementedError("The labeling method you are trying to evaluate has not been run yet."
                                       "Please run the labeling method first.")
-        ratio_df = self.time_series_plot(labeling_method=labeling_method)
-        self.timeseries_scatter(labeling_method=labeling_method)
+        ratio_df = self.plot_percent_live_over_conditions(labeling_method=labeling_method)
+        self.plot_two_features_over_conditions(labeling_method=labeling_method)
 
-    def time_series_plot(self, labeling_method):
+    def plot_percent_live_over_conditions(self, labeling_method):
         """
-        Takes in a dataframe that has been labeled and generates a time-series plot of
-        percent alive vs. time, colored by treatment amount.
+        Plots percent live (predicted) over all of the y_experiment conditions.
+        Takes in a dataframe that has been labeled and generates a
+        plot of percent alive vs. time, colored by treatment amount.
         This serves as a qualitative metric that allows us to compare different methods of labeling live/dead.
         """
         matplotlib.use("tkagg")
         if labeling_method not in self.labeled_data_dict.keys():
-            raise NotImplementedError("The labeling method you are trying to create a time_series_plot for has not been run yet."
+            raise NotImplementedError("The labeling method you are trying to create a plot for has not been run yet."
                                       "Please run the labeling method first.")
         else:
             labeled_df = self.labeled_data_dict[labeling_method]
@@ -366,10 +367,11 @@ class LiveDeadPipeline:
 
     # TODO: explore other bivariate distribution plots like hexbin plots
     # https://seaborn.pydata.org/tutorial/distributions.html
-    def timeseries_scatter(self, labeling_method, xcol="log_SSC-A", ycol="log_RL1-A", sample_fraction=0.1, kdeplot=False):
+    def plot_two_features_over_conditions(self, labeling_method, xcol="log_SSC-A", ycol="log_RL1-A",
+                                          sample_fraction=0.1, kdeplot=False):
         matplotlib.use("tkagg")
         if labeling_method not in self.labeled_data_dict.keys():
-            raise NotImplementedError("The labeling method you are trying to create a time_series_plot for has not been run yet."
+            raise NotImplementedError("The labeling method you are trying to create a plot for has not been run yet."
                                       "Please run the labeling method first.")
         else:
             labeled_df = self.labeled_data_dict[labeling_method]
