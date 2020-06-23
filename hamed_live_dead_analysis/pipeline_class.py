@@ -49,15 +49,15 @@ class LiveDeadPipeline:
             self.feature_cols = n.morph_cols
         else:
             self.feature_cols = n.morph_cols + n.sytox_cols
-        self.feature_cols = self.feature_cols
-        print(self.feature_cols)
+        print("feature_cols: {}".format(self.feature_cols))
 
         self.harness_path = os.path.join(current_dir_path, n.harness_output_dir)
         self.runs_path = os.path.join(self.harness_path, "test_harness_results/runs")
         self.labeled_data_dict = {}
 
-        self.output_dir_name = "({}_{}_{})_({}_{}_{})".format(self.x_strain, self.x_treatment, self.x_stain,
-                                                              self.y_strain, self.y_treatment, self.y_stain)
+        self.x_info = "{}_{}_{}".format(self.x_strain, self.x_treatment, self.x_stain)
+        self.y_info = "{}_{}_{}".format(self.y_strain, self.y_treatment, self.y_stain)
+        self.output_dir_name = "({})_({})".format(self.x_info, self.y_info)
         self.output_path = os.path.join(current_dir_path, n.pipeline_output_dir, self.output_dir_name)
         if not os.path.exists(self.output_path):
             os.makedirs(self.output_path)
@@ -139,12 +139,15 @@ class LiveDeadPipeline:
         Creates histogram of the distribution of the passed-in channel.
         Defaults to plotting the distribution of x data.
         Use plot_x and plot_y to configure which distributions to plot.
+        TODO: add ability to pass-in list of channels, which creates subplots or a facetgrid
         """
         dp = plt.figure()
         if plot_x:
-            sns.distplot(self.x_df[channel], bins=num_bins, color="lightgreen", norm_hist=False, kde=False)
+            sns.distplot(self.x_df[channel], bins=num_bins, color="tab:red", label=self.x_info,
+                         norm_hist=False, kde=False)
         if plot_y:
-            sns.distplot(self.y_df[channel], bins=num_bins, color="lightblue", norm_hist=False, kde=False)
+            sns.distplot(self.y_df[channel], bins=num_bins, color="tab:cyan", label=self.y_info,
+                         norm_hist=False, kde=False)
         if (not plot_x) and (not plot_y):
             raise NotImplementedError("plot_x and plot_y can't both be False, otherwise you aren't plotting anything!")
         plt.legend()
