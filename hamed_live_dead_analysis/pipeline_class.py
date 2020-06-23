@@ -367,8 +367,11 @@ class LiveDeadPipeline:
 
     # TODO: explore other bivariate distribution plots like hexbin plots
     # https://seaborn.pydata.org/tutorial/distributions.html
-    def plot_two_features_over_conditions(self, labeling_method, xcol="log_SSC-A", ycol="log_RL1-A",
+    def plot_two_features_over_conditions(self, labeling_method, axis_1="log_SSC-A", axis_2="log_RL1-A",
                                           sample_fraction=0.1, kdeplot=False):
+        """
+        Will use self.y_df not self.x_df
+        """
         matplotlib.use("tkagg")
         if labeling_method not in self.labeled_data_dict.keys():
             raise NotImplementedError("The labeling method you are trying to create a plot for has not been run yet."
@@ -376,10 +379,10 @@ class LiveDeadPipeline:
         else:
             labeled_df = self.labeled_data_dict[labeling_method]
 
-        if xcol not in labeled_df.columns.values:
-            labeled_df = pd.merge(labeled_df, self.y_df[[n.index, xcol]], on=n.index)
-        if ycol not in labeled_df.columns.values:
-            labeled_df = pd.merge(labeled_df, self.y_df[[n.index, ycol]], on=n.index)
+        if axis_1 not in labeled_df.columns.values:
+            labeled_df = pd.merge(labeled_df, self.y_df[[n.index, axis_1]], on=n.index)
+        if axis_2 not in labeled_df.columns.values:
+            labeled_df = pd.merge(labeled_df, self.y_df[[n.index, axis_2]], on=n.index)
 
         fig, ax = plt.subplots(ncols=len(n.timepoints), nrows=len(n.treatments_dict[self.y_treatment]),
                                figsize=(4 * len(n.timepoints), 4 * len(n.treatments_dict[self.y_treatment])), dpi=200)
@@ -397,35 +400,35 @@ class LiveDeadPipeline:
                 dead_df = dead_df.sample(frac=sample_fraction)
                 try:
                     if kdeplot:
-                        sns.kdeplot(live_df[xcol], live_df[ycol], ax=col, alpha=0.5, cmap="Blues", shade=True, label="Live",
+                        sns.kdeplot(live_df[axis_1], live_df[axis_2], ax=col, alpha=0.5, cmap="Blues", shade=True, label="Live",
                                     shade_lowest=False,
                                     dropna=True)
                     else:
-                        col.scatter(live_df[xcol], live_df[ycol], c="Blue", label="pred_{}".format("live"),
+                        col.scatter(live_df[axis_1], live_df[axis_2], c="Blue", label="pred_{}".format("live"),
                                     s=100, alpha=0.4, marker='o', edgecolor='black', linewidth='0')
                 except Exception as e:
                     pass
                 try:
                     if kdeplot:
-                        sns.kdeplot(dead_df[xcol], dead_df[ycol], ax=col, alpha=0.5, cmap="Reds", shade=True, label="Dead",
+                        sns.kdeplot(dead_df[axis_1], dead_df[axis_2], ax=col, alpha=0.5, cmap="Reds", shade=True, label="Dead",
                                     shade_lowest=False,
                                     dropna=True)
                     else:
-                        col.scatter(dead_df[xcol], dead_df[ycol], c="Red", label="pred_{}".format("dead"),
+                        col.scatter(dead_df[axis_1], dead_df[axis_2], c="Red", label="pred_{}".format("dead"),
                                     s=100, alpha=0.4, marker='o', edgecolor='black', linewidth='0')
                     col.legend()
                 except Exception as e:
                     pass
 
-                col.set_xlabel("{}".format(xcol))
-                col.set_ylabel("{}".format(ycol))
+                col.set_xlabel("{}".format(axis_1))
+                col.set_ylabel("{}".format(axis_2))
                 col.set_xlim(0, 7)
                 col.set_ylim(0, 7)
 
                 col.set_title("Ethanol (uL): " + str(curr_treatment) + " Time (h): " + str(curr_time))
         plt.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)
         plt.title(self.y_strain)
-        plt.savefig(os.path.join(self.output_path, "scatter_{}_{}_{}.png".format(labeling_method, xcol, ycol)))
+        plt.savefig(os.path.join(self.output_path, "scatter_{}_{}_{}.png".format(labeling_method, axis_1, axis_2)))
         plt.close(fig)
 
     def quantitative_metrics(self, labeling_method):
