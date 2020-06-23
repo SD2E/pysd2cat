@@ -49,7 +49,6 @@ class LiveDeadPipeline:
             self.feature_cols = n.morph_cols
         else:
             self.feature_cols = n.morph_cols + n.sytox_cols
-        print("feature_cols: {}".format(self.feature_cols))
 
         self.harness_path = os.path.join(current_dir_path, n.harness_output_dir)
         self.runs_path = os.path.join(self.harness_path, "test_harness_results/runs")
@@ -134,7 +133,7 @@ class LiveDeadPipeline:
         return th.list_of_this_instance_run_ids[-1]
 
     # ----- Exploratory Methods -----
-    def plot_distribution(self, channel=n.sytox_cols[0], plot_x=True, plot_y=False, num_bins=50):
+    def plot_distribution(self, channel=n.sytox_cols[0], plot_x=True, plot_y=False, num_bins=50, drop_zeros=False):
         """
         Creates histogram of the distribution of the passed-in channel.
         Defaults to plotting the distribution of x data.
@@ -143,10 +142,16 @@ class LiveDeadPipeline:
         """
         dp = plt.figure()
         if plot_x:
-            sns.distplot(self.x_df[channel], bins=num_bins, color="tab:red", label=self.x_info,
+            x_channel_values = self.x_df[channel]
+            if drop_zeros:
+                x_channel_values = x_channel_values[x_channel_values != 0]
+            sns.distplot(x_channel_values, bins=num_bins, color="tab:red", label=self.x_info,
                          norm_hist=False, kde=False)
         if plot_y:
-            sns.distplot(self.y_df[channel], bins=num_bins, color="tab:cyan", label=self.y_info,
+            y_channel_values = self.y_df[channel]
+            if drop_zeros:
+                y_channel_values = y_channel_values[y_channel_values != 0]
+            sns.distplot(y_channel_values, bins=num_bins, color="tab:cyan", label=self.y_info,
                          norm_hist=False, kde=False)
         if (not plot_x) and (not plot_y):
             raise NotImplementedError("plot_x and plot_y can't both be False, otherwise you aren't plotting anything!")
