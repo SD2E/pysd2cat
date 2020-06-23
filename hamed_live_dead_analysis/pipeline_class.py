@@ -134,9 +134,20 @@ class LiveDeadPipeline:
         return th.list_of_this_instance_run_ids[-1]
 
     # ----- Exploratory Methods -----
-    def plot_distribution(self, channel=n.sytox_cols[0]):
+    def plot_distribution(self, channel=n.sytox_cols[0], plot_x=True, plot_y=False, num_bins=50):
+        """
+        Creates histogram of the distribution of the passed-in channel.
+        Defaults to plotting the distribution of x data.
+        Use plot_x and plot_y to configure which distributions to plot.
+        """
         dp = plt.figure()
-        sns.distplot(self.x_df[channel], bins=50, color="lightgreen", norm_hist=False, kde=False)
+        if plot_x:
+            sns.distplot(self.x_df[channel], bins=num_bins, color="lightgreen", norm_hist=False, kde=False)
+        if plot_y:
+            sns.distplot(self.y_df[channel], bins=num_bins, color="lightblue", norm_hist=False, kde=False)
+        if (not plot_x) and (not plot_y):
+            raise NotImplementedError("plot_x and plot_y can't both be False, otherwise you aren't plotting anything!")
+        plt.legend()
         plt.title("Histogram of {}".format(channel))
         plt.savefig(os.path.join(self.output_path, "histogram_of_{}.png".format(channel)))
         plt.close(dp)
@@ -345,6 +356,8 @@ class LiveDeadPipeline:
 
         return ratio_df
 
+    # TODO: explore other bivariate distribution plots like hexbin plots
+    # https://seaborn.pydata.org/tutorial/distributions.html
     def timeseries_scatter(self, labeling_method, xcol="log_SSC-A", ycol="log_RL1-A", sample_fraction=0.1, kdeplot=False):
         matplotlib.use("tkagg")
         if labeling_method not in self.labeled_data_dict.keys():
