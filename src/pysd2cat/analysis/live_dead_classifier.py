@@ -156,7 +156,7 @@ def compute_mean_live(model,
     return mean_live
 
 def predict_live_dead(df, model, scaler):
-    print("Predicting live...")
+    #print("Predicting live...")
     df_norm = scaler.transform(df)
     predictions = model.predict(df_norm)
     #predictions = model.predict(df)
