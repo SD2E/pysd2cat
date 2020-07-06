@@ -1,11 +1,8 @@
 import os
-import sys
-import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
-from six import string_types
-from hamed_live_dead_analysis.supervised_analysis import retrieve_preds_and_labels
+from pysd2cat.analysis.hamed_live_dead_analysis.supervised_analysis import retrieve_preds_and_labels
 
 pd.set_option('display.max_columns', 500)
 pd.set_option('display.width', 10000)
