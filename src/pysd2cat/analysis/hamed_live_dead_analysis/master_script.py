@@ -4,8 +4,8 @@ import matplotlib
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from hamed_live_dead_analysis.pipeline_class import LiveDeadPipeline
-from hamed_live_dead_analysis.names import Names as n
+from pysd2cat.analysis.hamed_live_dead_analysis.pipeline_class import LiveDeadPipeline
+from pysd2cat.analysis.hamed_live_dead_analysis.names import Names as n
 
 matplotlib.use("tkagg")
 pd.set_option('display.max_columns', 500)
