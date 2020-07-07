@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
-from hamed_live_dead_analysis.names import Names as n
+from pysd2cat.analysis.hamed_live_dead_analysis.names import Names as n
 from harness.test_harness_class import TestHarness
 from harness.th_model_instances.hamed_models.random_forest_classification import random_forest_classification
 
