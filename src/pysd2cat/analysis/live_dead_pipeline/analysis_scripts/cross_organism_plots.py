@@ -1,13 +1,9 @@
 import os
-import sys
 import matplotlib
-import numpy as np
 import pandas as pd
-import seaborn as sns
-import matplotlib.pyplot as plt
-from pysd2cat.analysis.hamed_live_dead_analysis.pipeline_class import LiveDeadPipeline
-from pysd2cat.analysis.hamed_live_dead_analysis.names import Names as n
-from pysd2cat.analysis.hamed_live_dead_analysis.yeast_stain_vs_non_stain import overlaid_time_series_plot
+from pysd2cat.analysis.live_dead_pipeline.ld_pipeline_classes import LiveDeadPipeline
+from pysd2cat.analysis.live_dead_pipeline.names import Names as n
+from pysd2cat.analysis.live_dead_pipeline.analysis_scripts.yeast_stain_vs_non_stain import overlaid_time_series_plot
 
 matplotlib.use("tkagg")
 pd.set_option('display.max_columns', 500)
