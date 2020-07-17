@@ -9,7 +9,7 @@ class Names:
 
     # strains
     yeast = "yeast"
-    basc = "basc"
+    bacillus = "bacillus"
     ecoli = "ecoli"
 
     # treatments
