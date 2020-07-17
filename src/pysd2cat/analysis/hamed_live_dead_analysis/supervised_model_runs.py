@@ -106,7 +106,7 @@ def main():
 
     # new_path = os.path.join(current_path, "log_features_april_23")
     # run_models_varying_train_amounts(yeast_train_bank, yeast_test_df, [0.1], fcols_yeast, new_path, 'ethanol', "yeast")
-    # run_models_varying_train_amounts(basc_train_bank, basc_test_df, [1.0], fcols_basc_ecoli, new_path, 'ethanol', "basc")
+    # run_models_varying_train_amounts(basc_train_bank, basc_test_df, [1.0], fcols_basc_ecoli, new_path, 'ethanol', "bacillus")
     # run_models_varying_train_amounts(ecoli_train_bank, ecoli_test_df, [1.0], fcols_basc_ecoli, new_path, 'ethanol', "ecoli")
 
     cross_path = os.path.join(current_path, "cross_organism_april_23")
@@ -147,7 +147,7 @@ def main():
     # run_models_varying_train_amounts(basc_train_bank.loc[basc_train_bank["stain"] == 0],
     #                                  basc_test_df.loc[basc_test_df["stain"] == 1],
     #                                  [1.0], basc_ecoli_features_0,
-    #                                  stain_variants_path, 'ethanol', "basc non-stain --> stain")
+    #                                  stain_variants_path, 'ethanol', "bacillus non-stain --> stain")
     # run_models_varying_train_amounts(ecoli_train_bank.loc[ecoli_train_bank["stain"] == 0],
     #                                  ecoli_test_df.loc[ecoli_test_df["stain"] == 1],
     #                                  [1.0], basc_ecoli_features_0,

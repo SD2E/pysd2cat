@@ -56,7 +56,7 @@ def main():
 
     if organism == "yeast":
         df = pd.read_csv("datasets/yeast_train_bank.csv")
-    elif organism == "basc":
+    elif organism == "bacillus":
         df = pd.read_csv("datasets/basc_train_bank.csv")
     elif organism == "ecoli":
         df = pd.read_csv("datasets/ecoli_train_bank.csv")

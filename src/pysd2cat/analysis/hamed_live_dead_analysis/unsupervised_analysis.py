@@ -69,7 +69,7 @@ def main():
         train_df = yeast_train_bank
         test_df = yeast_test_df
         feature_cols = fcols_yeast
-    elif organism == "basc":
+    elif organism == "bacillus":
         train_df = basc_train_bank
         test_df = basc_test_df
         feature_cols = fcols_basc_ecoli
