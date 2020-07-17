@@ -9,14 +9,16 @@ class Names:
 
     # strains
     yeast = "yeast"
-    basc = "basc"
+    bacillus = "bacillus"
     ecoli = "ecoli"
 
     # treatments
     ethanol = "ethanol"
     heat = "heat"
     treatments_dict = {
-        ethanol: [0, 140, 210, 280, 1120],
+        ethanol: {yeast: [0, 10, 15, 20, 80],
+                  bacillus: [0, 5, 10, 15, 40],
+                  ecoli: [0, 5, 10, 15, 40]},
         heat: [0]
     }
     timepoints = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
@@ -33,8 +35,10 @@ class Names:
     # experiment dictionary
     exp_dict = {
         (yeast, ethanol): "temporary_yeast_ethanol",
-        (basc, ethanol): "experiment.transcriptic.r1eaf248xavu8a",
-        (ecoli, ethanol): "experiment.transcriptic.r1eaf25ne8ajts"
+        (bacillus, ethanol): "temporary_bacillus_ethanol",
+        (ecoli, ethanol): "temporary_ecoli_ethanol",
+        # (bacillus, ethanol): "experiment.transcriptic.r1eaf248xavu8a",
+        # (ecoli, ethanol): "experiment.transcriptic.r1eaf25ne8ajts"
     }
     # each experiment should have a corresponding folder with the same name as the experiment_id
     # inside the folder you will have data files: dataset, train, test, normalized_train, normalized_test, etc.

@@ -71,7 +71,7 @@ def get_timeseries_scatter(df, xcol, ycol, stain, time_points, ethanols, color_c
             if organism == "yeast":
                 col.set_xlim(0, 7)
                 col.set_ylim(0, 7)
-            elif organism == "basc":
+            elif organism == "bacillus":
                 col.set_xlim(0, 7)
                 col.set_ylim(0, 7)
             elif organism == "ecoli":
@@ -101,7 +101,7 @@ def main():
         df = pd.merge(df, df_test, on="arbitrary_index")
         ethanols = [0.0, 140.0, 210.0, 280.0, 1120.0]
         frac = 0.05
-    elif organism == "basc":
+    elif organism == "bacillus":
         df = retrieve_preds_and_labels(th_results_path="new_results/test_harness_results",
                                        test_df_path="datasets/basc_normalized_test_df.csv",
                                        append_cols=["time_point"], run_id="wb1r3yVbD1EVr")
