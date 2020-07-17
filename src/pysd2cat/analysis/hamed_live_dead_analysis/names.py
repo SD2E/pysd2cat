@@ -35,8 +35,10 @@ class Names:
     # experiment dictionary
     exp_dict = {
         (yeast, ethanol): "temporary_yeast_ethanol",
-        (basc, ethanol): "experiment.transcriptic.r1eaf248xavu8a",
-        (ecoli, ethanol): "experiment.transcriptic.r1eaf25ne8ajts"
+        (bacillus, ethanol): "temporary_bacillus_ethanol",
+        (ecoli, ethanol): "temporary_ecoli_ethanol",
+        # (bacillus, ethanol): "experiment.transcriptic.r1eaf248xavu8a",
+        # (ecoli, ethanol): "experiment.transcriptic.r1eaf25ne8ajts"
     }
     # each experiment should have a corresponding folder with the same name as the experiment_id
     # inside the folder you will have data files: dataset, train, test, normalized_train, normalized_test, etc.
