@@ -21,15 +21,15 @@ def main():
     # so it saves the splits as csv's so they can be read in by model code in other modules.
 
     # choose organism
-    organism = "basc"
+    organism = "bacillus"
 
     if organism == "yeast":
         feature_cols = ["FSC-A", "SSC-A", "BL1-A", "RL1-A", "FSC-H", "SSC-H", "BL1-H", "RL1-H", "FSC-W", "SSC-W", "BL1-W", "RL1-W"]
-    elif organism in ["basc", "ecoli"]:
+    elif organism in ["bacillus", "ecoli"]:
         feature_cols = ["FSC-A", "SSC-A", "RL1-A", "FSC-H", "SSC-H", "RL1-H", "FSC-W", "SSC-W", "RL1-W"]
     else:
         raise NotImplementedError("{} is not implemented. "
-                                  "Please choose from yeast, basc, or ecoli".format(organism))
+                                  "Please choose from yeast, bacillus, or ecoli".format(organism))
 
     print("\n**************************** CHOSEN ORGANISM IS: {} ****************************\n".format(organism))
 

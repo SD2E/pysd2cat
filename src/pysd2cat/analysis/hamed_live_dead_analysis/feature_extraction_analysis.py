@@ -17,7 +17,7 @@ def main():
     leaderboard = pd.read_html(os.path.join(th_results_path, "custom_classification_leaderboard.html"))[0]
 
     yeast_id = leaderboard.loc[leaderboard["Data and Split Description"].str.contains("yeast")]["Run ID"].iloc[0]
-    basc_id = leaderboard.loc[leaderboard["Data and Split Description"].str.contains("basc")]["Run ID"].iloc[0]
+    basc_id = leaderboard.loc[leaderboard["Data and Split Description"].str.contains("bacillus")]["Run ID"].iloc[0]
     ecoli_id = leaderboard.loc[leaderboard["Data and Split Description"].str.contains("ecoli")]["Run ID"].iloc[0]
     yeast_feature_importances = pd.read_csv(os.path.join(th_results_path,
                                                          "runs/run_{}/feature_importances.csv".format(yeast_id)))
@@ -26,7 +26,7 @@ def main():
     ecoli_feature_importances = pd.read_csv(os.path.join(th_results_path,
                                                          "runs/run_{}/feature_importances.csv".format(ecoli_id)))
     yeast_feature_importances["organism"] = "yeast"
-    basc_feature_importances["organism"] = "basc"
+    basc_feature_importances["organism"] = "bacillus"
     ecoli_feature_importances["organism"] = "ecoli"
 
     feature_importances = pd.concat([yeast_feature_importances,
