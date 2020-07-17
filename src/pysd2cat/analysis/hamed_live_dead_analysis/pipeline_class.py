@@ -208,11 +208,11 @@ class LiveDeadPipeline:
         print("Starting {} labeling".format(labeling_method_name))
 
         if live_conditions is None:
-            live_conditions = [{self.x_treatment: n.treatments_dict[self.x_treatment][0], n.time: n.timepoints[-1]}]
+            live_conditions = [{self.x_treatment: n.treatments_dict[self.x_treatment][self.x_strain][0], n.time: n.timepoints[-1]}]
         if dead_conditions is None:
-            dead_conditions = [{self.x_treatment: n.treatments_dict[self.x_treatment][-1], n.time: n.timepoints[-1]}]
-        print(live_conditions)
-        print(dead_conditions)
+            dead_conditions = [{self.x_treatment: n.treatments_dict[self.x_treatment][self.x_strain][-1], n.time: n.timepoints[-1]}]
+        print("Conditions designated as Live: {}".format(live_conditions))
+        print("Conditions designated as Dead: {}".format(dead_conditions))
         print()
 
         # Label points according to live_conditions and dead_conditions
@@ -380,11 +380,11 @@ class LiveDeadPipeline:
         if ycol not in labeled_df.columns.values:
             labeled_df = pd.merge(labeled_df, self.y_df[[n.index, ycol]], on=n.index)
 
-        fig, ax = plt.subplots(ncols=len(n.timepoints), nrows=len(n.treatments_dict[self.y_treatment]),
-                               figsize=(4 * len(n.timepoints), 4 * len(n.treatments_dict[self.y_treatment])), dpi=200)
+        fig, ax = plt.subplots(ncols=len(n.timepoints), nrows=len(n.treatments_dict[self.y_treatment][self.y_strain]),
+                               figsize=(4 * len(n.timepoints), 4 * len(n.treatments_dict[self.y_treatment][self.y_strain])), dpi=200)
         # iterate through rows of subplots. Each row corresponds to a treatment concentration
         for i, row in enumerate(ax):
-            curr_treatment = n.treatments_dict[self.y_treatment][i]  # current treatment conc to deal with
+            curr_treatment = n.treatments_dict[self.y_treatment][self.y_strain][i]  # current treatment conc to deal with
             # iterate through columns of subplots. Each column corresponds to a time-point
             for j, col in enumerate(row):
                 curr_time = n.timepoints[j]  # current time-point to deal with
