@@ -18,7 +18,7 @@ from harness.th_model_instances.hamed_models.random_forest_classification import
 matplotlib.use("tkagg")
 pd.set_option('display.max_columns', 500)
 pd.set_option('display.width', 10000)
-pd.set_option('display.max_colwidth', -1)
+pd.set_option('display.max_colwidth', None)
 
 # how is this different from os.path.dirname(os.path.realpath(__file__))?
 current_dir_path = os.getcwd()
@@ -117,12 +117,12 @@ class LiveDeadPipeline:
                       dict_of_function_parameters={},
                       training_data=train_df,
                       testing_data=test_df,
-                      data_and_split_description="method: {}, x_strain: {}, x_treatment: {}, x_stain: {},"
-                                                 " y_strain: {}, y_treatment: {}, y_stain: {}".format(inspect.stack()[1][3], self.x_strain,
-                                                                                                      self.x_treatment, self.x_stain,
-                                                                                                      self.y_strain, self.y_treatment,
-                                                                                                      self.y_stain),
-                      cols_to_predict=n.label,
+                      description="method: {}, x_strain: {}, x_treatment: {}, x_stain: {},"
+                                  " y_strain: {}, y_treatment: {}, y_stain: {}".format(inspect.stack()[1][3], self.x_strain,
+                                                                                       self.x_treatment, self.x_stain,
+                                                                                       self.y_strain, self.y_treatment,
+                                                                                       self.y_stain),
+                      target_cols=n.label,
                       feature_cols_to_use=self.feature_cols,
                       # TODO: figure out how to resolve discrepancies between x_treatment and y_treatment, since col names will be different
                       index_cols=[n.index, self.x_treatment, n.time, n.stain],
@@ -361,6 +361,7 @@ class LiveDeadPipeline:
         # TODO: add make_dir_if_does_not_exist
         plt.savefig(os.path.join(self.output_path, "time_series_{}.png".format(labeling_method)))
         plt.close(lp)
+        ratio_df.to_csv(os.path.join(self.output_path, "ratio_df.csv"), index=False)
 
         return ratio_df
 
