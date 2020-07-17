@@ -16,7 +16,9 @@ class Names:
     ethanol = "ethanol"
     heat = "heat"
     treatments_dict = {
-        ethanol: [0, 140, 210, 280, 1120],
+        ethanol: {yeast: [0, 10, 15, 20, 80],
+                  bacillus: [0, 5, 10, 15, 40],
+                  ecoli: [0, 5, 10, 15, 40]},
         heat: [0]
     }
     timepoints = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
