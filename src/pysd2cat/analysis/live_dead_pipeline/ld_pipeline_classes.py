@@ -11,14 +11,14 @@ import matplotlib.pyplot as plt
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
-from pysd2cat.analysis.hamed_live_dead_analysis.names import Names as n
+from pysd2cat.analysis.live_dead_pipeline.names import Names as n
 from harness.test_harness_class import TestHarness
 from harness.th_model_instances.hamed_models.random_forest_classification import random_forest_classification
 
 matplotlib.use("tkagg")
 pd.set_option('display.max_columns', 500)
 pd.set_option('display.width', 10000)
-pd.set_option('display.max_colwidth', -1)
+pd.set_option('display.max_colwidth', None)
 
 # how is this different from os.path.dirname(os.path.realpath(__file__))?
 current_dir_path = os.getcwd()
@@ -117,12 +117,12 @@ class LiveDeadPipeline:
                       dict_of_function_parameters={},
                       training_data=train_df,
                       testing_data=test_df,
-                      data_and_split_description="method: {}, x_strain: {}, x_treatment: {}, x_stain: {},"
-                                                 " y_strain: {}, y_treatment: {}, y_stain: {}".format(inspect.stack()[1][3], self.x_strain,
-                                                                                                      self.x_treatment, self.x_stain,
-                                                                                                      self.y_strain, self.y_treatment,
-                                                                                                      self.y_stain),
-                      cols_to_predict=n.label,
+                      description="method: {}, x_strain: {}, x_treatment: {}, x_stain: {},"
+                                  " y_strain: {}, y_treatment: {}, y_stain: {}".format(inspect.stack()[1][3], self.x_strain,
+                                                                                       self.x_treatment, self.x_stain,
+                                                                                       self.y_strain, self.y_treatment,
+                                                                                       self.y_stain),
+                      target_cols=n.label,
                       feature_cols_to_use=self.feature_cols,
                       # TODO: figure out how to resolve discrepancies between x_treatment and y_treatment, since col names will be different
                       index_cols=[n.index, self.x_treatment, n.time, n.stain],
@@ -208,11 +208,11 @@ class LiveDeadPipeline:
         print("Starting {} labeling".format(labeling_method_name))
 
         if live_conditions is None:
-            live_conditions = [{self.x_treatment: n.treatments_dict[self.x_treatment][0], n.time: n.timepoints[-1]}]
+            live_conditions = [{self.x_treatment: n.treatments_dict[self.x_treatment][self.x_strain][0], n.time: n.timepoints[-1]}]
         if dead_conditions is None:
-            dead_conditions = [{self.x_treatment: n.treatments_dict[self.x_treatment][-1], n.time: n.timepoints[-1]}]
-        print(live_conditions)
-        print(dead_conditions)
+            dead_conditions = [{self.x_treatment: n.treatments_dict[self.x_treatment][self.x_strain][-1], n.time: n.timepoints[-1]}]
+        print("Conditions designated as Live: {}".format(live_conditions))
+        print("Conditions designated as Dead: {}".format(dead_conditions))
         print()
 
         # Label points according to live_conditions and dead_conditions
@@ -361,6 +361,7 @@ class LiveDeadPipeline:
         # TODO: add make_dir_if_does_not_exist
         plt.savefig(os.path.join(self.output_path, "time_series_{}.png".format(labeling_method)))
         plt.close(lp)
+        ratio_df.to_csv(os.path.join(self.output_path, "ratio_df.csv"), index=False)
 
         return ratio_df
 
@@ -379,11 +380,11 @@ class LiveDeadPipeline:
         if ycol not in labeled_df.columns.values:
             labeled_df = pd.merge(labeled_df, self.y_df[[n.index, ycol]], on=n.index)
 
-        fig, ax = plt.subplots(ncols=len(n.timepoints), nrows=len(n.treatments_dict[self.y_treatment]),
-                               figsize=(4 * len(n.timepoints), 4 * len(n.treatments_dict[self.y_treatment])), dpi=200)
+        fig, ax = plt.subplots(ncols=len(n.timepoints), nrows=len(n.treatments_dict[self.y_treatment][self.y_strain]),
+                               figsize=(4 * len(n.timepoints), 4 * len(n.treatments_dict[self.y_treatment][self.y_strain])), dpi=200)
         # iterate through rows of subplots. Each row corresponds to a treatment concentration
         for i, row in enumerate(ax):
-            curr_treatment = n.treatments_dict[self.y_treatment][i]  # current treatment conc to deal with
+            curr_treatment = n.treatments_dict[self.y_treatment][self.y_strain][i]  # current treatment conc to deal with
             # iterate through columns of subplots. Each column corresponds to a time-point
             for j, col in enumerate(row):
                 curr_time = n.timepoints[j]  # current time-point to deal with
