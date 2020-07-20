@@ -17,14 +17,14 @@ strains = [n.yeast, n.ecoli, n.bacillus]
 
 
 def overlaid_time_series_plot(concatenated_ratio_df, treatment="ethanol", style_col="was stain used?",
-                              style_order=None, font_scale=1.0):
+                              style_order=None, font_scale=1.0, title=None, tight=True):
     """
     Takes in a dataframe that has been labeled and generates a time-series plot of
     percent alive vs. time, colored by treatment amount.
     This serves as a qualitative metric that allows us to compare different methods of labeling live/dead.
     """
     matplotlib.use("tkagg")
-    sns.set(style="ticks", font_scale=font_scale)
+    sns.set(style="ticks", font_scale=font_scale, rc={"lines.linewidth": 3.0})
     num_colors = len(concatenated_ratio_df[treatment].unique())
     palette = sns.color_palette("bright", num_colors)
 
@@ -35,8 +35,12 @@ def overlaid_time_series_plot(concatenated_ratio_df, treatment="ethanol", style_
     plt.ylim(0, 1)
     lp.set_xticks(range(13))
     lp.set_xticklabels([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])
-    plt.title("Predicted Live over Time, with and without Stain Features")
-    plt.tight_layout()
+    if title is None:
+        plt.title("Predicted Live over Time, with and without Stain Features")
+    else:
+        plt.title(title)
+    if tight:
+        plt.tight_layout()
     plt.show()
 
 
