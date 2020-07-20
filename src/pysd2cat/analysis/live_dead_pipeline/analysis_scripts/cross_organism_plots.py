@@ -18,15 +18,28 @@ def cross_organism_time_series_plot(train_strain=n.yeast, stain=1):
     for test_strain in strains:
         if test_strain != n.yeast:  # I added this because yeast results didn't transfer to microbes and plots looked terrible
             train_test_dir = "({}_ethanol_{})_({}_ethanol_{})".format(train_strain, stain, test_strain, stain)
-            ratio_df = pd.read_csv(os.path.join("pipeline_outputs/{}/ratio_df.csv".format(train_test_dir)))
+            live_dead_pipeline_dir_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            ratio_df = pd.read_csv(os.path.join(live_dead_pipeline_dir_path,
+                                                "pipeline_outputs/{}/ratio_df.csv".format(train_test_dir)))
             ratio_df["test_strain"] = test_strain
             relevant_cols = ["test_strain", "ethanol", "time_point", "predicted %live"]
             list_of_ratio_dfs.append(ratio_df[relevant_cols])
     concatenated = pd.concat(list_of_ratio_dfs)
     print(concatenated)
+    if train_strain == n.bacillus:
+        train_name_for_plot = "Bacillus"
+    elif train_strain == n.ecoli:
+        train_name_for_plot = "E-coli"
+    if stain == 1:
+        stain_title_entry = "Stain Info Used"
+    elif stain == 0:
+        stain_title_entry = "Stain Info Not Used"
+
     overlaid_time_series_plot(concatenated_ratio_df=concatenated,
                               treatment="ethanol",
-                              style_col="test_strain")
+                              style_col="test_strain",
+                              title="Cross-Organism Predictions. {}. Train on {}.".format(stain_title_entry, train_name_for_plot),
+                              font_scale=3.0, tight=False)
 
 
 def main():
@@ -46,7 +59,10 @@ def main():
                                      ])
                 ldp.evaluate_performance(n.condition_method)
 
+    cross_organism_time_series_plot(train_strain=n.bacillus, stain=1)
     cross_organism_time_series_plot(train_strain=n.ecoli, stain=1)
+    # cross_organism_time_series_plot(train_strain=n.bacillus, stain=0)
+    # cross_organism_time_series_plot(train_strain=n.ecoli, stain=0)
 
 
 if __name__ == '__main__':
