@@ -8,9 +8,6 @@ from sklearn.preprocessing import Binarizer
 import pandas as pd
 from pysd2cat.data import pipeline
 
-from harness.test_harness_class import TestHarness
-from harness.th_model_instances.hamed_models.random_forest_classification import random_forest_classification
-from harness.utils.names import Names
 import logging
 
 import os
@@ -31,6 +28,11 @@ def build_model_pd(classifier_df,
                    dry_run=False, 
                    feature_importance=False
                                  ):
+
+    from harness.test_harness_class import TestHarness
+    from harness.th_model_instances.hamed_models.random_forest_classification import random_forest_classification
+    from harness.utils.names import Names
+
     l.debug("data_df %s", str(data_df))
     l.debug("classifier_df %s", str(classifier_df))
     
