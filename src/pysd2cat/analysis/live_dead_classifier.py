@@ -8,15 +8,12 @@ from sklearn.preprocessing import Binarizer
 import pandas as pd
 from pysd2cat.data import pipeline
 
-from harness.test_harness_class import TestHarness
-from harness.th_model_instances.hamed_models.random_forest_classification import random_forest_classification
-from harness.utils.names import Names
 import logging
 
 import os
 
 l = logging.getLogger(__file__)
-l.setLevel(logging.DEBUG)
+l.setLevel(logging.INFO)
 
 
 def build_model_pd(classifier_df,
@@ -31,6 +28,11 @@ def build_model_pd(classifier_df,
                    dry_run=False, 
                    feature_importance=False
                                  ):
+
+    from harness.test_harness_class import TestHarness
+    from harness.th_model_instances.hamed_models.random_forest_classification import random_forest_classification
+    from harness.utils.names import Names
+
     l.debug("data_df %s", str(data_df))
     l.debug("classifier_df %s", str(classifier_df))
     
@@ -156,7 +158,7 @@ def compute_mean_live(model,
     return mean_live
 
 def predict_live_dead(df, model, scaler):
-    print("Predicting live...")
+    #print("Predicting live...")
     df_norm = scaler.transform(df)
     predictions = model.predict(df_norm)
     #predictions = model.predict(df)

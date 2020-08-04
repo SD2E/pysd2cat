@@ -1,5 +1,3 @@
-from harness.test_harness_class import TestHarness
-from harness.th_model_instances.hamed_models.random_forest_classification import random_forest_classification
 from pysd2cat.analysis.Names import Names
 from pysd2cat.analysis import live_dead_classifier as ldc
 import numpy as np
@@ -42,6 +40,7 @@ def get_classifier_dataframe(df, data_columns = ['FSC_A', 'SSC_A', 'BL1_A', 'RL1
 
 
 def compute_predicted_output(df, 
+                             training_df=None,
                              data_columns = ['FSC_A', 'SSC_A', 'BL1_A', 'RL1_A', 'FSC_H', 
                                              'SSC_H', 'BL1_H', 'RL1_H', 'FSC_W', 'SSC_W', 
                                              'BL1_W', 'RL1_W'], 
@@ -49,20 +48,24 @@ def compute_predicted_output(df,
                              strain_col=Names.STRAIN,
                              high_control=Names.NOR_00_CONTROL, 
                              low_control=Names.WT_LIVE_CONTROL,
+                             id_col='id',
                              use_harness=False,
                              description=None):
     ## Build the training/test input
-    c_df = get_classifier_dataframe(df, data_columns = data_columns, strain_col=strain_col, high_control=high_control, low_control=low_control)
+    if training_df is None:
+        c_df = get_classifier_dataframe(df, data_columns = data_columns, strain_col=strain_col, high_control=high_control, low_control=low_control)
+    else:
+        c_df = training_df
     
 
     if use_harness:
         c_df.loc[:, 'output'] = df['output']
-        c_df.loc[:, 'id'] = df['id']
+        c_df.loc[:, id_col] = df[id_col]
         c_df.loc[:, 'index'] = c_df.index
         df.loc[:,'index'] = df.index
         pred_df = ldc.build_model_pd(c_df,
                                      data_df = df,
-                                     index_cols=['index', 'output', 'id'],
+                                     index_cols=['index', 'output', id_col],
                                      input_cols=data_columns,
                                      output_cols=['class_label'],
                                      output_location=out_dir,
@@ -76,13 +79,17 @@ def compute_predicted_output(df,
         ## Predict label for unseen data
         pred_df = df[data_columns]
         pred_df = ldc.predict_live_dead(pred_df, model, scaler)
-        result_df = df[['output', 'id']]
+        if 'output' in df.columns:
+            result_df = df[['output', id_col]]
+        else:
+            result_df = df[[id_col]]
         result_df.loc[:,'predicted_output'] = pred_df['class_label'].astype(int)
     
     return result_df
 
    
 def compute_correctness_classifier(df,
+                             training_df=None,
                              out_dir = '.',
                              mean_output_label='probability_correct',
                              std_output_label='std_probability_correct',
@@ -96,16 +103,21 @@ def compute_correctness_classifier(df,
                              description=None,
                              add_predictions = False,
                              use_harness = False,
+                             id_col='id',
+                             channels = ['FSC_A', 'SSC_A', 'BL1_A', 'RL1_A', 'FSC_H', 'SSC_H', 'BL1_H', 'RL1_H', 'FSC_W', 'SSC_W', 'BL1_W', 'RL1_W'],
                              logger=l):
     
     df.loc[:,'output'] = pd.to_numeric(df['output'])
     logger.debug("Shape at start: " + str(df.shape) + " strain_col = " + strain_col)
     result_df = compute_predicted_output(df, 
+                                         training_df=training_df,
                                          out_dir=out_dir,
                                          strain_col=strain_col,
                                          high_control=high_control, 
                                          low_control=low_control, 
                                          use_harness=use_harness,
+                                         data_columns=channels,
+                                         id_col=id_col,
                                          description=description)
     logger.debug("Shape of result: " + str(result_df.shape) + ", columns= " + str(result_df.columns))
     result_df.loc[:, 'predicted_correct'] = result_df.apply(lambda x : None if np.isnan(x['output']) or np.isnan(x['predicted_output']) else 1.0 - np.abs(x['output'] - x['predicted_output']), axis=1)
@@ -150,7 +162,7 @@ def compute_correctness_classifier(df,
         #print(res['count'])
         return pd.Series(res, index=['mean', 'std', 'mean_high', 'std_high', 'mean_low', 'std_low'])
 
-    groups = result_df.groupby(['id'])
+    groups = result_df.groupby([id_col])
     acc_df = groups.apply(nan_agg).reset_index() 
 
     logger.debug("Shape of acc: " + str(acc_df.shape))
