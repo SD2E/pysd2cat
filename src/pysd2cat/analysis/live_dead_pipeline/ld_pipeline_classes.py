@@ -9,9 +9,9 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 import plotly
+# TODO: figure out orca package issues (will allow us to save plotly figures as static pngs)
 # plotly.io.orca.config.executable = 'orca.app'
 # /Users/he/anaconda3/bin/orca.app
-
 import plotly.express as px
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
@@ -392,16 +392,18 @@ class LiveDeadPipeline:
             raise Warning("The unique values in the {} column of labeled_df "
                           "do not match those in n.time_points: {}".format(n.time, n.time_points))
 
-        fig = grid_of_distributions_over_conditions(df1=labeled_df, axis_1=axis_1, axis_2=axis_2,
-                                                    grid_rows_source=self.y_treatment,
-                                                    grid_cols_source=n.time,
-                                                    color_source=n.label_preds,
-                                                    sample_fraction=sample_fraction, df2=None, kdeplot=kdeplot)
+        plotly_fig = grid_of_distributions_over_conditions(df1=labeled_df, axis_1=axis_1, axis_2=axis_2,
+                                                           grid_rows_source=self.y_treatment,
+                                                           grid_cols_source=n.time,
+                                                           color_source=n.label_preds,
+                                                           sample_fraction=sample_fraction, df2=None, kdeplot=kdeplot)
 
-        plt.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)
-        plt.title(self.y_strain)
-        plt.savefig(os.path.join(self.output_path, "scatter_{}_{}_{}.png".format(labeling_method, axis_1, axis_2)))
-        plt.close(fig)
+        html_output = os.path.join(self.output_path, "scatter_{}_{}_{}.html".format(labeling_method, axis_1, axis_2))
+        png_output = os.path.join(self.output_path, "scatter_{}_{}_{}.png".format(labeling_method, axis_1, axis_2))
+
+        plotly_fig.write_html(html_output)
+        # saving as static image (png) doesn't currently work, need to figure out issues with orca package
+        # plotly_fig.write_image(png_output)
 
     def quantitative_metrics(self, labeling_method):
         """
@@ -421,6 +423,12 @@ class ComparePipelines:
     def __init__(self, ld_pipeline_1, ld_pipeline_2):
         self.ld_pipeline_1 = ld_pipeline_1
         self.ld_pipeline_2 = ld_pipeline_2
+
+        # TODO update output_path to make things simpler/clearer
+        self.output_dir_name = "[{}]_vs_[{}]".format(self.ld_pipeline_1.output_dir_name, self.ld_pipeline_2.output_dir_name)
+        self.output_path = os.path.join(current_dir_path, n.pipeline_output_dir, "compare_pipelines", self.output_dir_name)
+        if not os.path.exists(self.output_path):
+            os.makedirs(self.output_path)
 
     def compare_plots_of_features_over_conditions(self, labeling_method_1, labeling_method_2,
                                                   axis_1="log_SSC-A", axis_2="log_RL1-A",
@@ -449,15 +457,20 @@ class ComparePipelines:
         if (axis_2 is not None) & (axis_2 not in labeled_df_2.columns.values):
             labeled_df = pd.merge(labeled_df_2, self.ld_pipeline_2.y_df[[n.index, axis_2]], on=n.index)
 
-        facet_grid = grid_of_distributions_over_conditions(df1=labeled_df_1, axis_1=axis_1, axis_2=axis_2,
+        plotly_fig = grid_of_distributions_over_conditions(df1=labeled_df_1, axis_1=axis_1, axis_2=axis_2,
                                                            grid_rows_source=self.ld_pipeline_1.y_treatment,
                                                            grid_cols_source=n.time,
                                                            color_source=n.label_preds,
-                                                           sample_fraction=sample_fraction, df2=labeled_df_2, kdeplot=kdeplot)
+                                                           sample_fraction=sample_fraction,
+                                                           df2=labeled_df_2, kdeplot=kdeplot)
 
-        # facet_grid.savefig("asdf.png")
-        # plt.savefig(os.path.join(self.output_path, "scatter_{}_{}_{}.png".format(labeling_method, axis_1, axis_2)))
-        # plt.close(fig)
+        # TODO update this file name to include labeling_method_2 or somehow make things clearer
+        html_output = os.path.join(self.output_path, "scatter_{}_{}_{}.html".format(labeling_method_1, axis_1, axis_2))
+        png_output = os.path.join(self.output_path, "scatter_{}_{}_{}.png".format(labeling_method_1, axis_1, axis_2))
+
+        plotly_fig.write_html(html_output)
+        # saving as static image (png) doesn't currently work, need to figure out issues with orca package
+        # plotly_fig.write_image(png_output)
 
 
 def grid_of_distributions_over_conditions(df1, axis_1, axis_2,
@@ -482,6 +495,7 @@ def grid_of_distributions_over_conditions(df1, axis_1, axis_2,
     else:
         relevant_columns = [axis_1, axis_2, grid_rows_source, grid_cols_source, color_source]
     df1 = df1[relevant_columns].copy()
+
     if df2 is not None:
         df2 = df2[relevant_columns].copy()
 
@@ -503,9 +517,13 @@ def grid_of_distributions_over_conditions(df1, axis_1, axis_2,
         if df2 is not None:
             df2, _ = train_test_split(df2, train_size=sample_fraction, random_state=5,
                                       stratify=df2[[grid_rows_source, grid_cols_source, color_source]])
+
+    df1[color_source] = df1[color_source].astype(int)
     if df2 is None:
+        df1[color_source] = df1[color_source].astype(str)
         df_plot = df1.copy()
     else:
+        df2[color_source] = df2[color_source].astype(int)
         df1[color_source] = 'df1_' + df1[color_source].astype(str)
         df2[color_source] = 'df2_' + df2[color_source].astype(str)
         df_plot = pd.concat([df1, df2])
@@ -519,47 +537,54 @@ def grid_of_distributions_over_conditions(df1, axis_1, axis_2,
 
     # Plotting code is below here
     if axis_2 is not None:
-        # relplot way:
-        # with sns.plotting_context(rc={"legend.fontsize": 60}):
-        #     grid = sns.relplot(x=axis_1, y=axis_2, alpha=0.5, data=df_plot, col=grid_cols_source, row=grid_rows_source, hue=color_source,
-        #                        col_order=grid_col_order, row_order=grid_row_order, hue_order=grid_hue_order, legend="full")
-
-        # # FacetGrid way:
-        # grid = sns.FacetGrid(data=df_plot, col=grid_cols_source, row=grid_rows_source, hue=color_source,
-        #                      col_order=grid_col_order, row_order=grid_row_order, hue_order=grid_hue_order)
-        # grid.map(sns.scatterplot, axis_1, axis_2)
-        # # plt.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)
-        # grid.fig.subplots_adjust(top=0.8)
-        # grid.fig.suptitle("BOOGALOO", size=20, horizontalalignment="center")
-        # grid.add_legend(title="LEGEND", bbox_to_anchor=(0.5, 0.85), ncol=len(grid_col_order), fontsize=14, title_fontsize=100)
-        #
-        # grid.savefig("asdf.png")
-        # sys.exit(0)
-
-        fig = px.scatter(df_plot, x=axis_1, y=axis_2, color=color_source, size=None,
-                         facet_col=grid_cols_source, facet_row=grid_rows_source,
-                         category_orders={grid_cols_source: grid_col_order,
-                                          grid_rows_source: grid_row_order,
-                                          color_source: grid_hue_order},
-                         opacity=0.5)
-        # fig.write_html("plotly_example.html")
-        fig.write_image("plotly_example.png")
-        sys.exit(0)
-
-        # legend = grid._legend
-        # legend.set_bbox_to_anchor([0.5, 0.95])  # legend coordinates
-        # legend._loc = 9  # says which part of the bbox to put at the coordinates above (9 stands for upper center)
-        # legend._fancybox = True
-        # legend._title = "LEGEND"
-        # legend._fontsize = 25
-        # legend._title_fontsize = 50
-        # legend._ncol = 1
+        plotly_fig = px.scatter(df_plot, x=axis_1, y=axis_2, color=color_source, size=None,
+                                facet_col=grid_cols_source, facet_row=grid_rows_source,
+                                category_orders={grid_cols_source: grid_col_order,
+                                                 grid_rows_source: grid_row_order,
+                                                 color_source: grid_hue_order},
+                                opacity=0.5)
     else:
         raise NotImplementedError("single axis distplots have not been implemented yet")
-        # grid = sns.FacetGrid(data=df_plot, col=grid_cols_source, row=grid_rows_source, hue=color_source,
-        #                      col_order=grid_col_order, row_order=grid_row_order, hue_order=grid_hue_order)
-        # grid.map(sns.distplot, axis_1, bins=100, label="testing123", norm_hist=False, kde=False)
 
-    # grid.add_legend(loc="upper center", ncol=1, fancybox=True)
+    return plotly_fig
 
-    return grid
+
+"""
+Archived code, will use or delete later, didn't want to delete for now
+
+Scatterplot grid code:
+
+        # relplot way:
+        with sns.plotting_context(rc={"legend.fontsize": 60}):
+            grid = sns.relplot(x=axis_1, y=axis_2, alpha=0.5, data=df_plot, col=grid_cols_source, row=grid_rows_source, hue=color_source,
+                               col_order=grid_col_order, row_order=grid_row_order, hue_order=grid_hue_order, legend="full")
+                                       
+
+        # FacetGrid way:
+        grid = sns.FacetGrid(data=df_plot, col=grid_cols_source, row=grid_rows_source, hue=color_source,
+                             col_order=grid_col_order, row_order=grid_row_order, hue_order=grid_hue_order)
+        grid.map(sns.scatterplot, axis_1, axis_2)
+        # plt.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)
+        grid.fig.subplots_adjust(top=0.8)
+        grid.fig.suptitle("BOOGALOO", size=20, horizontalalignment="center")
+        grid.add_legend(title="LEGEND", bbox_to_anchor=(0.5, 0.85), ncol=len(grid_col_order), fontsize=14, title_fontsize=100)
+        grid.savefig("asdf.png")
+        sys.exit(0)
+        
+        
+        # Updating legend
+        legend = grid._legend
+        legend.set_bbox_to_anchor([0.5, 0.95])  # legend coordinates
+        legend._loc = 9  # says which part of the bbox to put at the coordinates above (9 stands for upper center)
+        legend._fancybox = True
+        legend._title = "LEGEND"
+        legend._fontsize = 25
+        legend._title_fontsize = 50
+        legend._ncol = 1
+        
+
+Distplot code:
+        grid = sns.FacetGrid(data=df_plot, col=grid_cols_source, row=grid_rows_source, hue=color_source,
+                             col_order=grid_col_order, row_order=grid_row_order, hue_order=grid_hue_order)
+        grid.map(sns.distplot, axis_1, bins=100, label="testing123", norm_hist=False, kde=False)
+"""
