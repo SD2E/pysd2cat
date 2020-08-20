@@ -74,7 +74,7 @@ def overlaid_time_series_plot(concatenated_ratio_df, treatment="ethanol", style_
 
 
 def main():
-    run_models = True
+    run_models = False
     strain = n.yeast
 
     # CFU data
@@ -86,8 +86,8 @@ def main():
                                           "treatment", "treatment concentration", "treatment + concentration",
                                           "treatment time", "treatment time unit", "CFU", "percent_killed"]]
     cfu_data_2020.columns = cfu_cols_of_interest
-    cfu_data_2019["percent_live"] = (100.0 - cfu_data_2019["percent_killed"]) / 100.0
-    cfu_data_2020["percent_live"] = (100.0 - cfu_data_2020["percent_killed"]) / 100.0
+    cfu_data_2019["percent_live"] = (100.0 - cfu_data_2019["percent_killed"])
+    cfu_data_2020["percent_live"] = (100.0 - cfu_data_2020["percent_killed"])
     cfu_cols_of_interest = cfu_cols_of_interest + ["percent_live"]
 
     # subsetting 2020 data to the S288Ca yeast strain only and ethanol treatment only
@@ -99,8 +99,8 @@ def main():
                                           as_index=False, ).first()[cfu_cols_of_interest]
 
     # in 2019 data, add noise to the 15 and 80 ethanol concentrations so they don't overlap
-    cfu_data_2019.loc[cfu_data_2019["treatment_concentration"] == 15, "percent_live"] += 0.01
-    cfu_data_2019.loc[cfu_data_2019["treatment_concentration"] == 80, "percent_live"] -= 0.01
+    cfu_data_2019.loc[cfu_data_2019["treatment_concentration"] == 15, "percent_live"] += 1
+    cfu_data_2019.loc[cfu_data_2019["treatment_concentration"] == 80, "percent_live"] -= 1
 
     print(cfu_data_2019)
     print()
