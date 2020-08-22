@@ -6,12 +6,10 @@ import pandas as pd
 import seaborn as sns
 from pathlib import Path
 import matplotlib.pyplot as plt
-from sklearn.metrics import r2_score
-from scipy.stats import pearsonr
 from pysd2cat.analysis.live_dead_pipeline.ld_pipeline_classes import LiveDeadPipeline
 from pysd2cat.analysis.live_dead_pipeline.names import Names as n
-from pysd2cat.analysis.live_dead_pipeline.experiment_data.duke_2019_cfu_plot import prep_2019_cfu_data
-from pysd2cat.analysis.live_dead_pipeline.experiment_data.duke_2020_cfu_plot import prep_2020_cfu_data
+from pysd2cat.analysis.live_dead_pipeline.experiment_data.cfu_data.converge_cfu_data import prep_2019_cfu_data
+from pysd2cat.analysis.live_dead_pipeline.experiment_data.cfu_data.converge_cfu_data import prep_2020_cfu_data
 
 matplotlib.use("tkagg")
 pd.set_option('display.max_columns', 500)
@@ -79,16 +77,11 @@ def main():
 
     # CFU data
     cfu_cols_of_interest = ["strain", "replicate",
-                            "treatment", "treatment_concentration", "treatment + concentration",
-                            "treatment_time", "treatment_time_unit", "CFU", "percent_killed"]
+                            "treatment", "treatment_concentration",
+                            "treatment_time", "treatment_time_unit",
+                            "CFU", "percent_killed", "percent_live"]
     cfu_data_2019 = prep_2019_cfu_data()[cfu_cols_of_interest]
-    cfu_data_2020 = prep_2020_cfu_data()[["Strain", "replicate",
-                                          "treatment", "treatment concentration", "treatment + concentration",
-                                          "treatment time", "treatment time unit", "CFU", "percent_killed"]]
-    cfu_data_2020.columns = cfu_cols_of_interest
-    cfu_data_2019["percent_live"] = (100.0 - cfu_data_2019["percent_killed"])
-    cfu_data_2020["percent_live"] = (100.0 - cfu_data_2020["percent_killed"])
-    cfu_cols_of_interest = cfu_cols_of_interest + ["percent_live"]
+    cfu_data_2020 = prep_2020_cfu_data()[cfu_cols_of_interest]
 
     # subsetting 2020 data to the S288Ca yeast strain only and ethanol treatment only
     cfu_data_2020 = cfu_data_2020.loc[cfu_data_2020["strain"] == "S288Ca"]
@@ -106,6 +99,8 @@ def main():
     print()
     print(cfu_data_2020)
     print()
+
+    sys.exit(0)
 
     if run_models:
         # stain model
