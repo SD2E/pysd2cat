@@ -7,6 +7,7 @@ import matplotlib
 import numpy as np
 import pandas as pd
 import seaborn as sns
+from pathlib import Path
 import matplotlib.pyplot as plt
 import plotly
 # TODO: figure out orca package issues (will allow us to save plotly figures as static pngs)
@@ -25,8 +26,7 @@ pd.set_option('display.max_columns', 500)
 pd.set_option('display.width', 10000)
 pd.set_option('display.max_colwidth', None)
 
-# how is this different from os.path.dirname(os.path.realpath(__file__))?
-current_dir_path = os.getcwd()
+current_dir_path = Path(__file__).parent
 
 
 # TODO: figure out where/when dataframes should be copied or not
