@@ -17,15 +17,26 @@ def bin_cross(label_and_conds, y_pred):
 
 
 def cfu_loss(label_and_conds, y_pred):
-    y_true = label_and_conds[n.label]
-    conds = label_and_conds[[n.ethanol, n.time]]
     cfu_data = pd.read_csv("/Users/he/PycharmProjects/SD2/pysd2cat/src/pysd2cat/analysis/"
-                           "live_dead_pipeline/experiment_data/cfu_data/sample_CFU_table.csv")
-    cfu_data = cfu_data[["treatment_concentration", "treatment_time", "percent_live"]]
-    cfu_data["treatment_time"] = cfu_data["treatment_time"] * 2
+                           "live_dead_pipeline/experiment_data/cfu_data/processed_and_combined_cfus.csv")
+    cfu_data = cfu_data[["inducer_concentration", "timepoint", "percent_live"]]
 
     print(cfu_data)
-    return K.mean(K.abs(y_true - y_pred))
+    print()
+
+    ratio_df = pd.DataFrame(columns=["ethanol", n.time, n.num_live, n.num_dead, n.percent_live])
+    for tr in list(label_and_conds["ethanol"].unique()):
+        for ti in list(label_and_conds[n.time].unique()):
+            num_live = len(label_and_conds.loc[(label_and_conds["ethanol"] == tr) & (label_and_conds[n.time] == ti) & (
+                    label_and_conds["label"] == 1)])
+            num_dead = len(label_and_conds.loc[(label_and_conds["ethanol"] == tr) & (label_and_conds[n.time] == ti) & (
+                    label_and_conds["label"] == 0)])
+            ratio_df.loc[len(ratio_df)] = [tr, ti, num_live, num_dead, float(num_live) / (num_live + num_dead)]
+
+    print(ratio_df)
+
+    # use mean abs error like below
+    # return K.mean(K.abs(y_true - y_pred))
 
 
 def joint_loss(label_and_conds, y_pred):
@@ -44,7 +55,7 @@ def labeling_booster_model(input_shape=None):
     model.add(Dropout(0.1))
     wr = l1_l2(l2=0.02, l1=0)
     model.add(Dense(units=1, activation='sigmoid', kernel_regularizer=wr))
-    model.compile(loss='binary_crossentropy', optimizer="Adam",
+    model.compile(loss=joint_loss, optimizer="Adam",
                   metrics=['accuracy'])
     return model
 
