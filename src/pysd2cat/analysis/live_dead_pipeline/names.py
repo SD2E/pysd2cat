@@ -5,8 +5,8 @@ class Names:
     label = "label"
     label_preds = "label_predictions"
     cluster_preds = "cluster_predictions"
-    data_file_name = "pipeline_data.csv"
-    # data_file_name = "sampled_data_for_testing.csv"
+    # data_file_name = "pipeline_data.csv"
+    data_file_name = "sampled_data_for_testing.csv"
 
     # strains
     yeast = "yeast"
