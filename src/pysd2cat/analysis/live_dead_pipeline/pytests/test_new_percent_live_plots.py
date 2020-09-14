@@ -4,7 +4,6 @@ import pandas as pd
 from pathlib import Path
 from pysd2cat.analysis.live_dead_pipeline.names import Names as n
 from pysd2cat.analysis.live_dead_pipeline.ld_pipeline_classes import LiveDeadPipeline, ComparePipelines
-from pysd2cat.analysis.live_dead_pipeline.analysis_scripts.yeast_stain_vs_non_stain import overlaid_time_series_plot
 
 matplotlib.use("tkagg")
 pd.set_option('display.max_columns', 500)
@@ -40,26 +39,16 @@ def main():
                                       # {n.ethanol: 20.0, n.time: n.time_points[-1]},
                                       # {n.ethanol: 15.0, n.time: n.time_points[-1]}
                                   ])
+    print("\n\n\n\n\n\n\n")
+    ldp_no_stain.plot_percent_live_over_conditions(n.condition_method)
 
     print("\n\n\n\n\n\n\n")
-
     cp = ComparePipelines(ldp_stain, ldp_no_stain)
     cp.compare_percent_live_plots(n.condition_method, n.condition_method)
-
-
-
-
-
-
-
 
     import sys
     sys.exit(0)
 
-
-    overlaid_time_series_plot(concatenated_ratio_df=concatenated, treatment="ethanol",
-                              style_col="was stain used?", style_order=[True, False],
-                              font_scale=2.3, tight=True, cfu_data=[cfu_data_2019, cfu_data_2020])
     # don't need multiple CFU files because we can just combine them into one and then have a column determine the marker shape
 
     # pivoted = concatenated.pivot_table(index=["ethanol", "time_point"], columns="was stain used?", values="predicted %live")

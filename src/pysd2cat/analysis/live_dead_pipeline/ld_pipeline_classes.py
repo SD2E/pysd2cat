@@ -351,24 +351,14 @@ class LiveDeadPipeline:
         plot of percent alive vs. time, colored by treatment amount.
         This serves as a qualitative metric that allows us to compare different methods of labeling live/dead.
         """
-        matplotlib.use("tkagg")
-
         labeled_df = _get_labeled_df(labeling_method, self)
-
         percent_live_df = _create_percent_live_df(labeled_df, self)
+        treatment_col = self.y_treatment
 
-        lp = plt.figure()
-        palette = sns.color_palette("bright", 5)
-        sns.lineplot(x=percent_live_df[n.time], y=percent_live_df[n.percent_live], hue=percent_live_df[self.y_treatment], palette=palette)
-        plt.ylim(0, 1)
-        plt.title("Predicted Live over Time using {}\n{}".format(labeling_method, self.output_dir_name))  # TODO make title prettier
-
-        # TODO: add make_dir_if_does_not_exist
-        plt.savefig(os.path.join(self.output_path, "time_series_{}.png".format(labeling_method)))
-        plt.close(lp)
-        percent_live_df.to_csv(os.path.join(self.output_path, "percent_live_df.csv"), index=False)
-
-        return percent_live_df
+        _plot_percent_live_over_conditions(percent_live_df=percent_live_df,
+                                           treatment_col=treatment_col,
+                                           cfu_overlay=self.cfu_df,
+                                           compare=None)
 
     def plot_features_over_conditions(self, labeling_method, axis_1="log_SSC-A", axis_2="log_RL1-A",
                                       sample_fraction=0.1, kdeplot=False):
@@ -529,7 +519,7 @@ def _plot_percent_live_over_conditions(percent_live_df: pd.DataFrame, treatment_
     palette = dict(zip(treatment_levels, sns.color_palette("bright", num_colors)))
 
     if cfu_overlay is not None:
-        print(cfu_overlay)
+        # print(cfu_overlay)
         sp = sns.scatterplot(data=cfu_overlay, x="timepoint", y="percent_live", s=250, markers="date_of_experiment",
                              hue="inducer_concentration", legend="full", palette=palette, alpha=0.8, zorder=50)
 
