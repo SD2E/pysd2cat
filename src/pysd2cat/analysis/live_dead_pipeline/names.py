@@ -33,7 +33,8 @@ class Names:
     sytox_cols = ["log_{}".format(x) for x in sytox_cols]
     bl_cols = ["log_{}".format(x) for x in bl_cols]
 
-    # experiment dictionary
+    # experiment data dictionary
+    # might want to make the values lists of experiment_ids since different experiments could apply
     exp_dict = {
         (yeast, ethanol): "temporary_yeast_ethanol",
         (bacillus, ethanol): "temporary_bacillus_ethanol",
