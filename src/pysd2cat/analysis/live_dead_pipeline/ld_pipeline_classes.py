@@ -2,11 +2,13 @@ import os
 import sys
 import random
 import inspect
+import warnings
 import itertools
 import matplotlib
 import numpy as np
 import pandas as pd
 import seaborn as sns
+from typing import Union
 from pathlib import Path
 import matplotlib.pyplot as plt
 import plotly
@@ -99,6 +101,14 @@ class LiveDeadPipeline:
         # print()
         self.x_df = x_df.copy()
         self.y_df = y_df.copy()
+
+        # load CFU data
+        cfu_data = pd.read_csv(os.path.join(current_dir_path, n.exp_data_dir, "cfu_data", "processed_and_combined_cfus.csv"))
+
+        # TODO: updated hardcoded values after updating strain dict, etc
+        cfu_data = cfu_data.loc[cfu_data["inducer_type"].str.lower() == self.y_treatment]
+        cfu_data = cfu_data.loc[cfu_data["strain"] == "S288c_a"]
+        self.cfu_df = cfu_data.copy()
 
     # ----- Building Blocks -----
 
@@ -341,35 +351,14 @@ class LiveDeadPipeline:
         plot of percent alive vs. time, colored by treatment amount.
         This serves as a qualitative metric that allows us to compare different methods of labeling live/dead.
         """
-        matplotlib.use("tkagg")
-        if labeling_method not in self.labeled_data_dict.keys():
-            raise NotImplementedError("The labeling method you are trying to create a plot for has not been run yet."
-                                      "Please run the labeling method first.")
-        else:
-            labeled_df = self.labeled_data_dict[labeling_method]
+        labeled_df = _get_labeled_df(labeling_method, self)
+        percent_live_df = _create_percent_live_df(labeled_df, self)
+        treatment_col = self.y_treatment
 
-        ratio_df = pd.DataFrame(columns=[self.y_treatment, n.time, n.num_live, n.num_dead, n.percent_live])
-        for tr in list(labeled_df[self.y_treatment].unique()):
-            for ti in list(labeled_df[n.time].unique()):
-                num_live = len(labeled_df.loc[(labeled_df[self.y_treatment] == tr) & (labeled_df[n.time] == ti) & (
-                        labeled_df[n.label_preds] == 1)])
-                num_dead = len(labeled_df.loc[(labeled_df[self.y_treatment] == tr) & (labeled_df[n.time] == ti) & (
-                        labeled_df[n.label_preds] == 0)])
-                ratio_df.loc[len(ratio_df)] = [tr, ti, num_live, num_dead, float(num_live) / (num_live + num_dead)]
-        palette = sns.color_palette("bright", 5)
-
-        lp = plt.figure()
-        sns.lineplot(x=ratio_df[n.time], y=ratio_df[n.percent_live], hue=ratio_df[self.y_treatment], palette=palette)
-        plt.ylim(0, 1)
-        plt.title("Predicted Live over Time using {}\n{}".format(labeling_method, self.output_dir_name))  # TODO make title prettier
-        # lp.set(ylim=(0, 1))
-        # lp.set(title="Predicted Live over Time using {}\n{}".format(labeling_method, self.output_dir_name))  # TODO make title prettier
-        # TODO: add make_dir_if_does_not_exist
-        plt.savefig(os.path.join(self.output_path, "time_series_{}.png".format(labeling_method)))
-        plt.close(lp)
-        ratio_df.to_csv(os.path.join(self.output_path, "ratio_df.csv"), index=False)
-
-        return ratio_df
+        _plot_percent_live_over_conditions(percent_live_df=percent_live_df,
+                                           treatment_col=treatment_col,
+                                           cfu_overlay=self.cfu_df,
+                                           compare=None)
 
     def plot_features_over_conditions(self, labeling_method, axis_1="log_SSC-A", axis_2="log_RL1-A",
                                       sample_fraction=0.1, kdeplot=False):
@@ -377,11 +366,7 @@ class LiveDeadPipeline:
         Will use self.y_df not self.x_df
         """
         # matplotlib.use("tkagg")
-        if labeling_method not in self.labeled_data_dict.keys():
-            raise NotImplementedError("The labeling method you are trying to create a plot for has not been run yet."
-                                      "Please run the labeling method first.")
-        else:
-            labeled_df = self.labeled_data_dict[labeling_method]
+        labeled_df = _get_labeled_df(labeling_method, self)
 
         if axis_1 not in labeled_df.columns.values:
             labeled_df = pd.merge(labeled_df, self.y_df[[n.index, axis_1]], on=n.index)
@@ -420,7 +405,7 @@ class ComparePipelines:
     Allows for the comparison of the labeling results of two pipelines
     """
 
-    def __init__(self, ld_pipeline_1, ld_pipeline_2):
+    def __init__(self, ld_pipeline_1: LiveDeadPipeline, ld_pipeline_2: LiveDeadPipeline):
         self.ld_pipeline_1 = ld_pipeline_1
         self.ld_pipeline_2 = ld_pipeline_2
 
@@ -435,23 +420,14 @@ class ComparePipelines:
                                                   sample_fraction=0.1, kdeplot=False):
         """
         """
-        if labeling_method_1 not in self.ld_pipeline_1.labeled_data_dict.keys():
-            raise NotImplementedError("The labeling method you are trying to create a plot for has not been run yet."
-                                      "Please run the labeling method first.")
-        else:
-            labeled_df_1 = self.ld_pipeline_1.labeled_data_dict[labeling_method_1]
+        labeled_df_1 = _get_labeled_df(labeling_method_1, self.ld_pipeline_1)
+        labeled_df_2 = _get_labeled_df(labeling_method_2, self.ld_pipeline_2)
 
-        if labeling_method_2 not in self.ld_pipeline_2.labeled_data_dict.keys():
-            raise NotImplementedError("The labeling method you are trying to create a plot for has not been run yet."
-                                      "Please run the labeling method first.")
-        else:
-            labeled_df_2 = self.ld_pipeline_2.labeled_data_dict[labeling_method_2]
-
+        # TODO: labeled_df isn't used, so can this code be deleted?
         if axis_1 not in labeled_df_1.columns.values:
             labeled_df = pd.merge(labeled_df_1, self.ld_pipeline_1.y_df[[n.index, axis_1]], on=n.index)
         if (axis_2 is not None) & (axis_2 not in labeled_df_1.columns.values):
             labeled_df = pd.merge(labeled_df_1, self.ld_pipeline_1.y_df[[n.index, axis_2]], on=n.index)
-
         if axis_1 not in labeled_df_2.columns.values:
             labeled_df = pd.merge(labeled_df_2, self.ld_pipeline_2.y_df[[n.index, axis_1]], on=n.index)
         if (axis_2 is not None) & (axis_2 not in labeled_df_2.columns.values):
@@ -471,6 +447,116 @@ class ComparePipelines:
         plotly_fig.write_html(html_output)
         # saving as static image (png) doesn't currently work, need to figure out issues with orca package
         # plotly_fig.write_image(png_output)
+
+    def compare_percent_live_plots(self, labeling_method_1, labeling_method_2):
+        if self.ld_pipeline_1.x_strain != self.ld_pipeline_2.x_strain:
+            warnings.warn("x_strain doesn't match between ld_pipeline_1 and ld_pipeline_2. "
+                          "Maybe it was intentional but that's unlikely.")
+        if self.ld_pipeline_1.x_treatment != self.ld_pipeline_2.x_treatment:
+            warnings.warn("x_treatment doesn't match between ld_pipeline_1 and ld_pipeline_2. "
+                          "Maybe it was intentional but that's unlikely.")
+        if ((self.ld_pipeline_1.y_strain != self.ld_pipeline_2.y_strain) or
+                (self.ld_pipeline_1.y_treatment != self.ld_pipeline_2.y_treatment)):
+            raise NotImplementedError("compare_percent_live_plots is not implemented for comparing different "
+                                      "strains or treatments. Currently we can only create a plot for stain vs non-stain.")
+        else:
+            treatment_col = self.ld_pipeline_1.y_treatment
+        if self.ld_pipeline_1.y_stain == self.ld_pipeline_2.y_stain:
+            warnings.warn("It appears that you're comparing something to itself...")
+
+        labeled_df_1 = _get_labeled_df(labeling_method_1, self.ld_pipeline_1)
+        labeled_df_2 = _get_labeled_df(labeling_method_2, self.ld_pipeline_2)
+        percent_live_df_1 = _create_percent_live_df(labeled_df_1, self.ld_pipeline_1)
+        percent_live_df_2 = _create_percent_live_df(labeled_df_2, self.ld_pipeline_2)
+
+        percent_live_df_1[n.stain] = bool(self.ld_pipeline_1.y_stain)
+        percent_live_df_2[n.stain] = bool(self.ld_pipeline_2.y_stain)
+
+        concat_percent_live_df = pd.concat([percent_live_df_1, percent_live_df_2])
+
+        _plot_percent_live_over_conditions(percent_live_df=concat_percent_live_df,
+                                           treatment_col=treatment_col,
+                                           cfu_overlay=self.ld_pipeline_1.cfu_df,  # should be the same as self.ld_pipeline_2.cfu_df
+                                           compare=n.stain)
+
+
+def _get_labeled_df(labeling_method: str, pipeline: LiveDeadPipeline) -> pd.DataFrame:
+    """
+    """
+    if labeling_method not in pipeline.labeled_data_dict.keys():
+        raise NotImplementedError("The labeling method you are trying to get labels from has not been run yet. "
+                                  "Please run the labeling method first.")
+    else:
+        labeled_df = pipeline.labeled_data_dict[labeling_method].copy()
+    return labeled_df
+
+
+def _create_percent_live_df(labeled_df: pd.DataFrame, ld_pipeline: LiveDeadPipeline):
+    ratio_df = pd.DataFrame(columns=[ld_pipeline.y_treatment, n.time, n.num_live, n.num_dead, n.percent_live])
+    for tr in list(labeled_df[ld_pipeline.y_treatment].unique()):
+        for ti in list(labeled_df[n.time].unique()):
+            num_live = len(labeled_df.loc[(labeled_df[ld_pipeline.y_treatment] == tr) & (labeled_df[n.time] == ti) & (
+                    labeled_df[n.label_preds] == 1)])
+            num_dead = len(labeled_df.loc[(labeled_df[ld_pipeline.y_treatment] == tr) & (labeled_df[n.time] == ti) & (
+                    labeled_df[n.label_preds] == 0)])
+            ratio_df.loc[len(ratio_df)] = [tr, ti, num_live, num_dead, 100.0 * float(num_live) / (num_live + num_dead)]
+    return ratio_df
+
+
+def _plot_percent_live_over_conditions(percent_live_df: pd.DataFrame, treatment_col: str,
+                                       cfu_overlay: Union[pd.DataFrame, None] = None,
+                                       compare: Union[str, None] = None, font_scale=1.0, title=None, tight=True):
+    """
+    Generates a time-series plot of percent alive vs. time, colored by treatment_col amount.
+    This serves as a qualitative metric that allows us to compare different methods of labeling live/dead.
+    """
+
+    matplotlib.use("tkagg")
+    sns.set(style="ticks", font_scale=font_scale, rc={"lines.linewidth": 3.0})
+    treatment_levels = list(percent_live_df[treatment_col].unique())
+    treatment_levels.sort()
+    num_colors = len(treatment_levels)
+    palette = dict(zip(treatment_levels, sns.color_palette("bright", num_colors)))
+
+    if cfu_overlay is not None:
+        # print(cfu_overlay)
+        sp = sns.scatterplot(data=cfu_overlay, x="timepoint", y="percent_live", s=250, markers="date_of_experiment",
+                             hue="inducer_concentration", legend="full", palette=palette, alpha=0.8, zorder=50)
+
+    if compare is None:
+        style = None
+        style_order = None
+    else:
+        style = percent_live_df[compare]
+        style_order = list(percent_live_df[compare].unique())
+        style_order.sort()
+
+    lp = sns.lineplot(x=percent_live_df[n.time], y=percent_live_df[n.percent_live],
+                      hue=percent_live_df[treatment_col], style=style,
+                      style_order=style_order, palette=palette, legend="full", zorder=1)
+
+    legend = plt.legend(bbox_to_anchor=(1.01, 0.9), loc=2, borderaxespad=0.,
+                        handlelength=4, markerscale=1.9)
+    legend.get_frame().set_edgecolor('black')
+    plt.ylim(-5, 105)
+    lp.set_xticks(np.linspace(0, 6, num=13))
+    if title is None:
+        plt.title("Predicted Live over Time, with and without Stain Features. Yeast (S288C or CENPK)")
+    else:
+        plt.title(title)
+    if tight:
+        plt.tight_layout()
+
+    new_labels = ["Ethanol Concentration of\nFlow Predictions", "0%", "10%", "15%", "20%", "80%",
+                  "\nStain Used by Model", "True", "False",
+                  "\n\nEthanol Concentration of\n2019 CFUs", "0%", "15%", "80%",
+                  "\nEthanol Concentration of\n2020 CFUs", "0%", "20%", "80%"]
+    for t, l in zip(legend.texts, new_labels): t.set_text(l)
+
+    plt.xlabel("Exposure Time (Hours)")
+    plt.ylabel("Percent Live")
+
+    plt.show()
 
 
 def grid_of_distributions_over_conditions(df1, axis_1, axis_2,

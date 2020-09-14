@@ -21,8 +21,8 @@ def main():
     ldp.thresholding_method()
     ldp.condition_method(live_conditions=None,
                          dead_conditions=[
-                             {n.ethanol: 1120.0, n.time: n.timepoints[-1]},
-                             {n.ethanol: 280.0, n.time: n.timepoints[-1]}
+                             {n.ethanol: 1120.0, n.time: n.time_points[-1]},
+                             {n.ethanol: 280.0, n.time: n.time_points[-1]}
                          ]
                          )
     ldp.cluster_method(n_clusters=2)
