@@ -35,20 +35,38 @@ def main():
     features = n.morph_cols + n.sytox_cols
 
     df = df[features + ["inducer_concentration", "timepoint", "label"]]
-    print(df, "\n")
+    # df["condition"] = df["inducer_concentration"].astype(str) + "_" + df["timepoint"].astype(str)
+    # df.drop(columns=["inducer_concentration", "timepoint"], inplace=True)
+    print(df)
 
     features = n.morph_cols + n.sytox_cols
     X = df[features]
     Y = df[col_idx.keys()]
 
+    # debugging cfu_loss
+    debug_Y = Y[:64]
+    debug_conds = tf.convert_to_tensor(debug_Y.drop(columns=[n.label]))
+    debug_y_pred = tf.convert_to_tensor(debug_Y[n.label].sample(frac=1))  # random labels for y_pred, used for testing functions
+
+    # print(debug_conds)
+    # print()
+    # print(debug_y_pred)
+    # print()
+    loss = cfu_loss(conditions=debug_conds, y_pred=debug_y_pred)
+
+    # try joint loss
+
+    sys.exit(0)
+
     # Begin keras model
-    print("\n----------- Begin Keras Labeling Booster Model -----------\n")
+    print("----------- Begin Keras Labeling Booster Model -----------")
     model = labeling_booster_model(input_shape=len(features))
-    model.fit(X, Y, epochs=10, batch_size=64)
+
+    model.fit(X, Y, epochs=10, batch_size=1000)
 
     # evaluate the keras model
-    evaluation = model.evaluate(X, Y)
-    print(evaluation)
+    _, accuracy = model.evaluate(X, Y)
+    print('Accuracy: %.2f' % (accuracy * 100))
 
     # class_predictions = np.ndarray.flatten(model.predict_classes(X_val))
 
@@ -57,39 +75,43 @@ def bin_cross(y_true, y_pred):
     return tf.losses.binary_crossentropy(y_true=y_true, y_pred=y_pred)
 
 
-def cfu_loss(conditions, y_pred, loop_or_group="group"):
+def cfu_loss(conditions, y_pred):
+    print(conditions)
+    print()
+    print(y_pred)
+    print("\n\n\n\n\n\n\n")
+
+    # uniques, idx, count = tf.unique_with_counts(conditions)
+    # print(uniques)
+    # print(idx)
+    # print(count)
+
+    from tensorflow.python.ops import gen_array_ops
+    uniques, idx, count = gen_array_ops.unique_with_counts_v2(conditions, [0])
+    # print(uniques)
+    # print(idx)
+    # print(count)
+    print()
+
+    num_unique = tf.size(count)
+    sums = tf.math.unsorted_segment_sum(data=y_pred, segment_ids=idx, num_segments=num_unique)
+    print(sums)
+    print()
+    ones = tf.ones(y_pred.shape)
+    # lengths = tf.math.unsorted_segment_sum(data=ones, segment_ids=idx, num_segments=num_unique)
+    lengths = tf.cast(count, tf.float64)
+    print(lengths)
+    print()
+    ratios = tf.divide(sums, lengths)
+    print(ratios)
+
+    mean = tf.math.reduce_mean(ratios)
+    print(mean)
+
     # create ratio_df from conditions and y_pred
-    conditions[n.label_preds] = y_pred
+    # pred_and_conds = K.concatenate([conditions, y_pred])
 
-    # "loop" and "group" do the same thing, but group is much more succinct (and probably faster)
-    if loop_or_group == "loop":
-        ratio_df = pd.DataFrame(columns=["inducer_concentration", "timepoint", "percent_live_predictions"])
-        for tr in list(conditions["inducer_concentration"].unique()):
-            for ti in list(conditions["timepoint"].unique()):
-                num_live = len(conditions.loc[(conditions["inducer_concentration"] == tr) & (
-                        conditions["timepoint"] == ti) & (conditions[n.label_preds] == 1)])
-                num_dead = len(conditions.loc[(conditions["inducer_concentration"] == tr) & (
-                        conditions["timepoint"] == ti) & (conditions[n.label_preds] == 0)])
-                ratio_df.loc[len(ratio_df)] = [tr, ti, 100 * float(num_live) / (num_live + num_dead)]
-    elif loop_or_group == "group":
-        ratio_df = conditions.groupby(by=["inducer_concentration", "timepoint"],
-                                      as_index=False).apply(lambda x: 100 * x[n.label_preds].sum() /
-                                                                      len(x)).reset_index(name="percent_live_predictions")
-    else:
-        raise NotImplementedError()
-
-    # using these lines as a temporary way to get the CFU data we want (CFUs = "ground truth")
-    ldp_stain = LiveDeadPipeline(x_strain=n.yeast, x_treatment=n.ethanol, x_stain=1,
-                                 y_strain=None, y_treatment=None, y_stain=None)
-    ldp_stain.load_data()
-    cfu_data = ldp_stain.cfu_df[["inducer_concentration", "timepoint", "percent_live"]]
-
-    cond_cols = ["inducer_concentration", "timepoint"]
-    merged_df = pd.merge(ratio_df, cfu_data, on=cond_cols)
-    merged_df_grouped = merged_df.groupby(cond_cols, as_index=False).mean()
-    merged_df_grouped["diff"] = merged_df_grouped["percent_live_predictions"] - merged_df_grouped[n.percent_live]
-    # print(merged_df_grouped, "\n")
-    return K.mean(K.abs(merged_df_grouped["diff"]))
+    # return K.mean(K.abs(merged_df_grouped["diff"]))
 
 
 def joint_loss(label_and_conds, y_pred):
@@ -113,7 +135,7 @@ def labeling_booster_model(input_shape=None):
     model.add(Dense(units=1, activation='sigmoid', kernel_regularizer=wr))
     model.add(Flatten())
     model.compile(loss=joint_loss, optimizer="Adam",
-                  metrics=[bin_cross, cfu_loss, "accuracy"], run_eagerly=True)
+                  metrics=[bin_cross, cfu_loss, "accuracy"])
     return model
 
 
