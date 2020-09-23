@@ -143,7 +143,8 @@ class LiveDeadPipeline:
                       index_cols=[n.index, self.x_treatment, n.time, n.stain],
                       normalize=True,
                       feature_cols_to_normalize=self.feature_cols,
-                      feature_extraction="eli5_permutation",
+                      # feature_extraction="eli5_permutation",
+                      feature_extraction=False,
                       predict_untested_data=pred_df)
         return th.list_of_this_instance_run_ids[-1]
 
