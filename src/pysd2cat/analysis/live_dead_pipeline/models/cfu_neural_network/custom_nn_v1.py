@@ -9,13 +9,16 @@ from keras.models import Sequential
 from keras.regularizers import l1_l2
 from keras.layers import Dense, Dropout, Flatten
 from pysd2cat.analysis.live_dead_pipeline.names import Names as n
-from pysd2cat.analysis.live_dead_pipeline.ld_pipeline_classes import LiveDeadPipeline, ComparePipelines
+from pysd2cat.analysis.live_dead_pipeline.ld_pipeline_classes import LiveDeadPipeline
 
 # gets rid of the annoying SettingWithCopyWarnings
 # set this equal to "raise" if you feel like debugging SettingWithCopyWarnings.
 pd.options.mode.chained_assignment = None  # default="warn"
 
 col_idx = OrderedDict([(n.label, 0), ("inducer_concentration", 1), ("timepoint", 2), ("percent_live", 3)])
+
+# tf.compat.v1.disable_eager_execution()
+print(tf.executing_eagerly())
 
 
 def main():
@@ -55,29 +58,26 @@ def main():
     X = df[features]
     Y = df[col_idx.keys()]
 
-    # debugging cfu_loss
-    debug_Y = Y.sample(n=64, random_state=5)
+    '''
+    # debugging joint_loss
+    print("Debugging Loss Functions\n")
+    debug_Y = Y.sample(n=2273, random_state=5)
     print(debug_Y, "\n")
     debug_label_conds_cfus = tf.convert_to_tensor(debug_Y)
-    debug_conds = tf.convert_to_tensor(debug_Y.drop(columns=[n.label, "percent_live"]))
-    debug_cfu = tf.convert_to_tensor(debug_Y["percent_live"])
     debug_y_pred = tf.convert_to_tensor(debug_Y[n.label].sample(frac=1))  # random labels for y_pred, used for testing functions
-    # loss = cfu_loss(conditions=debug_conds, cfu=debug_cfu, y_pred=debug_y_pred)
-    # print(loss)
     loss = joint_loss(label_conds_cfus=debug_label_conds_cfus, y_pred=debug_y_pred)
     print(loss)
-
-    sys.exit(0)
+    '''
 
     # Begin keras model
-    print("----------- Begin Keras Labeling Booster Model -----------")
+    print("\n----------- Begin Keras Labeling Booster Model -----------\n")
     model = labeling_booster_model(input_shape=len(features))
-
-    model.fit(X, Y, epochs=10, batch_size=1000)
+    model.fit(X, Y, epochs=1, batch_size=32)
+    # model.fit(tf.convert_to_tensor(X), debug_label_conds_cfus, epochs=10, batch_size=64)
 
     # evaluate the keras model
-    _, accuracy = model.evaluate(X, Y)
-    print('Accuracy: %.2f' % (accuracy * 100))
+    evaluation = model.evaluate(X, Y)
+    print(evaluation)
 
     # class_predictions = np.ndarray.flatten(model.predict_classes(X_val))
 
@@ -87,12 +87,16 @@ def bin_cross(y_true, y_pred):
 
 
 def cfu_loss(conditions, cfu, y_pred):
-    print("conditions tensor:\n", conditions)
+    # y_pred = tf.round(y_pred)
+
+    print("conditions tensor:\n", conditions, "\n")
+    print("cfu percent_live tensor:\n", cfu, "\n")
+    print("y_pred tensor:\n", y_pred, "\n\n\n")
     print()
-    print("cfu percent_live tensor:\n", cfu)
-    print()
-    print("y_pred tensor:\n", y_pred)
-    print("\n\n\n\n\n\n\n")
+    # tf.print(conditions)
+    # tf.print(cfu)
+    # tf.print(y_pred)
+    # print(tf.keras.backend.eval(y_pred))
 
     # uniques, idx, count = tf.unique_with_counts(conditions)
     # print(uniques)
@@ -101,25 +105,25 @@ def cfu_loss(conditions, cfu, y_pred):
 
     from tensorflow.python.ops import gen_array_ops
     uniques, idx, count = gen_array_ops.unique_with_counts_v2(conditions, [0])
-    # print(uniques)
-    # print(idx)
-    # print(count)
-    print()
+    print(uniques)
+    print(idx)
+    print(count)
+    # print()
 
     num_unique = tf.size(count)
     sums = tf.math.unsorted_segment_sum(data=y_pred, segment_ids=idx, num_segments=num_unique)
-    print("sums:\n", sums, "\n")
+    # print("sums:\n", sums, "\n")
     # ones = tf.ones(y_pred.shape)
     # lengths = tf.math.unsorted_segment_sum(data=ones, segment_ids=idx, num_segments=num_unique)
-    lengths = tf.cast(count, tf.float64)
-    print("lengths:\n", lengths, "\n")
+    lengths = tf.cast(count, tf.float32)
+    # print("lengths:\n", lengths, "\n")
     percents = 100.0 * tf.divide(sums, lengths)  # check if I need to do multiplicaiton via backend function
-    print("percents:\n", percents, "\n")
+    # print("percents:\n", percents, "\n")
 
     ratios_mean = tf.math.reduce_mean(percents)
     cfus_mean = tf.math.reduce_mean(cfu)
     diff = ratios_mean - cfus_mean
-    print(ratios_mean, cfus_mean, diff)
+    # print(ratios_mean, cfus_mean, diff)
 
     return K.mean(K.abs(diff))
 
@@ -129,6 +133,7 @@ def joint_loss(label_conds_cfus, y_pred):
     cfus = label_conds_cfus[:, col_idx["percent_live"]]
     condition_indices = [col_idx["inducer_concentration"], col_idx["timepoint"]]
     conditions = tf.gather(label_conds_cfus, condition_indices, axis=1)
+    y_pred = K.flatten(y_pred)  # replace this?
     loss_1 = bin_cross(y_true=y_true, y_pred=y_pred)
     loss_2 = cfu_loss(conditions=conditions, cfu=cfus, y_pred=y_pred)
     return 0.5 * loss_1 + 0.5 * loss_2
@@ -146,7 +151,7 @@ def labeling_booster_model(input_shape=None):
     model.add(Dense(units=1, activation='sigmoid', kernel_regularizer=wr))
     model.add(Flatten())
     model.compile(loss=joint_loss, optimizer="Adam",
-                  metrics=[bin_cross, cfu_loss, "accuracy"])
+                  metrics=[bin_cross, "accuracy"], run_eagerly=True)  # removed cfu_loss because it wasn't working in metrics
     return model
 
 
