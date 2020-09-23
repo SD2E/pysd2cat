@@ -15,7 +15,7 @@ from pysd2cat.analysis.live_dead_pipeline.ld_pipeline_classes import LiveDeadPip
 # set this equal to "raise" if you feel like debugging SettingWithCopyWarnings.
 pd.options.mode.chained_assignment = None  # default="warn"
 
-col_idx = OrderedDict([(n.label, 0), ("inducer_concentration", 1), ("timepoint", 2)])
+col_idx = OrderedDict([(n.label, 0), ("inducer_concentration", 1), ("timepoint", 2), ("percent_live", 3)])
 
 
 def main():
@@ -38,21 +38,42 @@ def main():
     # df["condition"] = df["inducer_concentration"].astype(str) + "_" + df["timepoint"].astype(str)
     # df.drop(columns=["inducer_concentration", "timepoint"], inplace=True)
     print(df)
+    print()
+
+    # add CFUs
+    # using these lines as a temporary way to get the CFU data we want (CFUs = "ground truth")
+    ldp_stain = LiveDeadPipeline(x_strain=n.yeast, x_treatment=n.ethanol, x_stain=1,
+                                 y_strain=None, y_treatment=None, y_stain=None)
+    ldp_stain.load_data()
+    cfu_data = ldp_stain.cfu_df[["inducer_concentration", "timepoint", "percent_live"]]
+    # need to mean the cfu percent_live column over "inducer_concentration" and "timepoint", due to multiple replicates
+    cfu_means = cfu_data.groupby(by=["inducer_concentration", "timepoint"], as_index=False).mean()
+    print(cfu_means)
+    print()
+    # print(df.loc[(df["timepoint"] == 1.0) & (df["inducer_concentration"] == 15.0)])
+    # print()
+    df = pd.merge(df, cfu_means, how="inner", on=["inducer_concentration", "timepoint"])  # might want to change to left join
+    print(df)
+    print()
 
     features = n.morph_cols + n.sytox_cols
     X = df[features]
     Y = df[col_idx.keys()]
 
     # debugging cfu_loss
-    debug_Y = Y[:64]
-    debug_conds = tf.convert_to_tensor(debug_Y.drop(columns=[n.label]))
+    debug_Y = Y.sample(n=64, random_state=5)
+    print(debug_Y)
+    print()
+    debug_conds = tf.convert_to_tensor(debug_Y.drop(columns=[n.label, "percent_live"]))
+    debug_cfu = tf.convert_to_tensor(debug_Y["percent_live"])
     debug_y_pred = tf.convert_to_tensor(debug_Y[n.label].sample(frac=1))  # random labels for y_pred, used for testing functions
 
     # print(debug_conds)
     # print()
     # print(debug_y_pred)
     # print()
-    loss = cfu_loss(conditions=debug_conds, y_pred=debug_y_pred)
+    loss = cfu_loss(conditions=debug_conds, cfu=debug_cfu, y_pred=debug_y_pred)
+    print(loss)
 
     # try joint loss
 
@@ -75,10 +96,12 @@ def bin_cross(y_true, y_pred):
     return tf.losses.binary_crossentropy(y_true=y_true, y_pred=y_pred)
 
 
-def cfu_loss(conditions, y_pred):
-    print(conditions)
+def cfu_loss(conditions, cfu, y_pred):
+    print("conditions tensor:\n", conditions)
     print()
-    print(y_pred)
+    print("cfu percent_live tensor:\n", cfu)
+    print()
+    print("y_pred tensor:\n", y_pred)
     print("\n\n\n\n\n\n\n")
 
     # uniques, idx, count = tf.unique_with_counts(conditions)
@@ -95,31 +118,30 @@ def cfu_loss(conditions, y_pred):
 
     num_unique = tf.size(count)
     sums = tf.math.unsorted_segment_sum(data=y_pred, segment_ids=idx, num_segments=num_unique)
-    print(sums)
-    print()
-    ones = tf.ones(y_pred.shape)
+    print("sums:\n", sums, "\n")
+    # ones = tf.ones(y_pred.shape)
     # lengths = tf.math.unsorted_segment_sum(data=ones, segment_ids=idx, num_segments=num_unique)
     lengths = tf.cast(count, tf.float64)
-    print(lengths)
-    print()
-    ratios = tf.divide(sums, lengths)
-    print(ratios)
+    print("lengths:\n", lengths, "\n")
+    percents = 100.0 * tf.divide(sums, lengths)  # check if I need to do multiplicaiton via backend function
+    print("percents:\n", percents, "\n")
 
-    mean = tf.math.reduce_mean(ratios)
-    print(mean)
+    ratios_mean = tf.math.reduce_mean(percents)
+    cfus_mean = tf.math.reduce_mean(cfu)
+    diff = ratios_mean - cfus_mean
+    print(ratios_mean, cfus_mean, diff)
 
-    # create ratio_df from conditions and y_pred
-    # pred_and_conds = K.concatenate([conditions, y_pred])
-
-    # return K.mean(K.abs(merged_df_grouped["diff"]))
+    return K.mean(K.abs(diff))
 
 
 def joint_loss(label_and_conds, y_pred):
     y_true = label_and_conds[:, col_idx[n.label]]
     condition_indices = [col_idx["inducer_concentration"], col_idx["timepoint"]]
+    cfu_indices = [col_idx["percent_live"]]
     conditions = tf.gather(label_and_conds, condition_indices, axis=1)
+    cfus = tf.gather(label_and_conds, cfu_indices, axis=1)
     loss_1 = bin_cross(y_true=y_true, y_pred=y_pred)
-    loss_2 = cfu_loss(conditions=conditions, y_pred=y_pred)
+    loss_2 = cfu_loss(conditions=conditions, cfu=cfus, y_pred=y_pred)
     return 0.5 * loss_1 + 0.5 * loss_2
 
 
