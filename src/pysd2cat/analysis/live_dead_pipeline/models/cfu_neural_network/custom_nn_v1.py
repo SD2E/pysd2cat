@@ -4,12 +4,13 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 import keras.backend as K
-from sklearn.metrics import accuracy_score
 from keras.optimizers import SGD
 from collections import OrderedDict
 from keras.models import Sequential
 from keras.regularizers import l1_l2
 from keras.layers import Dense, Dropout, Flatten
+from sklearn.metrics import accuracy_score
+from tensorflow.python.ops import gen_array_ops
 from pysd2cat.analysis.live_dead_pipeline.names import Names as n
 from pysd2cat.analysis.live_dead_pipeline.ld_pipeline_classes import LiveDeadPipeline
 
@@ -94,13 +95,14 @@ def bin_cross(label_conds_cfus, y_pred):
 
 
 def cfu_loss(label_conds_cfus, y_pred):
-    cfus = label_conds_cfus[:, col_idx["percent_live"]]
+    cfu_percent_live = label_conds_cfus[:, col_idx["percent_live"]]
+    cfu_percent_live = tf.expand_dims(cfu_percent_live, axis=1)  # necessary to get cfu_percent_live in the same shape as y_pred
+
     condition_indices = [col_idx["inducer_concentration"], col_idx["timepoint"]]
     conditions = tf.gather(label_conds_cfus, condition_indices, axis=1)
 
     y_pred = tf.sigmoid((y_pred - 0.5) * 1000)
 
-    from tensorflow.python.ops import gen_array_ops
     uniques, idx, count = gen_array_ops.unique_with_counts_v2(conditions, [0])
 
     num_unique = tf.size(count)
@@ -111,7 +113,7 @@ def cfu_loss(label_conds_cfus, y_pred):
     # print("pred_percents:\n", pred_percents, "\n")
 
     pred_percents_mean = tf.math.reduce_mean(pred_percents)
-    percents_live_mean = tf.math.reduce_mean(cfus)
+    percents_live_mean = tf.math.reduce_mean(cfu_percent_live)
     diff = pred_percents_mean - percents_live_mean  # TODO: check if need backend function
     # print(pred_percents_mean, percents_live_mean, diff)
 
