@@ -1,8 +1,10 @@
 import os
 import sys
+import numpy as np
 import pandas as pd
 import tensorflow as tf
 import keras.backend as K
+from sklearn.metrics import accuracy_score
 from keras.optimizers import SGD
 from collections import OrderedDict
 from keras.models import Sequential
@@ -18,7 +20,8 @@ pd.options.mode.chained_assignment = None  # default="warn"
 col_idx = OrderedDict([(n.label, 0), ("inducer_concentration", 1), ("timepoint", 2), ("percent_live", 3)])
 
 # tf.compat.v1.disable_eager_execution()
-print(tf.executing_eagerly())
+print(tf.__version__)
+print("Eager Execution = {}\n".format(tf.executing_eagerly()))
 
 
 def main():
@@ -38,9 +41,6 @@ def main():
     features = n.morph_cols + n.sytox_cols
 
     df = df[features + ["inducer_concentration", "timepoint", "label"]]
-    # df["condition"] = df["inducer_concentration"].astype(str) + "_" + df["timepoint"].astype(str)
-    # df.drop(columns=["inducer_concentration", "timepoint"], inplace=True)
-    print(df, "\n")
 
     # add CFUs
     # using these lines as a temporary way to get the CFU data we want (CFUs = "ground truth")
@@ -50,14 +50,30 @@ def main():
     cfu_data = ldp_stain.cfu_df[["inducer_concentration", "timepoint", "percent_live"]]
     # need to mean the cfu percent_live column over "inducer_concentration" and "timepoint", due to multiple replicates
     cfu_means = cfu_data.groupby(by=["inducer_concentration", "timepoint"], as_index=False).mean()
-    print(cfu_means, "\n")
+    # print(cfu_means, "\n")
     df = pd.merge(df, cfu_means, how="inner", on=["inducer_concentration", "timepoint"])  # might want to change to left join
-    print(df, "\n")
+
+    print("\n" * 10, "*" * 200, "\n")
+    print("df:\n", df, "\n")
+    print(df["label"].value_counts(), "\n")
 
     features = n.morph_cols + n.sytox_cols
     X = df[features]
     Y = df[col_idx.keys()]
+    print("X:\n", X, "\n")
+    print("Y:\n", Y, "\n")
 
+    # Begin keras model
+    print("\n----------- Begin Keras Labeling Booster Model -----------\n")
+    model = labeling_booster_model(input_shape=len(features))
+    model.fit(X, Y, epochs=100, batch_size=1024)  # TODO: use generator instead of matrices
+    class_predictions = (model.predict(X) > 0.5).astype("int32")
+    training_accuracy = accuracy_score(y_true=Y[n.label], y_pred=class_predictions)
+    print("\nTraining Accuracy = {}%\n".format(round(100 * training_accuracy, 2)))
+
+    # TODO: add early stopping and a validation set, also use generator
+
+    # TODO: add debug mode using following code
     '''
     # debugging joint_loss
     print("Debugging Loss Functions\n")
@@ -67,91 +83,71 @@ def main():
     debug_y_pred = tf.convert_to_tensor(debug_Y[n.label].sample(frac=1))  # random labels for y_pred, used for testing functions
     loss = joint_loss(label_conds_cfus=debug_label_conds_cfus, y_pred=debug_y_pred)
     print(loss)
+    # model.fit(tf.convert_to_tensor(X), debug_label_conds_cfus, epochs=10, batch_size=64)
     '''
 
-    # Begin keras model
-    print("\n----------- Begin Keras Labeling Booster Model -----------\n")
-    model = labeling_booster_model(input_shape=len(features))
-    model.fit(X, Y, epochs=1, batch_size=32)
-    # model.fit(tf.convert_to_tensor(X), debug_label_conds_cfus, epochs=10, batch_size=64)
 
-    # evaluate the keras model
-    evaluation = model.evaluate(X, Y)
-    print(evaluation)
-
-    # class_predictions = np.ndarray.flatten(model.predict_classes(X_val))
-
-
-def bin_cross(y_true, y_pred):
+def bin_cross(label_conds_cfus, y_pred):
+    y_true = label_conds_cfus[:, col_idx[n.label]]
+    y_true = tf.expand_dims(y_true, axis=1)  # necessary to get y_true in the same shape as y_pred
     return tf.losses.binary_crossentropy(y_true=y_true, y_pred=y_pred)
 
 
-def cfu_loss(conditions, cfu, y_pred):
-    # y_pred = tf.round(y_pred)
-
-    print("conditions tensor:\n", conditions, "\n")
-    print("cfu percent_live tensor:\n", cfu, "\n")
-    print("y_pred tensor:\n", y_pred, "\n\n\n")
-    print()
-    # tf.print(conditions)
-    # tf.print(cfu)
-    # tf.print(y_pred)
-    # print(tf.keras.backend.eval(y_pred))
-
-    # uniques, idx, count = tf.unique_with_counts(conditions)
-    # print(uniques)
-    # print(idx)
-    # print(count)
-
-    from tensorflow.python.ops import gen_array_ops
-    uniques, idx, count = gen_array_ops.unique_with_counts_v2(conditions, [0])
-    print(uniques)
-    print(idx)
-    print(count)
-    # print()
-
-    num_unique = tf.size(count)
-    sums = tf.math.unsorted_segment_sum(data=y_pred, segment_ids=idx, num_segments=num_unique)
-    # print("sums:\n", sums, "\n")
-    # ones = tf.ones(y_pred.shape)
-    # lengths = tf.math.unsorted_segment_sum(data=ones, segment_ids=idx, num_segments=num_unique)
-    lengths = tf.cast(count, tf.float32)
-    # print("lengths:\n", lengths, "\n")
-    percents = 100.0 * tf.divide(sums, lengths)  # check if I need to do multiplicaiton via backend function
-    # print("percents:\n", percents, "\n")
-
-    ratios_mean = tf.math.reduce_mean(percents)
-    cfus_mean = tf.math.reduce_mean(cfu)
-    diff = ratios_mean - cfus_mean
-    # print(ratios_mean, cfus_mean, diff)
-
-    return K.mean(K.abs(diff))
-
-
-def joint_loss(label_conds_cfus, y_pred):
-    y_true = label_conds_cfus[:, col_idx[n.label]]
+def cfu_loss(label_conds_cfus, y_pred):
     cfus = label_conds_cfus[:, col_idx["percent_live"]]
     condition_indices = [col_idx["inducer_concentration"], col_idx["timepoint"]]
     conditions = tf.gather(label_conds_cfus, condition_indices, axis=1)
-    y_pred = K.flatten(y_pred)  # replace this?
-    loss_1 = bin_cross(y_true=y_true, y_pred=y_pred)
-    loss_2 = cfu_loss(conditions=conditions, cfu=cfus, y_pred=y_pred)
-    return 0.5 * loss_1 + 0.5 * loss_2
+
+    y_pred = tf.sigmoid((y_pred - 0.5) * 1000)
+
+    from tensorflow.python.ops import gen_array_ops
+    uniques, idx, count = gen_array_ops.unique_with_counts_v2(conditions, [0])
+
+    num_unique = tf.size(count)
+    sums = tf.math.unsorted_segment_sum(data=y_pred, segment_ids=idx, num_segments=num_unique)
+    lengths = tf.cast(count, tf.float32)
+    # print("lengths:\n", lengths, "\n")
+    pred_percents = 100.0 * tf.divide(sums, lengths)  # check if I need to do multiplication via backend function
+    # print("pred_percents:\n", pred_percents, "\n")
+
+    pred_percents_mean = tf.math.reduce_mean(pred_percents)
+    percents_live_mean = tf.math.reduce_mean(cfus)
+    diff = pred_percents_mean - percents_live_mean  # TODO: check if need backend function
+    # print(pred_percents_mean, percents_live_mean, diff)
+
+    return K.abs(diff)
 
 
+def joint_loss(label_conds_cfus, y_pred):
+    loss_bin_cross = bin_cross(label_conds_cfus=label_conds_cfus, y_pred=y_pred)
+    loss_cfu = cfu_loss(label_conds_cfus=label_conds_cfus, y_pred=y_pred)
+
+    return 0.99 * loss_bin_cross + 0.001 * loss_cfu
+    # return loss_bin_cross
+
+
+# can potentially branch forward scatter from side scatter and color.
+# And then concat and then allow them to mix after they mix within their groups.
 def labeling_booster_model(input_shape=None):
     model = Sequential()
     model.add(Dropout(0.1, input_shape=(input_shape,)))
     wr = l1_l2(l2=0.02, l1=0)
-    model.add(Dense(units=12, activation="relu", kernel_regularizer=wr))
+    model.add(Dense(units=32, activation="relu", kernel_regularizer=wr))
+    model.add(Dropout(0.3))
+    model.add(Dense(units=16, activation="relu", kernel_regularizer=wr))
     model.add(Dropout(0.1))
-    model.add(Dense(units=5, activation="relu", kernel_regularizer=wr))
+    model.add(Dense(units=8, activation="relu", kernel_regularizer=wr))
+    model.add(Dropout(0.1))
+    model.add(Dense(units=4, activation="relu", kernel_regularizer=wr))
     model.add(Dropout(0.1))
     wr = l1_l2(l2=0.02, l1=0)
     model.add(Dense(units=1, activation='sigmoid', kernel_regularizer=wr))
     model.add(Flatten())
     model.compile(loss=joint_loss, optimizer="Adam",
-                  metrics=[bin_cross, "accuracy"], run_eagerly=True)  # removed cfu_loss because it wasn't working in metrics
+                  metrics=[joint_loss, bin_cross, cfu_loss], run_eagerly=True)
+    # TODO: figure out how to add accuracy to metrics. Not trivial due to 4D nature of our Y.
+    print(model.summary())
+    print()
     return model
 
 
