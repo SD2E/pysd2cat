@@ -107,7 +107,9 @@ class LiveDeadPipeline:
         self.y_df = y_df.copy()
 
         # load CFU data
-        cfu_data = pd.read_csv(os.path.join(current_dir_path, n.exp_data_dir, "cfu_data", "processed_and_combined_cfus.csv"))
+        cfu_data = process_data_converge_cfu_output(
+            pd.read_csv(os.path.join(current_dir_path, n.exp_data_dir, "full_grid",
+                                     "Duke-YeastSTATES-Ethanol-Time-Series-LiveDeadClassification__cfu.csv")))
 
         # TODO: updated hardcoded values after updating strain dict, etc
         cfu_data = cfu_data.loc[cfu_data["inducer_type"].str.lower() == self.y_treatment]
@@ -577,9 +579,18 @@ def _plot_percent_live_over_conditions(percent_live_df: pd.DataFrame, treatment_
     palette = dict(zip(treatment_levels, sns.color_palette("bright", num_colors)))
 
     if cfu_overlay is not None:
+        treatment_levels = list(cfu_overlay["inducer_concentration"].unique())
+        treatment_levels.sort()
+        num_colors = len(treatment_levels)
+        palette_2 = dict(zip(treatment_levels, sns.color_palette("bright", num_colors)))
+        palette_2 = {0: "blue", 5: "pink", 10: "orange", 12: "yellow", 15: "lightgreen", 20: "red", 80: "purple"}
         # print(cfu_overlay)
+        # cfu_overlay = cfu_overlay.loc[~cfu_overlay["inducer_concentration"].isin([5, 12])]
+        print(cfu_overlay)
+        print()
+        print()
         sp = sns.scatterplot(data=cfu_overlay, x="timepoint", y="percent_live", s=250, markers="date_of_experiment",
-                             hue="inducer_concentration", legend="full", palette=palette, alpha=0.8, zorder=50)
+                             hue="inducer_concentration", legend="full", palette=palette_2, alpha=0.8, zorder=50)
 
     if compare is None:
         style = None
@@ -605,11 +616,11 @@ def _plot_percent_live_over_conditions(percent_live_df: pd.DataFrame, treatment_
     if tight:
         plt.tight_layout()
 
-    new_labels = ["Ethanol Concentration of\nFlow Predictions", "0%", "10%", "15%", "20%", "80%",
-                  "\nStain Used by Model", "True", "False",
-                  "\n\nEthanol Concentration of\n2019 CFUs", "0%", "15%", "80%",
-                  "\nEthanol Concentration of\n2020 CFUs", "0%", "20%", "80%"]
-    for t, l in zip(legend.texts, new_labels): t.set_text(l)
+    # new_labels = ["Ethanol Concentration of\nFlow Predictions", "0%", "10%", "15%", "20%", "80%",
+    #               "\nStain Used by Model", "True", "False",
+    #               "\n\nEthanol Concentration of\n2019 CFUs", "0%", "15%", "80%",
+    #               "\nEthanol Concentration of\n2020 CFUs", "0%", "20%", "80%"]
+    # for t, l in zip(legend.texts, new_labels): t.set_text(l)
 
     plt.xlabel("Exposure Time (Hours)")
     plt.ylabel("Percent Live")
