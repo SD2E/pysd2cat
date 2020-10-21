@@ -6,6 +6,7 @@ import warnings
 import itertools
 import matplotlib
 import numpy as np
+from collections import OrderedDict, Counter
 import pandas as pd
 import seaborn as sns
 from typing import Union
@@ -17,11 +18,13 @@ import plotly
 # /Users/he/anaconda3/bin/orca.app
 import plotly.express as px
 from sklearn.cluster import KMeans
+from sklearn.metrics import accuracy_score
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
 from pysd2cat.analysis.live_dead_pipeline.names import Names as n
 from harness.test_harness_class import TestHarness
 from harness.th_model_instances.hamed_models.random_forest_classification import random_forest_classification
+from src.pysd2cat.analysis.live_dead_pipeline.experiment_data.cfu_data.process_and_combine_cfu_data import process_data_converge_cfu_output
 
 matplotlib.use("tkagg")
 pd.set_option('display.max_columns', 500)
@@ -29,6 +32,7 @@ pd.set_option('display.width', 10000)
 pd.set_option('display.max_colwidth', None)
 
 current_dir_path = Path(__file__).parent
+col_idx = OrderedDict([(n.label, 0), ("inducer_concentration", 1), ("timepoint", 2), ("percent_live", 3)])
 
 
 # TODO: figure out where/when dataframes should be copied or not
@@ -399,6 +403,59 @@ class LiveDeadPipeline:
          But if the labels line up with some “ground truth”, then a supervised model should be able to perform better.
          Todo: look into how people evaluate semi-supervised models.
         """
+
+    def boost_labels_via_neural_network(self, method=n.condition_method) -> pd.DataFrame:
+        """
+        Nudges the labels towards "ground truth" percent_live values from
+        CFU data using a neural network model with custom loss function
+        :return:
+        """
+        print("*** Begin Boost ***\n")
+        from pysd2cat.analysis.live_dead_pipeline.models.cfu_neural_network.custom_nn_v1 import \
+            bin_cross, cfu_loss, joint_loss, labeling_booster_model
+
+        labeled_df = self.labeled_data_dict[method]
+        df = pd.merge(self.x_df,
+                      labeled_df[["arbitrary_index", "label_predictions"]].rename(columns={"label_predictions": n.label}),
+                      on="arbitrary_index")
+
+        df.rename(columns={"ethanol": "inducer_concentration", "time_point": "timepoint"}, inplace=True)
+        # df["timepoint"] = df["timepoint"] / 2
+
+        features = n.morph_cols + n.sytox_cols
+
+        df = df[features + ["inducer_concentration", "timepoint", "label"]]
+        # df["condition"] = df["inducer_concentration"].astype(str) + "_" + df["timepoint"].astype(str)
+        # df.drop(columns=["inducer_concentration", "timepoint"], inplace=True)
+        # print(df, "\n")
+
+        cfu_data = self.cfu_df[["inducer_concentration", "timepoint", "percent_live"]]
+        # need to mean the cfu percent_live column over "inducer_concentration" and "timepoint", due to multiple replicates
+        cfu_means = cfu_data.groupby(by=["inducer_concentration", "timepoint"], as_index=False).mean()
+        # print(cfu_means, "\n")
+        df = pd.merge(df, cfu_means, how="inner", on=["inducer_concentration", "timepoint"])  # might want to change to left join
+        # print(df, "\n")
+        # print(df["timepoint"].value_counts())
+        # print()
+        # print(df["inducer_concentration"].value_counts())
+        #
+        # sys.exit(0)
+
+        features = n.morph_cols + n.sytox_cols
+        X = df[features]
+        Y = df[col_idx.keys()]
+
+        # Begin keras model
+        print("\n----------- Begin Keras Labeling Booster Model -----------\n")
+        model = labeling_booster_model(input_shape=len(features))
+        model.fit(X, Y, epochs=100, batch_size=1024)  # TODO: use generator instead of matrices
+        class_predictions = np.ndarray.flatten(model.predict(X) > 0.5).astype("int32")
+        training_accuracy = accuracy_score(y_true=Y[n.label], y_pred=class_predictions)
+        print("\nTraining Accuracy = {}%\n".format(round(100 * training_accuracy, 2)))
+        print(Counter(class_predictions))
+
+        df["boosted_labels"] = class_predictions
+        self.boosted_labels = df.copy()
 
 
 class ComparePipelines:
