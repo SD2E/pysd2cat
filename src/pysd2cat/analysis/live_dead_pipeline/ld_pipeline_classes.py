@@ -351,21 +351,35 @@ class LiveDeadPipeline:
         ratio_df = self.plot_percent_live_over_conditions(labeling_method=labeling_method)
         self.plot_features_over_conditions(labeling_method=labeling_method)
 
-    def plot_percent_live_over_conditions(self, labeling_method):
+    def plot_percent_live_over_conditions(self, labeling_method, boosted=False):
         """
         Plots percent live (predicted) over all of the y_experiment conditions.
         Takes in a dataframe that has been labeled and generates a
         plot of percent alive vs. time, colored by treatment amount.
         This serves as a qualitative metric that allows us to compare different methods of labeling live/dead.
         """
-        labeled_df = _get_labeled_df(labeling_method, self)
-        percent_live_df = _create_percent_live_df(labeled_df, self)
-        treatment_col = self.y_treatment
+        if boosted:
+            labeled_df = self.boosted_labels.copy()
+            labeled_df.rename(columns={"inducer_concentration": "ethanol",
+                                       "timepoint": "time_point",
+                                       "boosted_labels": "label_predictions",
+                                       }, inplace=True)
+            percent_live_df = _create_percent_live_df(labeled_df, self)
+            treatment_col = self.y_treatment
 
-        _plot_percent_live_over_conditions(percent_live_df=percent_live_df,
-                                           treatment_col=treatment_col,
-                                           cfu_overlay=self.cfu_df,
-                                           compare=None)
+            _plot_percent_live_over_conditions(percent_live_df=percent_live_df,
+                                               treatment_col=treatment_col,
+                                               cfu_overlay=self.cfu_df,
+                                               compare=None, title="Boosted Labels.")
+        else:
+            labeled_df = _get_labeled_df(labeling_method, self)
+            percent_live_df = _create_percent_live_df(labeled_df, self)
+            treatment_col = self.y_treatment
+
+            _plot_percent_live_over_conditions(percent_live_df=percent_live_df,
+                                               treatment_col=treatment_col,
+                                               cfu_overlay=self.cfu_df,
+                                               compare=None, title="Regular Labels.")
 
     def plot_features_over_conditions(self, labeling_method, axis_1="log_SSC-A", axis_2="log_RL1-A",
                                       sample_fraction=0.1, kdeplot=False):
