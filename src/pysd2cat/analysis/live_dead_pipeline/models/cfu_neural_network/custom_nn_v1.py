@@ -124,15 +124,16 @@ def cfu_loss(label_conds_cfus, y_pred):
     diff = pred_percents_mean - percents_live_mean  # TODO: check if need backend function
     # print(pred_percents_mean, percents_live_mean, diff)
 
-    return K.abs(diff)
+    return K.abs(diff / 100.0)
 
 
 def joint_loss(label_conds_cfus, y_pred):
     loss_bin_cross = bin_cross(label_conds_cfus=label_conds_cfus, y_pred=y_pred)
     loss_cfu = cfu_loss(label_conds_cfus=label_conds_cfus, y_pred=y_pred)
 
-    return 0.99 * loss_bin_cross + 0.001 * loss_cfu
+    return 1.0 * loss_bin_cross + 1.0 * loss_cfu
     # return loss_bin_cross
+    # return loss_cfu
 
 
 # can potentially branch forward scatter from side scatter and color.
