@@ -5,7 +5,7 @@ import pandas as pd
 import tensorflow as tf
 import keras.backend as K
 from keras.optimizers import SGD
-from collections import OrderedDict
+from collections import OrderedDict, Counter
 from keras.models import Sequential
 from keras.regularizers import l1_l2
 from keras.layers import Dense, Dropout, Flatten
@@ -58,19 +58,26 @@ def main():
     print("df:\n", df, "\n")
     print(df["label"].value_counts(), "\n")
 
+    # df = df.loc[df["timepoint"].isin([0.5, 3.0])]
+    # df = df.loc[df["inducer_concentration"].isin([0.0, 80.0])]
+
     features = n.morph_cols + n.sytox_cols
     X = df[features]
     Y = df[col_idx.keys()]
     print("X:\n", X, "\n")
     print("Y:\n", Y, "\n")
+    # print(Y["inducer_concentration"].value_counts(), "\n")
+    # print(Y["timepoint"].value_counts(), "\n")
+    # print(Y["percent_live"].value_counts(), "\n")
 
     # Begin keras model
     print("\n----------- Begin Keras Labeling Booster Model -----------\n")
     model = labeling_booster_model(input_shape=len(features))
     model.fit(X, Y, epochs=100, batch_size=1024)  # TODO: use generator instead of matrices
-    class_predictions = (model.predict(X) > 0.5).astype("int32")
+    class_predictions = np.ndarray.flatten(model.predict(X) > 0.5).astype("int32")
     training_accuracy = accuracy_score(y_true=Y[n.label], y_pred=class_predictions)
     print("\nTraining Accuracy = {}%\n".format(round(100 * training_accuracy, 2)))
+    print(Counter(class_predictions))
 
     # TODO: add early stopping and a validation set, also use generator
 
