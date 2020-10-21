@@ -18,6 +18,17 @@ pd.set_option('display.max_colwidth', None)
 def main():
     strain = n.yeast
 
+    # # non-stain model
+    # ldp_no_stain = LiveDeadPipeline(x_strain=strain, x_treatment=n.ethanol, x_stain=0,
+    #                                 y_strain=None, y_treatment=None, y_stain=None)
+    # ldp_no_stain.load_data()
+    # ldp_no_stain.condition_method(live_conditions=None,
+    #                               dead_conditions=[
+    #                                   {n.ethanol: 80.0, n.time: n.time_points[-1]},
+    #                                   # {n.ethanol: 20.0, n.time: n.time_points[-1]},
+    #                                   # {n.ethanol: 15.0, n.time: n.time_points[-1]}
+    #                               ])
+
     # stain model
     ldp_stain = LiveDeadPipeline(x_strain=strain, x_treatment=n.ethanol, x_stain=1,
                                  y_strain=None, y_treatment=None, y_stain=None)
@@ -29,22 +40,26 @@ def main():
                                    # {n.ethanol: 15.0, n.time: n.time_points[-1]}
                                ])
 
-    # non-stain model
-    ldp_no_stain = LiveDeadPipeline(x_strain=strain, x_treatment=n.ethanol, x_stain=0,
-                                    y_strain=None, y_treatment=None, y_stain=None)
-    ldp_no_stain.load_data()
-    ldp_no_stain.condition_method(live_conditions=None,
-                                  dead_conditions=[
-                                      {n.ethanol: 80.0, n.time: n.time_points[-1]},
-                                      # {n.ethanol: 20.0, n.time: n.time_points[-1]},
-                                      # {n.ethanol: 15.0, n.time: n.time_points[-1]}
-                                  ])
-    print("\n\n\n\n\n\n\n")
-    ldp_no_stain.plot_percent_live_over_conditions(n.condition_method)
+    ldp_stain.boost_labels_via_neural_network(method=n.condition_method)
 
-    print("\n\n\n\n\n\n\n")
-    cp = ComparePipelines(ldp_stain, ldp_no_stain)
-    cp.compare_percent_live_plots(n.condition_method, n.condition_method)
+    # print()
+    # print(ldp_stain.labeled_data_dict[n.condition_method])
+    # print()
+    # print(ldp_stain.boosted_labels)
+    # print()
+    ldp_stain.plot_percent_live_over_conditions(n.condition_method, False)
+    print()
+    ldp_stain.plot_percent_live_over_conditions(n.condition_method, True)
+
+    import sys
+    sys.exit(0)
+
+    # print("\n\n\n\n\n\n\n")
+    # ldp_no_stain.plot_percent_live_over_conditions(n.condition_method)
+
+    # print("\n\n\n\n\n\n\n")
+    # cp = ComparePipelines(ldp_stain, ldp_no_stain)
+    # cp.compare_percent_live_plots(n.condition_method, n.condition_method)
 
     import sys
     sys.exit(0)
