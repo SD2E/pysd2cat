@@ -54,8 +54,8 @@ def main():
                 print(ldp.feature_cols, "\n")
                 ldp.condition_method(live_conditions=None,
                                      dead_conditions=[
-                                         {n.ethanol: n.treatments_dict[n.ethanol][train_strain][-1], n.time: n.timepoints[-1]},
-                                         {n.ethanol: n.treatments_dict[n.ethanol][train_strain][-2], n.time: n.timepoints[-1]}
+                                         {n.ethanol: n.treatments_dict[n.ethanol][train_strain][-1], n.timepoint: n.timepoints[-1]},
+                                         {n.ethanol: n.treatments_dict[n.ethanol][train_strain][-2], n.timepoint: n.timepoints[-1]}
                                      ])
                 ldp.evaluate_performance(n.condition_method)
 

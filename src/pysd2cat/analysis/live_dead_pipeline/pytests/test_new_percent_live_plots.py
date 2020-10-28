@@ -35,7 +35,7 @@ def main():
     ldp_stain.load_data()
     ldp_stain.condition_method(live_conditions=None,
                                dead_conditions=[
-                                   {n.ethanol: 80.0, n.time: n.time_points[-1]},
+                                   {n.ethanol: 80.0, n.timepoint: n.time_points[-1]},
                                    # {n.ethanol: 20.0, n.time: n.time_points[-1]},
                                    # {n.ethanol: 15.0, n.time: n.time_points[-1]}
                                ])
