@@ -1,5 +1,6 @@
 import os
 import sys
+import time
 import random
 import inspect
 import warnings
@@ -24,7 +25,7 @@ from sklearn.model_selection import train_test_split
 from pysd2cat.analysis.live_dead_pipeline.names import Names as n
 from harness.test_harness_class import TestHarness
 from harness.th_model_instances.hamed_models.random_forest_classification import random_forest_classification
-from src.pysd2cat.analysis.live_dead_pipeline.experiment_data.cfu_data.process_and_combine_cfu_data import process_data_converge_cfu_output
+from pysd2cat.analysis.live_dead_pipeline.models.cfu_neural_network.custom_nn_v1 import labeling_booster_model
 
 matplotlib.use("tkagg")
 pd.set_option('display.max_columns', 500)
@@ -42,6 +43,7 @@ class LiveDeadPipeline:
                  y_strain=None, y_treatment=None, y_stain=None, use_previously_trained_model=False):
         """
         Assuming we will always normalize via Standard Scalar and log10-transformed data, so those are not arguments.
+        TODO: allow for x_strain and y_strain to be lists of strains, and have load data concatenate the data for those strains.
         """
         # TODO: add NotImplementedError checks
         self.x_strain = x_strain
@@ -76,7 +78,7 @@ class LiveDeadPipeline:
 
     # TODO: save out intermediate files (e.g. normalized train/test split csvs) and check if they exist already when running pipeline
     # save them with consistent names in the folder specified by self.data_path. Append argument info to file names?
-    def load_data(self):
+    def load_data(self, sample_flow: Union[bool, int, float] = False):
         """
         All data coming in should already be log10-transformed, so no need to transform it.
         :return:
@@ -84,7 +86,7 @@ class LiveDeadPipeline:
         """
         x_df = pd.read_csv(os.path.join(self.x_data_path, n.data_file_name))
         if (self.y_strain == self.x_strain) & (self.y_treatment == self.x_treatment) & (self.y_stain == self.x_stain):
-            y_df = x_df  # TODO: need to make sure this is ok, might need to do x_df.copy() instead
+            y_df = x_df.copy()  # see if I can get rid of copy here
         else:
             y_df = pd.read_csv(os.path.join(self.y_data_path, n.data_file_name))
 
@@ -92,28 +94,22 @@ class LiveDeadPipeline:
         x_df = x_df.loc[x_df[n.stain] == self.x_stain]
         y_df = y_df.loc[y_df[n.stain] == self.y_stain]
 
-        # we want to have the data normalized before model runs because of data visualizations? Or actually is that what we don't want?
-        # if we do want normalized, then should be fine to normalize all the data together (before train/test split),
-        # because our models will re-normalize after train/test splitting, which should have the same effect (double check this)
-        # x_scaler = StandardScaler()
-        # y_scaler = StandardScaler()
-        # x_df[self.feature_cols] = x_scaler.fit_transform(x_df[self.feature_cols])
-        # y_df[self.feature_cols] = y_scaler.fit_transform(y_df[self.feature_cols])
-        # print(x_df.head())
-        # print()
-        # print(y_df.head())
-        # print()
+        # take random sample of the data if sample_flow is not False
+        if sample_flow != False:
+            x_df, _ = train_test_split(x_df, train_size=sample_flow, random_state=5,
+                                       stratify=x_df[[n.inducer_concentration, n.timepoint, n.stain]])
+            y_df, _ = train_test_split(y_df, train_size=sample_flow, random_state=5,
+                                       stratify=y_df[[n.inducer_concentration, n.timepoint, n.stain]])
+
         self.x_df = x_df.copy()
         self.y_df = y_df.copy()
 
         # load CFU data
-        cfu_data = process_data_converge_cfu_output(
-            pd.read_csv(os.path.join(current_dir_path, n.exp_data_dir, "full_grid",
-                                     "Duke-YeastSTATES-Ethanol-Time-Series-LiveDeadClassification__cfu.csv")))
+        cfu_data = pd.read_csv(os.path.join(current_dir_path, n.exp_data_dir, "yeast_ethanol", "cfu_data.csv"))
 
-        # TODO: updated hardcoded values after updating strain dict, etc
-        cfu_data = cfu_data.loc[cfu_data["inducer_type"].str.lower() == self.y_treatment]
-        cfu_data = cfu_data.loc[cfu_data["strain"] == "S288c_a"]
+        # # TODO: updated hardcoded values after updating strain dict, etc
+        # cfu_data = cfu_data.loc[cfu_data["inducer_type"].str.lower() == self.y_treatment]
+        # cfu_data = cfu_data.loc[cfu_data["strain"] == "S288c_a"]
         self.cfu_df = cfu_data.copy()
 
     # ----- Building Blocks -----
