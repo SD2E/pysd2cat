@@ -6,6 +6,7 @@ import warnings
 import itertools
 import matplotlib
 import numpy as np
+from collections import OrderedDict, Counter
 import pandas as pd
 import seaborn as sns
 from typing import Union
@@ -17,11 +18,13 @@ import plotly
 # /Users/he/anaconda3/bin/orca.app
 import plotly.express as px
 from sklearn.cluster import KMeans
+from sklearn.metrics import accuracy_score
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
 from pysd2cat.analysis.live_dead_pipeline.names import Names as n
 from harness.test_harness_class import TestHarness
 from harness.th_model_instances.hamed_models.random_forest_classification import random_forest_classification
+from src.pysd2cat.analysis.live_dead_pipeline.experiment_data.cfu_data.process_and_combine_cfu_data import process_data_converge_cfu_output
 
 matplotlib.use("tkagg")
 pd.set_option('display.max_columns', 500)
@@ -29,6 +32,7 @@ pd.set_option('display.width', 10000)
 pd.set_option('display.max_colwidth', None)
 
 current_dir_path = Path(__file__).parent
+col_idx = OrderedDict([(n.label, 0), ("inducer_concentration", 1), ("timepoint", 2), ("percent_live", 3)])
 
 
 # TODO: figure out where/when dataframes should be copied or not
@@ -103,7 +107,9 @@ class LiveDeadPipeline:
         self.y_df = y_df.copy()
 
         # load CFU data
-        cfu_data = pd.read_csv(os.path.join(current_dir_path, n.exp_data_dir, "cfu_data", "processed_and_combined_cfus.csv"))
+        cfu_data = process_data_converge_cfu_output(
+            pd.read_csv(os.path.join(current_dir_path, n.exp_data_dir, "full_grid",
+                                     "Duke-YeastSTATES-Ethanol-Time-Series-LiveDeadClassification__cfu.csv")))
 
         # TODO: updated hardcoded values after updating strain dict, etc
         cfu_data = cfu_data.loc[cfu_data["inducer_type"].str.lower() == self.y_treatment]
@@ -143,7 +149,8 @@ class LiveDeadPipeline:
                       index_cols=[n.index, self.x_treatment, n.time, n.stain],
                       normalize=True,
                       feature_cols_to_normalize=self.feature_cols,
-                      feature_extraction="eli5_permutation",
+                      # feature_extraction="eli5_permutation",
+                      feature_extraction=False,
                       predict_untested_data=pred_df)
         return th.list_of_this_instance_run_ids[-1]
 
@@ -344,21 +351,35 @@ class LiveDeadPipeline:
         ratio_df = self.plot_percent_live_over_conditions(labeling_method=labeling_method)
         self.plot_features_over_conditions(labeling_method=labeling_method)
 
-    def plot_percent_live_over_conditions(self, labeling_method):
+    def plot_percent_live_over_conditions(self, labeling_method, boosted=False):
         """
         Plots percent live (predicted) over all of the y_experiment conditions.
         Takes in a dataframe that has been labeled and generates a
         plot of percent alive vs. time, colored by treatment amount.
         This serves as a qualitative metric that allows us to compare different methods of labeling live/dead.
         """
-        labeled_df = _get_labeled_df(labeling_method, self)
-        percent_live_df = _create_percent_live_df(labeled_df, self)
-        treatment_col = self.y_treatment
+        if boosted:
+            labeled_df = self.boosted_labels.copy()
+            labeled_df.rename(columns={"inducer_concentration": "ethanol",
+                                       "timepoint": "time_point",
+                                       "boosted_labels": "label_predictions",
+                                       }, inplace=True)
+            percent_live_df = _create_percent_live_df(labeled_df, self)
+            treatment_col = self.y_treatment
 
-        _plot_percent_live_over_conditions(percent_live_df=percent_live_df,
-                                           treatment_col=treatment_col,
-                                           cfu_overlay=self.cfu_df,
-                                           compare=None)
+            _plot_percent_live_over_conditions(percent_live_df=percent_live_df,
+                                               treatment_col=treatment_col,
+                                               cfu_overlay=self.cfu_df,
+                                               compare=None, title="Boosted Labels.")
+        else:
+            labeled_df = _get_labeled_df(labeling_method, self)
+            percent_live_df = _create_percent_live_df(labeled_df, self)
+            treatment_col = self.y_treatment
+
+            _plot_percent_live_over_conditions(percent_live_df=percent_live_df,
+                                               treatment_col=treatment_col,
+                                               cfu_overlay=self.cfu_df,
+                                               compare=None, title="Regular Labels.")
 
     def plot_features_over_conditions(self, labeling_method, axis_1="log_SSC-A", axis_2="log_RL1-A",
                                       sample_fraction=0.1, kdeplot=False):
@@ -398,6 +419,59 @@ class LiveDeadPipeline:
          But if the labels line up with some “ground truth”, then a supervised model should be able to perform better.
          Todo: look into how people evaluate semi-supervised models.
         """
+
+    def boost_labels_via_neural_network(self, method=n.condition_method) -> pd.DataFrame:
+        """
+        Nudges the labels towards "ground truth" percent_live values from
+        CFU data using a neural network model with custom loss function
+        :return:
+        """
+        print("*** Begin Boost ***\n")
+        from pysd2cat.analysis.live_dead_pipeline.models.cfu_neural_network.custom_nn_v1 import \
+            bin_cross, cfu_loss, joint_loss, labeling_booster_model
+
+        labeled_df = self.labeled_data_dict[method]
+        df = pd.merge(self.x_df,
+                      labeled_df[["arbitrary_index", "label_predictions"]].rename(columns={"label_predictions": n.label}),
+                      on="arbitrary_index")
+
+        df.rename(columns={"ethanol": "inducer_concentration", "time_point": "timepoint"}, inplace=True)
+        # df["timepoint"] = df["timepoint"] / 2
+
+        features = n.morph_cols + n.sytox_cols
+
+        df = df[features + ["inducer_concentration", "timepoint", "label"]]
+        # df["condition"] = df["inducer_concentration"].astype(str) + "_" + df["timepoint"].astype(str)
+        # df.drop(columns=["inducer_concentration", "timepoint"], inplace=True)
+        # print(df, "\n")
+
+        cfu_data = self.cfu_df[["inducer_concentration", "timepoint", "percent_live"]]
+        # need to mean the cfu percent_live column over "inducer_concentration" and "timepoint", due to multiple replicates
+        cfu_means = cfu_data.groupby(by=["inducer_concentration", "timepoint"], as_index=False).mean()
+        # print(cfu_means, "\n")
+        df = pd.merge(df, cfu_means, how="inner", on=["inducer_concentration", "timepoint"])  # might want to change to left join
+        # print(df, "\n")
+        # print(df["timepoint"].value_counts())
+        # print()
+        # print(df["inducer_concentration"].value_counts())
+        #
+        # sys.exit(0)
+
+        features = n.morph_cols + n.sytox_cols
+        X = df[features]
+        Y = df[col_idx.keys()]
+
+        # Begin keras model
+        print("\n----------- Begin Keras Labeling Booster Model -----------\n")
+        model = labeling_booster_model(input_shape=len(features))
+        model.fit(X, Y, epochs=100, batch_size=1024)  # TODO: use generator instead of matrices
+        class_predictions = np.ndarray.flatten(model.predict(X) > 0.5).astype("int32")
+        training_accuracy = accuracy_score(y_true=Y[n.label], y_pred=class_predictions)
+        print("\nTraining Accuracy = {}%\n".format(round(100 * training_accuracy, 2)))
+        print(Counter(class_predictions))
+
+        df["boosted_labels"] = class_predictions
+        self.boosted_labels = df.copy()
 
 
 class ComparePipelines:
@@ -519,9 +593,18 @@ def _plot_percent_live_over_conditions(percent_live_df: pd.DataFrame, treatment_
     palette = dict(zip(treatment_levels, sns.color_palette("bright", num_colors)))
 
     if cfu_overlay is not None:
+        treatment_levels = list(cfu_overlay["inducer_concentration"].unique())
+        treatment_levels.sort()
+        num_colors = len(treatment_levels)
+        palette_2 = dict(zip(treatment_levels, sns.color_palette("bright", num_colors)))
+        palette_2 = {0: "blue", 5: "pink", 10: "orange", 12: "yellow", 15: "lightgreen", 20: "red", 80: "purple"}
         # print(cfu_overlay)
+        # cfu_overlay = cfu_overlay.loc[~cfu_overlay["inducer_concentration"].isin([5, 12])]
+        print(cfu_overlay)
+        print()
+        print()
         sp = sns.scatterplot(data=cfu_overlay, x="timepoint", y="percent_live", s=250, markers="date_of_experiment",
-                             hue="inducer_concentration", legend="full", palette=palette, alpha=0.8, zorder=50)
+                             hue="inducer_concentration", legend="full", palette=palette_2, alpha=0.8, zorder=50)
 
     if compare is None:
         style = None
@@ -547,11 +630,11 @@ def _plot_percent_live_over_conditions(percent_live_df: pd.DataFrame, treatment_
     if tight:
         plt.tight_layout()
 
-    new_labels = ["Ethanol Concentration of\nFlow Predictions", "0%", "10%", "15%", "20%", "80%",
-                  "\nStain Used by Model", "True", "False",
-                  "\n\nEthanol Concentration of\n2019 CFUs", "0%", "15%", "80%",
-                  "\nEthanol Concentration of\n2020 CFUs", "0%", "20%", "80%"]
-    for t, l in zip(legend.texts, new_labels): t.set_text(l)
+    # new_labels = ["Ethanol Concentration of\nFlow Predictions", "0%", "10%", "15%", "20%", "80%",
+    #               "\nStain Used by Model", "True", "False",
+    #               "\n\nEthanol Concentration of\n2019 CFUs", "0%", "15%", "80%",
+    #               "\nEthanol Concentration of\n2020 CFUs", "0%", "20%", "80%"]
+    # for t, l in zip(legend.texts, new_labels): t.set_text(l)
 
     plt.xlabel("Exposure Time (Hours)")
     plt.ylabel("Percent Live")

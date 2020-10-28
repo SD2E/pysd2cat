@@ -5,8 +5,7 @@ class Names:
     label = "label"
     label_preds = "label_predictions"
     cluster_preds = "cluster_predictions"
-    # data_file_name = "pipeline_data.csv"
-    data_file_name = "sampled_data_for_testing.csv"
+    data_file_name = "pipeline_data.csv"
 
     # strains
     yeast = "yeast"
@@ -22,7 +21,8 @@ class Names:
                   ecoli: [0, 5, 10, 15, 40]},
         heat: [0]
     }
-    time_points = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+    # time_points = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+    time_points = [0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0]
 
     # feature columns
     morph_cols = ["FSC-A", "FSC-H", "FSC-W", "SSC-A", "SSC-H", "SSC-W"]
@@ -36,11 +36,9 @@ class Names:
     # experiment data dictionary
     # might want to make the values lists of experiment_ids since different experiments could apply
     exp_dict = {
-        (yeast, ethanol): "temporary_yeast_ethanol",
-        (bacillus, ethanol): "temporary_bacillus_ethanol",
-        (ecoli, ethanol): "temporary_ecoli_ethanol",
-        # (bacillus, ethanol): "experiment.transcriptic.r1eaf248xavu8a",
-        # (ecoli, ethanol): "experiment.transcriptic.r1eaf25ne8ajts"
+        (yeast, ethanol): "yeast_ethanol",
+        (bacillus, ethanol): "bacillus_ethanol",
+        (ecoli, ethanol): "ecoli_ethanol"
     }
     # each experiment should have a corresponding folder with the same name as the experiment_id
     # inside the folder you will have data files: dataset, train, test, normalized_train, normalized_test, etc.
@@ -51,7 +49,7 @@ class Names:
 
     num_live = "num_live"
     num_dead = "num_dead"
-    percent_live = "predicted %live"
+    percent_live = "percent_live"
 
     # labeling methods:
     thresholding_method = "thresholding_method"
