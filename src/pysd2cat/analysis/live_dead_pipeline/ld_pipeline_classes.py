@@ -593,11 +593,10 @@ def _plot_percent_live_over_conditions(percent_live_df: pd.DataFrame, treatment_
         num_colors = len(treatment_levels)
         palette_2 = dict(zip(treatment_levels, sns.color_palette("bright", num_colors)))
         # palette_2 = {0: "blue", 5: "pink", 10: "orange", 12: "yellow", 15: "lightgreen", 20: "red", 80: "purple"}
-        # print(cfu_overlay)
-        # cfu_overlay = cfu_overlay.loc[~cfu_overlay["inducer_concentration"].isin([5, 12])]
-        print(cfu_overlay)
-        print()
-        print()
+
+        # take means for cleaner plotting, TODO: potentially plot boxplots instead
+        cfu_overlay = cfu_overlay.groupby(by=[n.inducer_concentration, n.timepoint], as_index=False).mean()
+
         sp = sns.scatterplot(data=cfu_overlay, x="timepoint", y="percent_live", s=250, markers="date_of_experiment",
                              hue="inducer_concentration", legend="full", palette=palette_2, alpha=0.8, zorder=50)
 
