@@ -142,7 +142,7 @@ class LiveDeadPipeline:
                       target_cols=n.label,
                       feature_cols_to_use=self.feature_cols,
                       # TODO: figure out how to resolve discrepancies between x_treatment and y_treatment, since col names will be different
-                      index_cols=[n.index, self.x_treatment, n.time, n.stain],
+                      index_cols=[n.index, n.inducer_concentration, n.timepoint, n.stain],
                       normalize=True,
                       feature_cols_to_normalize=self.feature_cols,
                       # feature_extraction="eli5_permutation",
@@ -226,9 +226,11 @@ class LiveDeadPipeline:
         print("Starting {} labeling".format(labeling_method_name))
 
         if live_conditions is None:
-            live_conditions = [{self.x_treatment: n.treatments_dict[self.x_treatment][self.x_strain][0], n.time: n.time_points[-1]}]
+            live_conditions = [
+                {n.inducer_concentration: n.treatments_dict[self.x_treatment][self.x_strain][0], n.timepoint: n.time_points[-1]}]
         if dead_conditions is None:
-            dead_conditions = [{self.x_treatment: n.treatments_dict[self.x_treatment][self.x_strain][-1], n.time: n.time_points[-1]}]
+            dead_conditions = [
+                {n.inducer_concentration: n.treatments_dict[self.x_treatment][self.x_strain][-1], n.timepoint: n.time_points[-1]}]
         print("Conditions designated as Live: {}".format(live_conditions))
         print("Conditions designated as Dead: {}".format(dead_conditions))
         print()
@@ -237,6 +239,9 @@ class LiveDeadPipeline:
         # first obtain indexes of the rows that correspond to live_conditions and dead_conditions
         live_indexes = []
         dead_indexes = []
+        # print(live_conditions)
+        # print(dead_conditions)
+        # print(self.x_df["inducer_concentration"].value_counts(dropna=False))
         for lc in live_conditions:
             live_indexes += list(self.x_df.loc[(self.x_df[list(lc)] == pd.Series(lc)).all(axis=1), n.index])
         for dc in dead_conditions:
@@ -249,7 +254,7 @@ class LiveDeadPipeline:
         labeled_df.loc[labeled_df[n.index].isin(dead_indexes), n.label] = 0
         # mainly doing this split so Test Harness can run without balking (it expects testing_data)
         train_df, test_df = train_test_split(labeled_df, train_size=0.95, random_state=5,
-                                             stratify=labeled_df[[self.x_treatment, n.time, n.label]])
+                                             stratify=labeled_df[[n.inducer_concentration, n.timepoint, n.label]])
 
         # Invoke Test Harness
         run_id = self.invoke_test_harness(train_df=train_df, test_df=test_df, pred_df=self.y_df)
@@ -355,13 +360,9 @@ class LiveDeadPipeline:
         This serves as a qualitative metric that allows us to compare different methods of labeling live/dead.
         """
         if boosted:
-            labeled_df = self.boosted_labels.copy()
-            labeled_df.rename(columns={"inducer_concentration": "ethanol",
-                                       "timepoint": "time_point",
-                                       "boosted_labels": "label_predictions",
-                                       }, inplace=True)
-            percent_live_df = _create_percent_live_df(labeled_df, self)
-            treatment_col = self.y_treatment
+            labeled_df = self.boosted_labels
+            percent_live_df = _create_percent_live_df(labeled_df)
+            treatment_col = n.inducer_concentration
 
             _plot_percent_live_over_conditions(percent_live_df=percent_live_df,
                                                treatment_col=treatment_col,
@@ -369,8 +370,8 @@ class LiveDeadPipeline:
                                                compare=None, title="Boosted Labels.")
         else:
             labeled_df = _get_labeled_df(labeling_method, self)
-            percent_live_df = _create_percent_live_df(labeled_df, self)
-            treatment_col = self.y_treatment
+            percent_live_df = _create_percent_live_df(labeled_df)
+            treatment_col = n.inducer_concentration
 
             _plot_percent_live_over_conditions(percent_live_df=percent_live_df,
                                                treatment_col=treatment_col,
@@ -390,13 +391,13 @@ class LiveDeadPipeline:
         if axis_2 not in labeled_df.columns.values:
             labeled_df = pd.merge(labeled_df, self.y_df[[n.index, axis_2]], on=n.index)
 
-        if set(labeled_df[n.time].unique()) != set(n.time_points):
+        if set(labeled_df[n.timepoint].unique()) != set(n.time_points):
             raise Warning("The unique values in the {} column of labeled_df "
-                          "do not match those in n.time_points: {}".format(n.time, n.time_points))
+                          "do not match those in n.time_points: {}".format(n.timepoint, n.time_points))
 
         plotly_fig = grid_of_distributions_over_conditions(df1=labeled_df, axis_1=axis_1, axis_2=axis_2,
                                                            grid_rows_source=self.y_treatment,
-                                                           grid_cols_source=n.time,
+                                                           grid_cols_source=n.timepoint,
                                                            color_source=n.label_preds,
                                                            sample_fraction=sample_fraction, df2=None, kdeplot=kdeplot)
 
@@ -422,29 +423,20 @@ class LiveDeadPipeline:
         CFU data using a neural network model with custom loss function
         :return:
         """
-        print("*** Begin Boost ***\n")
-        from pysd2cat.analysis.live_dead_pipeline.models.cfu_neural_network.custom_nn_v1 import \
-            bin_cross, cfu_loss, joint_loss, labeling_booster_model
+        print("*** Begin Label Boost ***\n")
 
         labeled_df = self.labeled_data_dict[method]
         df = pd.merge(self.x_df,
                       labeled_df[["arbitrary_index", "label_predictions"]].rename(columns={"label_predictions": n.label}),
                       on="arbitrary_index")
 
-        df.rename(columns={"ethanol": "inducer_concentration", "time_point": "timepoint"}, inplace=True)
-        # df["timepoint"] = df["timepoint"] / 2
-
-        features = n.morph_cols + n.sytox_cols
+        # features = n.morph_cols + n.sytox_cols
+        features = n.morph_cols
 
         df = df[features + ["inducer_concentration", "timepoint", "label"]]
-        # df["condition"] = df["inducer_concentration"].astype(str) + "_" + df["timepoint"].astype(str)
-        # df.drop(columns=["inducer_concentration", "timepoint"], inplace=True)
-        # print(df, "\n")
-
         cfu_data = self.cfu_df[["inducer_concentration", "timepoint", "percent_live"]]
         # need to mean the cfu percent_live column over "inducer_concentration" and "timepoint", due to multiple replicates
         cfu_means = cfu_data.groupby(by=["inducer_concentration", "timepoint"], as_index=False).mean()
-        # print(cfu_means, "\n")
         df = pd.merge(df, cfu_means, how="inner", on=["inducer_concentration", "timepoint"])  # might want to change to left join
         # print(df, "\n")
         # print(df["timepoint"].value_counts())
@@ -505,7 +497,7 @@ class ComparePipelines:
 
         plotly_fig = grid_of_distributions_over_conditions(df1=labeled_df_1, axis_1=axis_1, axis_2=axis_2,
                                                            grid_rows_source=self.ld_pipeline_1.y_treatment,
-                                                           grid_cols_source=n.time,
+                                                           grid_cols_source=n.timepoint,
                                                            color_source=n.label_preds,
                                                            sample_fraction=sample_fraction,
                                                            df2=labeled_df_2, kdeplot=kdeplot)
@@ -561,13 +553,13 @@ def _get_labeled_df(labeling_method: str, pipeline: LiveDeadPipeline) -> pd.Data
     return labeled_df
 
 
-def _create_percent_live_df(labeled_df: pd.DataFrame, ld_pipeline: LiveDeadPipeline):
-    ratio_df = pd.DataFrame(columns=[ld_pipeline.y_treatment, n.time, n.num_live, n.num_dead, n.percent_live])
-    for tr in list(labeled_df[ld_pipeline.y_treatment].unique()):
-        for ti in list(labeled_df[n.time].unique()):
-            num_live = len(labeled_df.loc[(labeled_df[ld_pipeline.y_treatment] == tr) & (labeled_df[n.time] == ti) & (
+def _create_percent_live_df(labeled_df: pd.DataFrame):
+    ratio_df = pd.DataFrame(columns=[n.inducer_concentration, n.timepoint, n.num_live, n.num_dead, n.percent_live, "from_cfu"])
+    for tr in list(labeled_df[n.inducer_concentration].unique()):
+        for ti in list(labeled_df[n.timepoint].unique()):
+            num_live = len(labeled_df.loc[(labeled_df[n.inducer_concentration] == tr) & (labeled_df[n.timepoint] == ti) & (
                     labeled_df[n.label_preds] == 1)])
-            num_dead = len(labeled_df.loc[(labeled_df[ld_pipeline.y_treatment] == tr) & (labeled_df[n.time] == ti) & (
+            num_dead = len(labeled_df.loc[(labeled_df[n.inducer_concentration] == tr) & (labeled_df[n.timepoint] == ti) & (
                     labeled_df[n.label_preds] == 0)])
             ratio_df.loc[len(ratio_df)] = [tr, ti, num_live, num_dead, 100.0 * float(num_live) / (num_live + num_dead)]
     return ratio_df
@@ -593,7 +585,7 @@ def _plot_percent_live_over_conditions(percent_live_df: pd.DataFrame, treatment_
         treatment_levels.sort()
         num_colors = len(treatment_levels)
         palette_2 = dict(zip(treatment_levels, sns.color_palette("bright", num_colors)))
-        palette_2 = {0: "blue", 5: "pink", 10: "orange", 12: "yellow", 15: "lightgreen", 20: "red", 80: "purple"}
+        # palette_2 = {0: "blue", 5: "pink", 10: "orange", 12: "yellow", 15: "lightgreen", 20: "red", 80: "purple"}
         # print(cfu_overlay)
         # cfu_overlay = cfu_overlay.loc[~cfu_overlay["inducer_concentration"].isin([5, 12])]
         print(cfu_overlay)
@@ -610,7 +602,7 @@ def _plot_percent_live_over_conditions(percent_live_df: pd.DataFrame, treatment_
         style_order = list(percent_live_df[compare].unique())
         style_order.sort()
 
-    lp = sns.lineplot(x=percent_live_df[n.time], y=percent_live_df[n.percent_live],
+    lp = sns.lineplot(x=percent_live_df[n.timepoint], y=percent_live_df[n.percent_live],
                       hue=percent_live_df[treatment_col], style=style,
                       style_order=style_order, palette=palette, legend="full", zorder=1)
 
