@@ -565,7 +565,10 @@ def _create_percent_live_df(labeled_df: pd.DataFrame):
                     labeled_df[n.label_preds] == 1)])
             num_dead = len(labeled_df.loc[(labeled_df[n.inducer_concentration] == tr) & (labeled_df[n.timepoint] == ti) & (
                     labeled_df[n.label_preds] == 0)])
-            ratio_df.loc[len(ratio_df)] = [tr, ti, num_live, num_dead, 100.0 * float(num_live) / (num_live + num_dead)]
+            from_cfu = labeled_df.loc[(labeled_df[n.inducer_concentration] == tr) & (labeled_df[n.timepoint] == ti), n.percent_live].mean()
+            ratio_df.loc[len(ratio_df)] = [tr, ti, num_live, num_dead, 100.0 * float(num_live) / (num_live + num_dead), from_cfu]
+    print("\nratio_df")
+    print(ratio_df, "\n")
     return ratio_df
 
 
