@@ -6,7 +6,8 @@ class Names:
     label = "label"
     label_preds = "label_predictions"
     cluster_preds = "cluster_predictions"
-    data_file_name = "pipeline_data.csv"
+    # data_file_name = "pipeline_data.csv"
+    data_file_name = "sampled_pipeline_data.csv"
 
     # strains
     yeast = "yeast"
@@ -18,7 +19,7 @@ class Names:
     ethanol = "ethanol"
     heat = "heat"
     treatments_dict = {
-        ethanol: {yeast: [0, 10, 15, 20, 80],
+        ethanol: {yeast: [0.0, 5.0, 10.0, 12.5, 15.0, 20.0, 80.0],
                   bacillus: [0, 5, 10, 15, 40],
                   ecoli: [0, 5, 10, 15, 40]},
         heat: [0]
@@ -29,10 +30,9 @@ class Names:
     morph_cols = ["FSC-A", "FSC-H", "FSC-W", "SSC-A", "SSC-H", "SSC-W"]
     sytox_cols = ["RL1-A", "RL1-H", "RL1-W"]
     bl_cols = ["BL1-A", "BL1-H", "BL1-W"]
-    # mito_cols = None
-    morph_cols = ["log_{}".format(x) for x in morph_cols]
-    sytox_cols = ["log_{}".format(x) for x in sytox_cols]
-    bl_cols = ["log_{}".format(x) for x in bl_cols]
+    # morph_cols = ["log_{}".format(x) for x in morph_cols]
+    # sytox_cols = ["log_{}".format(x) for x in sytox_cols]
+    # bl_cols = ["log_{}".format(x) for x in bl_cols]
 
     # experiment data dictionary
     # might want to make the values lists of experiment_ids since different experiments could apply
@@ -44,7 +44,7 @@ class Names:
     # each experiment should have a corresponding folder with the same name as the experiment_id
     # inside the folder you will have data files: dataset, train, test, normalized_train, normalized_test, etc.
     # then the LiveDeadPipeline can call file if it exists or otherwise create it using preprocessing methods
-    exp_data_dir = "experiment_data"
+    exp_data_dir = "experiment_data/processed"
     harness_output_dir = "test_harness_outputs"
     pipeline_output_dir = "pipeline_outputs"
 
