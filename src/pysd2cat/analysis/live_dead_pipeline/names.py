@@ -1,6 +1,7 @@
 class Names:
     index = "arbitrary_index"
-    time = "time_point"
+    timepoint = "timepoint"
+    temperature = "temperature"
     stain = "stain"
     label = "label"
     label_preds = "label_predictions"
@@ -13,6 +14,7 @@ class Names:
     ecoli = "ecoli"
 
     # treatments
+    inducer_concentration = "inducer_concentration"
     ethanol = "ethanol"
     heat = "heat"
     treatments_dict = {
@@ -21,7 +23,6 @@ class Names:
                   ecoli: [0, 5, 10, 15, 40]},
         heat: [0]
     }
-    # time_points = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
     time_points = [0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0]
 
     # feature columns
