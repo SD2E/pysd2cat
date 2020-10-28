@@ -442,28 +442,37 @@ class LiveDeadPipeline:
         # need to mean the cfu percent_live column over "inducer_concentration" and "timepoint", due to multiple replicates
         cfu_means = cfu_data.groupby(by=["inducer_concentration", "timepoint"], as_index=False).mean()
         df = pd.merge(df, cfu_means, how="inner", on=["inducer_concentration", "timepoint"])  # might want to change to left join
-        # print(df, "\n")
-        # print(df["timepoint"].value_counts())
-        # print()
-        # print(df["inducer_concentration"].value_counts())
-        #
-        # sys.exit(0)
 
-        features = n.morph_cols + n.sytox_cols
+        # sort df by conditions so batches are per-condition for the most part
+        df.sort_values(by=[n.inducer_concentration, n.timepoint], inplace=True)
+
+        # subselect conditions for testing purposes
+        print()
+        print(df.shape)
+        df = df.loc[(df[n.inducer_concentration].isin([0.0])) & (df[n.timepoint].isin([0.5]))]
+        # df[n.percent_live] = 80.0
+        print(df.shape)
+        print()
+
         X = df[features]
         Y = df[col_idx.keys()]
 
         # Begin keras model
         print("\n----------- Begin Keras Labeling Booster Model -----------\n")
+        start_time = time.time()
         model = labeling_booster_model(input_shape=len(features))
-        model.fit(X, Y, epochs=100, batch_size=1024)  # TODO: use generator instead of matrices
-        class_predictions = np.ndarray.flatten(model.predict(X) > 0.5).astype("int32")
+        model.fit(X, Y, epochs=14, batch_size=128, verbose=True, shuffle=True)  # TODO: use generator instead of matrices
+        predict_proba = model.predict(X)
+        class_predictions = np.ndarray.flatten(predict_proba > 0.5).astype("int32")
         training_accuracy = accuracy_score(y_true=Y[n.label], y_pred=class_predictions)
+        print("\nModel Boosting took {} seconds".format(time.time() - start_time))
         print("\nTraining Accuracy = {}%\n".format(round(100 * training_accuracy, 2)))
-        print(Counter(class_predictions))
+        print(Counter(class_predictions), "\n")
+        # plt.hist(predict_proba, bins=25)
+        # plt.show()
 
-        df["boosted_labels"] = class_predictions
-        self.boosted_labels = df.copy()
+        df["label_predictions"] = class_predictions
+        self.boosted_labels = df
 
 
 class ComparePipelines:
