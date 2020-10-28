@@ -234,6 +234,8 @@ class LiveDeadPipeline:
         print("Conditions designated as Live: {}".format(live_conditions))
         print("Conditions designated as Dead: {}".format(dead_conditions))
         print()
+        self.live_conds = [tuple(d.values()) for d in live_conditions]
+        self.dead_conds = [tuple(d.values()) for d in dead_conditions]
 
         # Label points according to live_conditions and dead_conditions
         # first obtain indexes of the rows that correspond to live_conditions and dead_conditions
@@ -376,7 +378,9 @@ class LiveDeadPipeline:
             _plot_percent_live_over_conditions(percent_live_df=percent_live_df,
                                                treatment_col=treatment_col,
                                                cfu_overlay=self.cfu_df,
-                                               compare=None, title="Regular Labels.")
+                                               compare=None,
+                                               title="Regular Labels\nlive = {}\ndead = {}".format(self.live_conds,
+                                                                                                   self.dead_conds))
 
     def plot_features_over_conditions(self, labeling_method, axis_1="log_SSC-A", axis_2="log_RL1-A",
                                       sample_fraction=0.1, kdeplot=False):
