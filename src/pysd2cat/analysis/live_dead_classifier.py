@@ -6,6 +6,7 @@ from sklearn.preprocessing import Normalizer
 from sklearn.preprocessing import StandardScaler
 from sklearn.preprocessing import Binarizer
 import pandas as pd
+import numpy as np
 from pysd2cat.data import pipeline
 
 import logging
@@ -108,10 +109,15 @@ def build_model(dataframe):
     rf_model = RandomForestClassifier(random_state=1, class_weight = 'balanced',
                                      n_estimators=361,  criterion='entropy', min_samples_leaf=13, n_jobs=-1)
 
+    if np.any(np.isnan(train_X_norm)):
+        train_X_norm = np.nan_to_num(train_X_norm)
+
     # Fit model
     rf_model.fit(train_X_norm, train_y)
 
     val_X_norm = scaler.transform(val_X)
+    if np.any(np.isnan(val_X_norm)):
+        val_X_norm = np.nan_to_num(val_X_norm)
     val_p = pd.DataFrame(rf_model.predict(val_X_norm), columns=['class_label'])
     error = mean_absolute_error(val_y, val_p)
     #print(dataframe.columns)
@@ -144,6 +150,8 @@ def compute_mean_live(model,
                     if c_df is not None:
                         c_df = c_df.sample(frac=0.1, replace=True)
                         c_df_norm = scaler.transform(c_df.drop(columns=['output']))
+                        if np.any(np.isnan(c_df_norm)):
+                            c_df_norm = np.nan_to_num(c_df_norm)
                         c_df_y = model.predict(c_df_norm)
                         #print("c_df_y: {}".format(c_df_y.type()))
                         #print(c_df_y)
@@ -160,6 +168,8 @@ def compute_mean_live(model,
 def predict_live_dead(df, model, scaler):
     #print("Predicting live...")
     df_norm = scaler.transform(df)
+    if np.any(np.isnan(df_norm)):
+        df_norm = np.nan_to_num(df_norm)
     predictions = model.predict(df_norm)
     #predictions = model.predict(df)
     #print(predictions)
