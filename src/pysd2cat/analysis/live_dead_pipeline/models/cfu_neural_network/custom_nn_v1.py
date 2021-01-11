@@ -13,6 +13,9 @@ from sklearn.metrics import accuracy_score
 from tensorflow.python.ops import gen_array_ops
 from pysd2cat.analysis.live_dead_pipeline.names import Names as n
 
+pd.set_option('display.max_columns', 500)
+pd.set_option('display.width', 10000)
+pd.set_option('display.max_colwidth', None)
 # gets rid of the annoying SettingWithCopyWarnings
 # set this equal to "raise" if you feel like debugging SettingWithCopyWarnings.
 pd.options.mode.chained_assignment = None  # default="warn"
@@ -25,42 +28,14 @@ print("Eager Execution = {}\n".format(tf.executing_eagerly()))
 
 
 def main():
-    # Load, prepare, and generate labels for data
-    ldp = LiveDeadPipeline(x_strain=n.yeast, x_treatment=n.ethanol, x_stain=1,
-                           y_strain=None, y_treatment=None, y_stain=None)
-    ldp.load_data()
-    ldp.condition_method()
-    labeled_df = ldp.labeled_data_dict[n.condition_method]
-    df = pd.merge(ldp.x_df,
-                  labeled_df[["arbitrary_index", "label_predictions"]].rename(columns={"label_predictions": n.label}),
-                  on="arbitrary_index")
-
-    df.rename(columns={"ethanol": "inducer_concentration", "time_point": "timepoint"}, inplace=True)
-    df["timepoint"] = df["timepoint"] / 2
-
-    features = n.morph_cols + n.sytox_cols
-
-    df = df[features + ["inducer_concentration", "timepoint", "label"]]
-
-    # add CFUs
-    # using these lines as a temporary way to get the CFU data we want (CFUs = "ground truth")
-    ldp_stain = LiveDeadPipeline(x_strain=n.yeast, x_treatment=n.ethanol, x_stain=1,
-                                 y_strain=None, y_treatment=None, y_stain=None)
-    ldp_stain.load_data()
-    cfu_data = ldp_stain.cfu_df[["inducer_concentration", "timepoint", "percent_live"]]
-    # need to mean the cfu percent_live column over "inducer_concentration" and "timepoint", due to multiple replicates
-    cfu_means = cfu_data.groupby(by=["inducer_concentration", "timepoint"], as_index=False).mean()
-    # print(cfu_means, "\n")
-    df = pd.merge(df, cfu_means, how="inner", on=["inducer_concentration", "timepoint"])  # might want to change to left join
-
-    print("\n" * 10, "*" * 200, "\n")
+    df = pd.read_csv("df_for_testing.csv")
     print("df:\n", df, "\n")
     print(df["label"].value_counts(), "\n")
 
     # df = df.loc[df["timepoint"].isin([0.5, 3.0])]
     # df = df.loc[df["inducer_concentration"].isin([0.0, 80.0])]
 
-    features = n.morph_cols + n.sytox_cols
+    features = n.morph_cols
     X = df[features]
     Y = df[col_idx.keys()]
     print("X:\n", X, "\n")
@@ -95,6 +70,7 @@ def main():
 
 
 def bin_cross(label_conds_cfus, y_pred):
+    print(label_conds_cfus)
     y_true = label_conds_cfus[:, col_idx[n.label]]
     y_true = tf.expand_dims(y_true, axis=1)  # necessary to get y_true in the same shape as y_pred
     return tf.losses.binary_crossentropy(y_true=y_true, y_pred=y_pred)
@@ -131,19 +107,11 @@ def cfu_loss_2(label_conds_cfus, y_pred):
     # cfu_percent_live = tf.expand_dims(cfu_percent_live, axis=1)
 
     diff = cfu_percent_live - K.flatten(y_pred)
-
-    # print(cfu_percent_live)
-    # print()
-    # print(K.flatten(y_pred))
-    # print()
-    # print()
-
-    # print(diff)
-    # print()
-    # print(K.abs(K.mean(diff)))
-    # sys.exit(0)
-
     return K.abs(K.mean(diff))
+
+
+def cfu_loss_1d(cfu_true, y_pred):
+    pass
 
 
 def joint_loss(label_conds_cfus, y_pred):
@@ -151,14 +119,14 @@ def joint_loss(label_conds_cfus, y_pred):
     loss_cfu = cfu_loss(label_conds_cfus=label_conds_cfus, y_pred=y_pred)
     # loss_cfu = cfu_loss_2(label_conds_cfus=label_conds_cfus, y_pred=y_pred)
 
-    return loss_bin_cross + 3*loss_cfu
+    return loss_bin_cross + 3 * loss_cfu
     # return loss_bin_cross
     # return loss_cfu
 
 
 # can potentially branch forward scatter from side scatter and color.
 # And then concat and then allow them to mix after they mix within their groups.
-def labeling_booster_model(input_shape=None):
+def labeling_booster_model(input_shape=None, loss=joint_loss):
     model = Sequential()
     model.add(Dropout(0.1, input_shape=(input_shape,)))
     # wr = l1_l2(l2=0.02, l1=0)
@@ -174,8 +142,32 @@ def labeling_booster_model(input_shape=None):
     # wr = l1_l2(l2=0.02, l1=0)
     model.add(Dense(units=1, activation='sigmoid', kernel_regularizer=wr))
     model.add(Flatten())
-    model.compile(loss=joint_loss, optimizer="Adam",
+    model.compile(loss=loss, optimizer="Adam",
                   metrics=[joint_loss, bin_cross, cfu_loss, cfu_loss_2], run_eagerly=True)
+    # TODO: figure out how to add accuracy to metrics. Not trivial due to 4D nature of our Y.
+    print(model.summary())
+    print()
+    return model
+
+
+def labeling_booster_model_1d(input_shape=None, loss=joint_loss):
+    model = Sequential()
+    model.add(Dropout(0.1, input_shape=(input_shape,)))
+    # wr = l1_l2(l2=0.02, l1=0)
+    wr = None
+    model.add(Dense(units=32, activation="relu", kernel_regularizer=wr))
+    model.add(Dropout(0.3))
+    model.add(Dense(units=16, activation="relu", kernel_regularizer=wr))
+    model.add(Dropout(0.1))
+    model.add(Dense(units=8, activation="relu", kernel_regularizer=wr))
+    model.add(Dropout(0.1))
+    model.add(Dense(units=4, activation="relu", kernel_regularizer=wr))
+    model.add(Dropout(0.1))
+    # wr = l1_l2(l2=0.02, l1=0)
+    model.add(Dense(units=1, activation='sigmoid', kernel_regularizer=wr))
+    model.add(Flatten())
+    model.compile(loss=cfu_loss_1d, optimizer="Adam",
+                  metrics=[cfu_loss_1d], run_eagerly=True)
     # TODO: figure out how to add accuracy to metrics. Not trivial due to 4D nature of our Y.
     print(model.summary())
     print()

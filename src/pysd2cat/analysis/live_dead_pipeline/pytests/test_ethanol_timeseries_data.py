@@ -23,35 +23,29 @@ def main():
                                     y_strain=None, y_treatment=None, y_stain=None)
     ldp_no_stain.load_data()
     ldp_no_stain.condition_method(
-        live_conditions=[
-            {n.inducer_concentration: 0.0, n.timepoint: 1.5},
-            {n.inducer_concentration: 0.0, n.timepoint: 2.5},
-            {n.inducer_concentration: 0.0, n.timepoint: 3.5},
-            {n.inducer_concentration: 0.0, n.timepoint: 4.5},
-            {n.inducer_concentration: 0.0, n.timepoint: 5.5},
-            {n.inducer_concentration: 0.0, n.timepoint: 6.0},
-            {n.inducer_concentration: 5.0, n.timepoint: 0.5}
-        ],
+        live_conditions=None,
         dead_conditions=[
-            {n.inducer_concentration: 80.0, n.timepoint: 1.0},
-            {n.inducer_concentration: 80.0, n.timepoint: 2.0},
-            {n.inducer_concentration: 80.0, n.timepoint: 3.0},
-            {n.inducer_concentration: 80.0, n.timepoint: 4.0},
-            {n.inducer_concentration: 80.0, n.timepoint: 5.0},
+            # {n.inducer_concentration: 80.0, n.timepoint: 1.0},
+            # {n.inducer_concentration: 80.0, n.timepoint: 2.0},
+            # {n.inducer_concentration: 80.0, n.timepoint: 3.0},
+            # {n.inducer_concentration: 80.0, n.timepoint: 4.0},
+            # {n.inducer_concentration: 80.0, n.timepoint: 5.0},
             {n.inducer_concentration: 80.0, n.timepoint: 6.0},
-            {n.inducer_concentration: 20.0, n.timepoint: 1.0},
-            {n.inducer_concentration: 20.0, n.timepoint: 2.0},
-            {n.inducer_concentration: 20.0, n.timepoint: 3.0},
-            {n.inducer_concentration: 20.0, n.timepoint: 4.0},
-            {n.inducer_concentration: 20.0, n.timepoint: 5.0},
+            # {n.inducer_concentration: 20.0, n.timepoint: 1.0},
+            # {n.inducer_concentration: 20.0, n.timepoint: 2.0},
+            # {n.inducer_concentration: 20.0, n.timepoint: 3.0},
+            # {n.inducer_concentration: 20.0, n.timepoint: 4.0},
+            # {n.inducer_concentration: 20.0, n.timepoint: 5.0},
             {n.inducer_concentration: 20.0, n.timepoint: 6.0},
-            {n.inducer_concentration: 15.0, n.timepoint: 6.0},
-            {n.inducer_concentration: 12.5, n.timepoint: 6.0},
-            {n.inducer_concentration: 10.0, n.timepoint: 6.0}
+            # {n.inducer_concentration: 15.0, n.timepoint: 6.0},
+            # {n.inducer_concentration: 12.5, n.timepoint: 6.0},
+            # {n.inducer_concentration: 10.0, n.timepoint: 6.0}
         ])
 
+    # print(ldp_no_stain.labeled_data_dict[n.condition_method])
+
     # ldp_no_stain.plot_percent_live_over_conditions(n.condition_method, False)
-    print()
+    # print()
 
     ldp_no_stain.boost_labels_via_neural_network(method=n.condition_method)
     # ldp_no_stain.plot_percent_live_over_conditions(n.condition_method, True)
