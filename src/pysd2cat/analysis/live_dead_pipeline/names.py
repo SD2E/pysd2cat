@@ -4,6 +4,7 @@ class Names:
     temperature = "temperature"
     stain = "stain"
     label = "label"
+    label_probs = "label_probs"
     label_preds = "label_predictions"
     cluster_preds = "cluster_predictions"
     # data_file_name = "pipeline_data.csv"
