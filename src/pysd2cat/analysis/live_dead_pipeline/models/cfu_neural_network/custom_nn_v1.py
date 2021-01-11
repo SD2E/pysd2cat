@@ -12,7 +12,6 @@ from keras.layers import Dense, Dropout, Flatten
 from sklearn.metrics import accuracy_score
 from tensorflow.python.ops import gen_array_ops
 from pysd2cat.analysis.live_dead_pipeline.names import Names as n
-from pysd2cat.analysis.live_dead_pipeline.ld_pipeline_classes import LiveDeadPipeline
 
 # gets rid of the annoying SettingWithCopyWarnings
 # set this equal to "raise" if you feel like debugging SettingWithCopyWarnings.
@@ -127,11 +126,32 @@ def cfu_loss(label_conds_cfus, y_pred):
     return K.abs(diff / 100.0)
 
 
+def cfu_loss_2(label_conds_cfus, y_pred):
+    cfu_percent_live = label_conds_cfus[:, col_idx["percent_live"]] / 100.0
+    # cfu_percent_live = tf.expand_dims(cfu_percent_live, axis=1)
+
+    diff = cfu_percent_live - K.flatten(y_pred)
+
+    # print(cfu_percent_live)
+    # print()
+    # print(K.flatten(y_pred))
+    # print()
+    # print()
+
+    # print(diff)
+    # print()
+    # print(K.abs(K.mean(diff)))
+    # sys.exit(0)
+
+    return K.abs(K.mean(diff))
+
+
 def joint_loss(label_conds_cfus, y_pred):
     loss_bin_cross = bin_cross(label_conds_cfus=label_conds_cfus, y_pred=y_pred)
     loss_cfu = cfu_loss(label_conds_cfus=label_conds_cfus, y_pred=y_pred)
+    # loss_cfu = cfu_loss_2(label_conds_cfus=label_conds_cfus, y_pred=y_pred)
 
-    return 1.0 * loss_bin_cross + 1.0 * loss_cfu
+    return loss_bin_cross + 3*loss_cfu
     # return loss_bin_cross
     # return loss_cfu
 
@@ -141,7 +161,8 @@ def joint_loss(label_conds_cfus, y_pred):
 def labeling_booster_model(input_shape=None):
     model = Sequential()
     model.add(Dropout(0.1, input_shape=(input_shape,)))
-    wr = l1_l2(l2=0.02, l1=0)
+    # wr = l1_l2(l2=0.02, l1=0)
+    wr = None
     model.add(Dense(units=32, activation="relu", kernel_regularizer=wr))
     model.add(Dropout(0.3))
     model.add(Dense(units=16, activation="relu", kernel_regularizer=wr))
@@ -150,11 +171,11 @@ def labeling_booster_model(input_shape=None):
     model.add(Dropout(0.1))
     model.add(Dense(units=4, activation="relu", kernel_regularizer=wr))
     model.add(Dropout(0.1))
-    wr = l1_l2(l2=0.02, l1=0)
+    # wr = l1_l2(l2=0.02, l1=0)
     model.add(Dense(units=1, activation='sigmoid', kernel_regularizer=wr))
     model.add(Flatten())
     model.compile(loss=joint_loss, optimizer="Adam",
-                  metrics=[joint_loss, bin_cross, cfu_loss], run_eagerly=True)
+                  metrics=[joint_loss, bin_cross, cfu_loss, cfu_loss_2], run_eagerly=True)
     # TODO: figure out how to add accuracy to metrics. Not trivial due to 4D nature of our Y.
     print(model.summary())
     print()
