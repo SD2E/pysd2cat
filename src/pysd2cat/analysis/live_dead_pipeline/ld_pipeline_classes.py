@@ -431,13 +431,16 @@ class LiveDeadPipeline:
 
         labeled_df = self.labeled_data_dict[method]
         df = pd.merge(self.x_df,
-                      labeled_df[["arbitrary_index", "label_predictions"]].rename(columns={"label_predictions": n.label}),
+                      labeled_df[["arbitrary_index", "label_predictions",
+                                  "label_prob_predictions"]].rename(columns={"label_predictions": n.label,
+                                                                             "label_prob_predictions": n.label_probs}),
                       on="arbitrary_index")
 
         # features = n.morph_cols + n.sytox_cols
         features = n.morph_cols
 
-        df = df[features + ["inducer_concentration", "timepoint", "label"]]
+        df = df[features + [n.inducer_concentration, n.timepoint, n.label, n.label_probs]]
+
         cfu_data = self.cfu_df[["inducer_concentration", "timepoint", "percent_live"]]
         # need to mean the cfu percent_live column over "inducer_concentration" and "timepoint", due to multiple replicates
         cfu_means = cfu_data.groupby(by=["inducer_concentration", "timepoint"], as_index=False).mean()
@@ -445,6 +448,9 @@ class LiveDeadPipeline:
 
         # sort df by conditions so batches are per-condition for the most part
         df.sort_values(by=[n.inducer_concentration, n.timepoint], inplace=True)
+
+        # df.to_csv("df_for_testing.csv", index=False)
+        # sys.exit(0)
 
         # subselect conditions for testing purposes
         print()
