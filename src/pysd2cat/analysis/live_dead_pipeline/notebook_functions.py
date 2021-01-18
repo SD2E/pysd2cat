@@ -337,15 +337,15 @@ def get_point_density_values(x, y):
     return gaussian_kde(xy)(xy)
 
 
-def get_conc_df_with_kde_values(conc):
+def get_conc_df_with_kde_values(run_info, conc, features):
     if conc == "all":
         # Getting KDE values for all the data takes a longgggg time, so going to take a sample:
-        conc_df = info_strateos_stained_morph.sample(frac=0.1, random_state=5)
+        conc_df = run_info.sample(frac=0.1, random_state=5)
     else:
-        conc_df = info_strateos_stained_morph.loc[info_strateos_stained_morph[n.inducer_concentration] == conc]
+        conc_df = run_info.loc[run_info[n.inducer_concentration] == conc]
 
     # create unlogged features
-    for f in features_stained_strateos:
+    for f in features:
         conc_df["log_{}".format(f)] = conc_df[f]
         conc_df[f] = conc_df[f].pow(10)
 
