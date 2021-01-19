@@ -17,7 +17,7 @@ from sklearn.metrics import accuracy_score
 from collections import OrderedDict, Counter
 from tensorflow.python.ops import gen_array_ops
 from keras.layers import Dense, Dropout, Flatten
-from src.pysd2cat.analysis.live_dead_pipeline.names import Names as n
+from names import Names as n
 from scipy.stats import gaussian_kde
 from descartes import PolygonPatch
 import alphashape
@@ -226,10 +226,10 @@ def plot_percent_live_over_conditions(condition_results, plot_type="scatter",
     plt.xlim(0, 6.5)
     plt.ylim(-5, 105)
 
-
-#     legend = plt.legend(bbox_to_anchor=(1.01, 0.9), loc=2, borderaxespad=0.,
-#                         handlelength=4, markerscale=1.8)
-#     legend.get_frame().set_edgecolor('black')
+    #     legend = plt.legend(bbox_to_anchor=(1.01, 0.9), loc=2, borderaxespad=0.,
+    #                         handlelength=4, markerscale=1.8)
+    #     legend.get_frame().set_edgecolor('black')
+    plt.show()
 
 
 def plot_per_cond(condition_results):
@@ -237,6 +237,7 @@ def plot_per_cond(condition_results):
         temp = condition_results.loc[condition_results[n.inducer_concentration] == conc]
         plot_percent_live_over_conditions(temp, plot_type="mixed", color_by=n.timepoint, fig_height=5,
                                           title="Ethanol Concentration = {}".format(conc))
+    plt.show()
 
 
 def plot_prob_changes(concat, y_max):
@@ -256,6 +257,7 @@ def plot_prob_changes(concat, y_max):
     legend = plt.legend(bbox_to_anchor=(1.01, 0.9), loc=2, borderaxespad=0.,
                         handlelength=4, markerscale=1.8)
     legend.get_frame().set_edgecolor('black')
+    plt.show()
 
 
 def get_all_run_info(df, X, pl, append_df_cols=None):
@@ -337,10 +339,18 @@ def get_point_density_values(x, y):
     return gaussian_kde(xy)(xy)
 
 
-def get_conc_df_with_kde_values(run_info, conc, features):
+def get_conc_df_with_kde_values(run_info: pd.DataFrame, conc, features, cc="RL1-H"):
+    """
+
+    :param run_info:
+    :param conc:
+    :param features:
+    :param cc: color channel name
+    :return:
+    """
     if conc == "all":
         # Getting KDE values for all the data takes a longgggg time, so going to take a sample:
-        conc_df = run_info.sample(frac=0.1, random_state=5)
+        conc_df = run_info.sample(frac=0.05, random_state=5)
     else:
         conc_df = run_info.loc[run_info[n.inducer_concentration] == conc]
 
@@ -349,16 +359,16 @@ def get_conc_df_with_kde_values(run_info, conc, features):
         conc_df["log_{}".format(f)] = conc_df[f]
         conc_df[f] = conc_df[f].pow(10)
 
-    # calculate point densities for (SSC-A, FSC-A) and (RL1-H, FSC-A)
+    # calculate point densities for (SSC-A, FSC-A) and (cc, FSC-A)
     conc_df["kde_S_F"] = get_point_density_values(x=conc_df["FSC-A"], y=conc_df["SSC-A"])
-    conc_df["kde_R_F"] = get_point_density_values(x=conc_df["RL1-H"], y=conc_df["SSC-A"])
+    conc_df["kde_R_F"] = get_point_density_values(x=conc_df[cc], y=conc_df["SSC-A"])
     conc_df["kde_log_S_F"] = get_point_density_values(x=conc_df["log_FSC-A"], y=conc_df["log_SSC-A"])
-    conc_df["kde_log_R_F"] = get_point_density_values(x=conc_df["log_RL1-H"], y=conc_df["log_SSC-A"])
+    conc_df["kde_log_R_F"] = get_point_density_values(x=conc_df["log_{}".format(cc)], y=conc_df["log_SSC-A"])
 
     return conc_df
 
 
-def kde_scatter(conc_df, logged=False, subset_ratio=0.5,
+def kde_scatter(conc_df, cc="RL1-H", logged=False, subset_ratio=0.5,
                 log_kde=False, n_bins=None, cmap="Spectral_r",
                 pred_col=None, pred_display_type="scatter_density",
                 line_params=([2.4, 3.05], [4, 5.75])):
@@ -374,13 +384,12 @@ def kde_scatter(conc_df, logged=False, subset_ratio=0.5,
 
     if logged:
         ssc = "log_SSC-A"
-        rl1 = "log_RL1-H"
+        cc = "log_{}".format(cc)
         fsc = "log_FSC-A"
         kde_sf = "kde_log_S_F"
         kde_rf = "kde_log_R_F"
     else:
         ssc = "SSC-A"
-        rl1 = "RL1-H"
         fsc = "FSC-A"
         kde_sf = "kde_S_F"
         kde_rf = "kde_R_F"
@@ -417,19 +426,19 @@ def kde_scatter(conc_df, logged=False, subset_ratio=0.5,
                                                        subset_df.loc[subset_df["kmeans"] == 0, fsc])), 0)
     subset_boundary_2 = alphashape.alphashape(list(zip(subset_df.loc[subset_df["kmeans"] == 1, ssc],
                                                        subset_df.loc[subset_df["kmeans"] == 1, fsc])), 0)
-    #     ax1.add_patch(PolygonPatch(subset_boundary_1, alpha=1.0, ec=lines_color, fc="none", lw=5))
-    ax1.add_patch(PolygonPatch(subset_boundary_2, alpha=1.0, ec=lines_color, fc="none", lw=5))
+    ax1.add_patch(PolygonPatch(subset_boundary_1, alpha=1.0, ec=lines_color, fc="none", lw=5))
+    # ax1.add_patch(PolygonPatch(subset_boundary_2, alpha=1.0, ec=lines_color, fc="none", lw=5))
 
     # Third plot:
-    subset_no_debris = subset_df.loc[subset_df["kmeans"] == 1]
-    ax3.scatter(subset_no_debris[rl1], subset_no_debris[fsc],
-                c=get_point_density_values(x=subset_no_debris[rl1], y=subset_no_debris[fsc]),
+    subset_no_debris = subset_df.loc[subset_df["kmeans"] == 0]
+    ax3.scatter(subset_no_debris[cc], subset_no_debris[fsc],
+                c=get_point_density_values(x=subset_no_debris[cc], y=subset_no_debris[fsc]),
                 s=dot_size, cmap=cmap)
     if logged:
-        ax3.set_xlabel("log(RL1-H)", fontsize=40)
+        ax3.set_xlabel("log({})".format(cc.strip("log_")), fontsize=40)
         ax3.set_ylabel("log(FSC-A)", fontsize=40)
     else:
-        ax3.set_xlabel(rl1)
+        ax3.set_xlabel(cc)
         ax3.set_ylabel(fsc)
     ax3.set_ylim(ax1.get_ylim())
     ax3.set_xlim(right=5)
@@ -452,9 +461,9 @@ def kde_scatter(conc_df, logged=False, subset_ratio=0.5,
                         c=get_point_density_values(x=conc_df.loc[conc_df[pred_col] == 1, ssc],
                                                    y=conc_df.loc[conc_df[pred_col] == 1, fsc]),
                         s=dot_size, cmap=cmap)
-            ax5.scatter(subset_df.loc[subset_df[pred_col] == 1, rl1],
+            ax5.scatter(subset_df.loc[subset_df[pred_col] == 1, cc],
                         subset_df.loc[subset_df[pred_col] == 1, fsc],
-                        c=get_point_density_values(x=subset_df.loc[subset_df[pred_col] == 1, rl1],
+                        c=get_point_density_values(x=subset_df.loc[subset_df[pred_col] == 1, cc],
                                                    y=subset_df.loc[subset_df[pred_col] == 1, fsc]),
                         s=dot_size, cmap=cmap)
             ax6.scatter(conc_df.loc[conc_df[pred_col] == 0, ssc],
@@ -462,9 +471,9 @@ def kde_scatter(conc_df, logged=False, subset_ratio=0.5,
                         c=get_point_density_values(x=conc_df.loc[conc_df[pred_col] == 0, ssc],
                                                    y=conc_df.loc[conc_df[pred_col] == 0, fsc]),
                         s=dot_size, cmap=cmap)
-            ax7.scatter(subset_df.loc[subset_df[pred_col] == 0, rl1],
+            ax7.scatter(subset_df.loc[subset_df[pred_col] == 0, cc],
                         subset_df.loc[subset_df[pred_col] == 0, fsc],
-                        c=get_point_density_values(x=subset_df.loc[subset_df[pred_col] == 0, rl1],
+                        c=get_point_density_values(x=subset_df.loc[subset_df[pred_col] == 0, cc],
                                                    y=subset_df.loc[subset_df[pred_col] == 0, fsc]),
                         s=dot_size, cmap=cmap)
             ax5.plot(line_params[0], line_params[1], c=lines_color, linestyle="dashed")
@@ -481,14 +490,14 @@ def kde_scatter(conc_df, logged=False, subset_ratio=0.5,
             ax7.set_xlim(ax3.get_xlim())
             if logged:
                 ax4.set_xlabel("log(SSC-A)", fontsize=40)
-                ax5.set_xlabel("log(RL1-H)", fontsize=40)
+                ax5.set_xlabel("log({})".format(cc.strip("log_")), fontsize=40)
                 ax6.set_xlabel("log(SSC-A)", fontsize=40)
-                ax7.set_xlabel("log(RL1-H)", fontsize=40)
+                ax7.set_xlabel("log({})".format(cc.strip("log_")), fontsize=40)
             else:
                 ax4.set_xlabel(ssc)
-                ax5.set_xlabel(rl1)
+                ax5.set_xlabel(cc)
                 ax6.set_xlabel(ssc)
-                ax7.set_xlabel(rl1)
+                ax7.set_xlabel(cc)
 
             ax4.set_ylim(ax1.get_ylim())
             ax5.set_ylim(ax1.get_ylim())
@@ -517,9 +526,9 @@ def kde_scatter(conc_df, logged=False, subset_ratio=0.5,
             ax1.add_patch(PolygonPatch(live_shape, alpha=1.0, ec="cyan", fc="none", lw=5))
             ax1.add_patch(PolygonPatch(dead_shape, alpha=1.0, ec="hotpink", fc="none", lw=5))
 
-            live = list(zip(subset_df.loc[subset_df[pred_col] == 1, rl1],
+            live = list(zip(subset_df.loc[subset_df[pred_col] == 1, cc],
                             subset_df.loc[subset_df[pred_col] == 1, fsc]))
-            dead = list(zip(subset_df.loc[subset_df[pred_col] == 0, rl1],
+            dead = list(zip(subset_df.loc[subset_df[pred_col] == 0, cc],
                             subset_df.loc[subset_df[pred_col] == 0, fsc]))
             live[:] = [x for x in live if x != (0, 0)]
             dead[:] = [x for x in dead if x != (0, 0)]
