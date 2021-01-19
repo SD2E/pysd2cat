@@ -40,7 +40,7 @@ col_idx = OrderedDict([(n.label, 0), ("inducer_concentration", 1), ("timepoint",
 # TODO: add in cross-strain and cross-treatment labeling if it makes sense.
 class LiveDeadPipeline:
     def __init__(self, x_strain=n.yeast, x_treatment=n.ethanol, x_stain=1,
-                 y_strain=None, y_treatment=None, y_stain=None, use_previously_trained_model=False):
+                 y_strain=None, y_treatment=None, y_stain=None):
         """
         Assuming we will always normalize via Standard Scalar and log10-transformed data, so those are not arguments.
         TODO: allow for x_strain and y_strain to be lists of strains, and have load data concatenate the data for those strains.
@@ -113,19 +113,6 @@ class LiveDeadPipeline:
         self.cfu_df = cfu_data.copy()
 
     # ----- Building Blocks -----
-
-    def cluster(self):
-        """
-        Clusters the data according to the algorithm you choose.
-        Hamed look and see if we already have code that does this.
-        """
-        pass
-
-    def confusion_matrix(self):
-        pass
-
-    def find_threshold(self):
-        pass
 
     def invoke_test_harness(self, train_df, test_df, pred_df):
         print("initializing TestHarness object with this output_location: {}\n".format(self.harness_path))
@@ -204,8 +191,6 @@ class LiveDeadPipeline:
         # else:
         #     plt.title("Distributions of the {} channel.".format(channel))
         # plt.show()
-
-    # ----- Filtering Debris Methods -----
 
     # ----- Labeling methods -----
 
