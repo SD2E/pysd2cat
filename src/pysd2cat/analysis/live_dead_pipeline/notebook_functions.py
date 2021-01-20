@@ -368,48 +368,59 @@ def get_conc_df_with_kde_values(run_info: pd.DataFrame, conc, features, cc="RL1-
     return conc_df
 
 
-def get_percent_of_autogater_live_points_above_soa_line(conc_df: pd.DataFrame, point_on_line_1: tuple,
-                                                        point_on_line_2: tuple, cc="RL1-H"):
-    live_preds = conc_df.loc[conc_df["nn_preds"] == 1]
-    num_live_preds = len(live_preds)
+def are_points_left_of_line(point_1_that_defines_line: tuple, point_2_that_defines_line: tuple,
+                            x_values, y_values):
+    point_1_that_defines_line = np.array(point_1_that_defines_line)
+    point_2_that_defines_line = np.array(point_2_that_defines_line)
+    points = np.array(pd.concat([x_values, y_values], axis=1))
+    if point_1_that_defines_line[1] < point_2_that_defines_line[1]:
+        are_points_left_of = np.cross(points - point_1_that_defines_line,
+                                      points - point_2_that_defines_line) > 0
+    elif point_1_that_defines_line[1] > point_2_that_defines_line[1]:
+        are_points_left_of = np.cross(points - point_1_that_defines_line,
+                                      points - point_2_that_defines_line) < 0
+    else:
+        raise ValueError("You have defined a horizontal line.\n"
+                         "The y-component of 'point_1_that_defines_line' and 'point_2_that_defines_line' cannot be equal!")
 
-    isabove = lambda p, a, b: np.cross(p - a, b - a) < 0
+    return are_points_left_of
 
-    a = np.array(point_on_line_1)
-    b = np.array(point_on_line_2)
 
-    fig = plt.figure(figsize=(2, 2))
+def get_percent_of_autogater_live_points_left_of_soa_line(conc_df: pd.DataFrame, point_1_that_defines_line: tuple,
+                                                          point_2_that_defines_line: tuple, cc="RL1-H"):
+    autogater_live_preds = conc_df.loc[conc_df["nn_preds"] == 1]
+    x_values = autogater_live_preds["log_{}".format(cc)]
+    y_values = autogater_live_preds["log_FSC-A"]
+    line_params = ([point_1_that_defines_line[0], point_2_that_defines_line[0]],
+                   [point_1_that_defines_line[1], point_2_that_defines_line[1]])
 
-    p = np.random.rand(10, 2) * 5
-    p = np.array(live_preds[["log_{}".format(cc), "log_FSC-A"]])
+    left_of_line = are_points_left_of_line(point_1_that_defines_line=point_1_that_defines_line,
+                                           point_2_that_defines_line=point_2_that_defines_line,
+                                           x_values=x_values,
+                                           y_values=y_values)
 
-    plt.plot([a[0], b[0]], [a[1], b[1]], marker="o", color="k")
-    plt.scatter(p[:, 0], p[:, 1], c=isabove(p, a, b), cmap="bwr", vmin=0, vmax=1, s=1)
-
-    plt.xlim(0, 5)
-    plt.ylim(0, 6.5)
+    fig = plt.figure(figsize=(2.5, 2.5))
+    plt.plot(line_params[0], line_params[1], c="cyan")
+    plt.scatter(x_values, y_values, c=left_of_line, cmap="bwr", s=1)
+    plt.xlim(0)
+    plt.ylim(0)
     plt.show()
-
-    live_preds["isabove"] = isabove(p, a, b)
-    num_above = len(live_preds.loc[live_preds["isabove"] == True])
-    num_below = len(live_preds.loc[live_preds["isabove"] == False])
-    percent_above = (num_above / num_live_preds) * 100.0
-    return round(percent_above, 2)
+    percent_left_of_line = (float(sum(left_of_line)) / float(len(left_of_line))) * 100.0
+    return round(percent_left_of_line, 2)
 
 
-def kde_scatter(conc_df, cc="RL1-H", logged=False, subset_ratio=0.5,
-                point_on_line_1: tuple = (2.4, 4), point_on_line_2: tuple = (3.05, 5.75),
-                log_kde=False, n_bins=None, cmap="Spectral_r",
-                pred_col=None, pred_display_type="scatter_density"):
-    print("% of AutoGater live preds above SOA line: {}".format(
-        get_percent_of_autogater_live_points_above_soa_line(conc_df=conc_df, cc=cc,
-                                                            point_on_line_1=point_on_line_1,
-                                                            point_on_line_2=point_on_line_2)))
+def kde_scatter(conc_df, cc="RL1-H", logged=False, fraction_of_points_based_on_kde=0.9,
+                point_1_that_defines_line: tuple = (2.4, 4), point_2_that_defines_line: tuple = (3.05, 5.75),
+                n_bins=None, cmap="Spectral_r", pred_col=None):
+    print("Percent of AutoGater live predictions that are left of the SOA dashed line: {}".format(
+        get_percent_of_autogater_live_points_left_of_soa_line(conc_df=conc_df, cc=cc,
+                                                              point_1_that_defines_line=point_1_that_defines_line,
+                                                              point_2_that_defines_line=point_2_that_defines_line)))
 
     dot_size = 1
     lines_color = "cyan"
-    line_params = ([point_on_line_1[0], point_on_line_2[0]],
-                   [point_on_line_1[1], point_on_line_2[1]])
+    line_params = ([point_1_that_defines_line[0], point_2_that_defines_line[0]],
+                   [point_1_that_defines_line[1], point_2_that_defines_line[1]])
 
     conc_df = conc_df.copy()
 
@@ -433,11 +444,6 @@ def kde_scatter(conc_df, cc="RL1-H", logged=False, subset_ratio=0.5,
     # Sort the points by density, so that the densest points appear on top
     conc_df = conc_df.sort_values(by=kde_sf)
 
-    # log kde values if specified
-    if log_kde is True:
-        conc_df[kde_sf] = np.log10(conc_df[kde_sf])
-        conc_df[kde_rf] = np.log10(conc_df[kde_rf])
-
     # switch to plotting bins if n_bins is specified
     if n_bins is not None:
         conc_df[kde_sf] = pd.qcut(conc_df[kde_sf], n_bins, labels=False)
@@ -452,21 +458,30 @@ def kde_scatter(conc_df, cc="RL1-H", logged=False, subset_ratio=0.5,
         ax1.set_xlabel(ssc)
         ax1.set_ylabel(fsc)
 
-    # Get subset of data based on percentage specified by subset_ratio (tail works because we sorted by kde earlier)
-    subset_df = conc_df.tail(int(len(conc_df) * subset_ratio))
+    # Get subset of data based on fraction specified by fraction_of_points_based_on_kde
+    # also don't include points with 0 values in the subset because they are trash and mess up kmeans
+    subset_df = conc_df.loc[conc_df[fsc] != 0]
+    subset_df = subset_df.loc[subset_df[ssc] != 0]
+    subset_df = subset_df.tail(int(len(subset_df) * fraction_of_points_based_on_kde))  # tail works because we sorted by kde earlier
 
-    # Second plot: overlay alpha_shape of the subset we got
-    # first doing a KMeans with 2 clusters to get an alpha shape around each ellipse
+    # Overlay alpha_shape of the subset we got on top of first plot
+    # first doing a KMeans with 2 clusters to get an alpha shape around each cluster
     subset_df["kmeans"] = KMeans(n_clusters=2, random_state=5).fit(subset_df[[ssc, fsc]]).labels_
-    subset_boundary_1 = alphashape.alphashape(list(zip(subset_df.loc[subset_df["kmeans"] == 0, ssc],
-                                                       subset_df.loc[subset_df["kmeans"] == 0, fsc])), 0)
-    subset_boundary_2 = alphashape.alphashape(list(zip(subset_df.loc[subset_df["kmeans"] == 1, ssc],
-                                                       subset_df.loc[subset_df["kmeans"] == 1, fsc])), 0)
-    ax1.add_patch(PolygonPatch(subset_boundary_1, alpha=1.0, ec=lines_color, fc="none", lw=5))
-    # ax1.add_patch(PolygonPatch(subset_boundary_2, alpha=1.0, ec=lines_color, fc="none", lw=5))
+
+    # always get the cluster with higher mean FSC:
+    cluster_0_fsc_mean = subset_df.loc[subset_df["kmeans"] == 0, fsc].mean()
+    cluster_1_fsc_mean = subset_df.loc[subset_df["kmeans"] == 1, fsc].mean()
+    if cluster_0_fsc_mean > cluster_1_fsc_mean:
+        good_cluster = 0
+    else:
+        good_cluster = 1
+
+    cluster_boundary = alphashape.alphashape(list(zip(subset_df.loc[subset_df["kmeans"] == good_cluster, ssc],
+                                                      subset_df.loc[subset_df["kmeans"] == good_cluster, fsc])), 0)
+    ax1.add_patch(PolygonPatch(cluster_boundary, alpha=1.0, ec=lines_color, fc="none", lw=5))
 
     # Third plot:
-    subset_no_debris = subset_df.loc[subset_df["kmeans"] == 0]
+    subset_no_debris = subset_df.loc[subset_df["kmeans"] == good_cluster]
     ax3.scatter(subset_no_debris[cc], subset_no_debris[fsc],
                 c=get_point_density_values(x=subset_no_debris[cc], y=subset_no_debris[fsc]),
                 s=dot_size, cmap=cmap)
@@ -485,98 +500,81 @@ def kde_scatter(conc_df, cc="RL1-H", logged=False, subset_ratio=0.5,
     ax3.set_title("Manual Selection of Live Cells", fontweight="bold", fontsize=40)
 
     if pred_col is not None:
-        if pred_display_type == "scatter_density":
-            fig = plt.figure(figsize=(20, 20.5))
-            ax4 = plt.subplot(2, 2, 1)
-            ax5 = plt.subplot(2, 2, 2)
-            ax6 = plt.subplot(2, 2, 3)
-            ax7 = plt.subplot(2, 2, 4)
+        fig = plt.figure(figsize=(20, 20.5))
+        ax4 = plt.subplot(2, 2, 1)
+        ax5 = plt.subplot(2, 2, 2)
+        ax6 = plt.subplot(2, 2, 3)
+        ax7 = plt.subplot(2, 2, 4)
 
-            ax4.scatter(conc_df.loc[conc_df[pred_col] == 1, ssc],
-                        conc_df.loc[conc_df[pred_col] == 1, fsc],
-                        c=get_point_density_values(x=conc_df.loc[conc_df[pred_col] == 1, ssc],
-                                                   y=conc_df.loc[conc_df[pred_col] == 1, fsc]),
-                        s=dot_size, cmap=cmap)
-            ax5.scatter(subset_df.loc[subset_df[pred_col] == 1, cc],
-                        subset_df.loc[subset_df[pred_col] == 1, fsc],
-                        c=get_point_density_values(x=subset_df.loc[subset_df[pred_col] == 1, cc],
-                                                   y=subset_df.loc[subset_df[pred_col] == 1, fsc]),
-                        s=dot_size, cmap=cmap)
-            ax6.scatter(conc_df.loc[conc_df[pred_col] == 0, ssc],
-                        conc_df.loc[conc_df[pred_col] == 0, fsc],
-                        c=get_point_density_values(x=conc_df.loc[conc_df[pred_col] == 0, ssc],
-                                                   y=conc_df.loc[conc_df[pred_col] == 0, fsc]),
-                        s=dot_size, cmap=cmap)
-            ax7.scatter(subset_df.loc[subset_df[pred_col] == 0, cc],
-                        subset_df.loc[subset_df[pred_col] == 0, fsc],
-                        c=get_point_density_values(x=subset_df.loc[subset_df[pred_col] == 0, cc],
-                                                   y=subset_df.loc[subset_df[pred_col] == 0, fsc]),
-                        s=dot_size, cmap=cmap)
-            ax5.plot(line_params[0], line_params[1], c=lines_color, linestyle="dashed")
-            ax7.plot(line_params[0], line_params[1], c=lines_color, linestyle="dashed")
+        ax4.scatter(conc_df.loc[conc_df[pred_col] == 1, ssc],
+                    conc_df.loc[conc_df[pred_col] == 1, fsc],
+                    c=get_point_density_values(x=conc_df.loc[conc_df[pred_col] == 1, ssc],
+                                               y=conc_df.loc[conc_df[pred_col] == 1, fsc]),
+                    s=dot_size, cmap=cmap)
+        ax5.scatter(subset_df.loc[subset_df[pred_col] == 1, cc],
+                    subset_df.loc[subset_df[pred_col] == 1, fsc],
+                    c=get_point_density_values(x=subset_df.loc[subset_df[pred_col] == 1, cc],
+                                               y=subset_df.loc[subset_df[pred_col] == 1, fsc]),
+                    s=dot_size, cmap=cmap)
+        ax6.scatter(conc_df.loc[conc_df[pred_col] == 0, ssc],
+                    conc_df.loc[conc_df[pred_col] == 0, fsc],
+                    c=get_point_density_values(x=conc_df.loc[conc_df[pred_col] == 0, ssc],
+                                               y=conc_df.loc[conc_df[pred_col] == 0, fsc]),
+                    s=dot_size, cmap=cmap)
+        ax7.scatter(subset_df.loc[subset_df[pred_col] == 0, cc],
+                    subset_df.loc[subset_df[pred_col] == 0, fsc],
+                    c=get_point_density_values(x=subset_df.loc[subset_df[pred_col] == 0, cc],
+                                               y=subset_df.loc[subset_df[pred_col] == 0, fsc]),
+                    s=dot_size, cmap=cmap)
+        ax5.plot(line_params[0], line_params[1], c=lines_color, linestyle="dashed")
+        ax7.plot(line_params[0], line_params[1], c=lines_color, linestyle="dashed")
 
-            #             ax4.set_title("Predicted Healthy Cells", fontweight="bold", fontsize=30)
-            #             ax5.set_title("Predicted Healthy Cells", fontweight="bold", fontsize=30)
-            #             ax6.set_title("Predicted Dead, Dying, and Debris", fontweight="bold", fontsize=30)
-            #             ax7.set_title("Predicted Dead, Dying, and Debris", fontweight="bold", fontsize=30)
+        #             ax4.set_title("Predicted Healthy Cells", fontweight="bold", fontsize=30)
+        #             ax5.set_title("Predicted Healthy Cells", fontweight="bold", fontsize=30)
+        #             ax6.set_title("Predicted Dead, Dying, and Debris", fontweight="bold", fontsize=30)
+        #             ax7.set_title("Predicted Dead, Dying, and Debris", fontweight="bold", fontsize=30)
 
-            ax4.set_xlim(ax1.get_xlim())
-            ax5.set_xlim(ax3.get_xlim())
-            ax6.set_xlim(ax1.get_xlim())
-            ax7.set_xlim(ax3.get_xlim())
-            if logged:
-                ax4.set_xlabel("log(SSC-A)", fontsize=40)
-                ax5.set_xlabel("log({})".format(cc.strip("log_")), fontsize=40)
-                ax6.set_xlabel("log(SSC-A)", fontsize=40)
-                ax7.set_xlabel("log({})".format(cc.strip("log_")), fontsize=40)
-            else:
-                ax4.set_xlabel(ssc)
-                ax5.set_xlabel(cc)
-                ax6.set_xlabel(ssc)
-                ax7.set_xlabel(cc)
-
-            ax4.set_ylim(ax1.get_ylim())
-            ax5.set_ylim(ax1.get_ylim())
-            ax6.set_ylim(ax1.get_ylim())
-            ax7.set_ylim(ax1.get_ylim())
-            if logged:
-                ax4.set_ylabel("log(FSC-A)", fontsize=40)
-                ax5.set_ylabel("log(FSC-A)", fontsize=40)
-                ax6.set_ylabel("log(FSC-A)", fontsize=40)
-                ax7.set_ylabel("log(FSC-A)", fontsize=40)
-            else:
-                ax4.set_ylabel(fsc)
-                ax5.set_ylabel(fsc)
-                ax6.set_ylabel(fsc)
-                ax7.set_ylabel(fsc)
-
-        elif pred_display_type == "alpha_shape":
-            live = list(zip(conc_df.loc[conc_df[pred_col] == 1, ssc],
-                            conc_df.loc[conc_df[pred_col] == 1, fsc]))
-            dead = list(zip(conc_df.loc[conc_df[pred_col] == 0, ssc],
-                            conc_df.loc[conc_df[pred_col] == 0, fsc]))
-            live[:] = [x for x in live if x != (0, 0)]
-            dead[:] = [x for x in dead if x != (0, 0)]
-            live_shape = alphashape.alphashape(live, 0)
-            dead_shape = alphashape.alphashape(dead, 0)
-            ax1.add_patch(PolygonPatch(live_shape, alpha=1.0, ec="cyan", fc="none", lw=5))
-            ax1.add_patch(PolygonPatch(dead_shape, alpha=1.0, ec="hotpink", fc="none", lw=5))
-
-            live = list(zip(subset_df.loc[subset_df[pred_col] == 1, cc],
-                            subset_df.loc[subset_df[pred_col] == 1, fsc]))
-            dead = list(zip(subset_df.loc[subset_df[pred_col] == 0, cc],
-                            subset_df.loc[subset_df[pred_col] == 0, fsc]))
-            live[:] = [x for x in live if x != (0, 0)]
-            dead[:] = [x for x in dead if x != (0, 0)]
-            live_shape = alphashape.alphashape(live, 0)
-            dead_shape = alphashape.alphashape(dead, 0)
-            ax3.add_patch(PolygonPatch(live_shape, alpha=1.0, ec="cyan", fc="none", lw=5))
-            ax3.add_patch(PolygonPatch(dead_shape, alpha=1.0, ec="hotpink", fc="none", lw=5))
+        ax4.set_xlim(ax1.get_xlim())
+        ax5.set_xlim(ax3.get_xlim())
+        ax6.set_xlim(ax1.get_xlim())
+        ax7.set_xlim(ax3.get_xlim())
+        if logged:
+            ax4.set_xlabel("log(SSC-A)", fontsize=40)
+            ax5.set_xlabel("log({})".format(cc.strip("log_")), fontsize=40)
+            ax6.set_xlabel("log(SSC-A)", fontsize=40)
+            ax7.set_xlabel("log({})".format(cc.strip("log_")), fontsize=40)
         else:
-            raise ValueError("pred_display_type must equal 'scatter_density' or 'alpha_shape'"
-                             "when pred_col is not None.")
+            ax4.set_xlabel(ssc)
+            ax5.set_xlabel(cc)
+            ax6.set_xlabel(ssc)
+            ax7.set_xlabel(cc)
+
+        ax4.set_ylim(ax1.get_ylim())
+        ax5.set_ylim(ax1.get_ylim())
+        ax6.set_ylim(ax1.get_ylim())
+        ax7.set_ylim(ax1.get_ylim())
+        if logged:
+            ax4.set_ylabel("log(FSC-A)", fontsize=40)
+            ax5.set_ylabel("log(FSC-A)", fontsize=40)
+            ax6.set_ylabel("log(FSC-A)", fontsize=40)
+            ax7.set_ylabel("log(FSC-A)", fontsize=40)
+        else:
+            ax4.set_ylabel(fsc)
+            ax5.set_ylabel(fsc)
+            ax6.set_ylabel(fsc)
+            ax7.set_ylabel(fsc)
 
     plt.subplots_adjust(hspace=0.4)
     plt.show()
 
-    return conc_df, subset_df
+    # Calculate SOA_preds by getting points left of boundary line in ax3
+    cluster_of_interest = subset_df.loc[subset_df["kmeans"] == good_cluster]  # this gives us only the points in ax3
+    cluster_of_interest["SOA_preds"] = are_points_left_of_line(point_1_that_defines_line=point_1_that_defines_line,
+                                                               point_2_that_defines_line=point_2_that_defines_line,
+                                                               x_values=cluster_of_interest[cc],
+                                                               y_values=cluster_of_interest[fsc]).astype(int)
+    soa_live_indices = cluster_of_interest.loc[cluster_of_interest["SOA_preds"] == 1].index
+    conc_df["SOA_preds"] = 0
+    conc_df.loc[soa_live_indices, 'SOA_preds'] = 1
+
+    return conc_df
