@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 from keras.optimizers import SGD, Adam
 from keras.models import Sequential
 from keras.regularizers import l1_l2
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, r2_score
 from collections import OrderedDict, Counter
 from tensorflow.python.ops import gen_array_ops
 from keras.layers import Dense, Dropout, Flatten
@@ -578,3 +578,88 @@ def kde_scatter(conc_df, cc="RL1-H", logged=False, fraction_of_points_based_on_k
     conc_df.loc[soa_live_indices, 'SOA_preds'] = 1
 
     return conc_df
+
+
+def summary_table_of_results(kde_df):
+    summary_table = kde_df.groupby([n.inducer_concentration, n.timepoint], as_index=False).mean()
+
+    name_weakly = "Weakly Supervised Model (RF)"
+    name_cfu = "CFUs"
+    name_weakly_boosted = "AutoGater"
+    name_SOA = "State of the Art"
+
+    summary_table.rename(columns={"label": name_weakly,
+                                  "cfu_percent_live": name_cfu,
+                                  "nn_preds": name_weakly_boosted,
+                                  "SOA_preds": name_SOA}, inplace=True)
+
+    summary_table = summary_table[[n.inducer_concentration, n.timepoint,
+                                   name_weakly, name_cfu, name_weakly_boosted, name_SOA]]
+    # summary_table = summary_table.loc[summary_table[n.timepoint].isin([0.5, 3.0, 6.0])]
+    summary_table[name_weakly] = summary_table[name_weakly] * 100
+    summary_table[name_weakly_boosted] = summary_table[name_weakly_boosted] * 100
+    summary_table[name_SOA] = summary_table[name_SOA] * 100
+
+    # Calculating R^2 between CFUs and models
+    fig = plt.figure(figsize=[5, 5])
+    sns.scatterplot(summary_table["CFUs"], summary_table["State of the Art"], legend="full", label="SOA")
+    sns.scatterplot(summary_table["CFUs"], summary_table["AutoGater"], legend="full", label="AutoGater")
+    plt.xlim(-5, 105)
+    plt.ylim(-5, 105)
+    plt.ylabel("Model")
+    plt.show()
+    soa_r2 = r2_score(summary_table["State of the Art"], summary_table["CFUs"])
+    autogater_r2 = r2_score(summary_table["AutoGater"], summary_table["CFUs"])
+    print("R-Squared between CFUs and State of the Art: {}".format(soa_r2))
+    print("R-Squared between CFUs and AutoGater: {}".format(autogater_r2))
+    print()
+
+    summary_table[name_weakly] = summary_table[name_weakly].astype(int).astype(str) + "%"
+    summary_table[name_cfu] = summary_table[name_cfu].astype(int).astype(str) + "%"
+    summary_table[name_weakly_boosted] = summary_table[name_weakly_boosted].astype(int).astype(str) + "%"
+    summary_table[name_SOA] = summary_table[name_SOA].astype(int).astype(str) + "%"
+
+    summary_table[n.inducer_concentration] = summary_table[n.inducer_concentration].astype(str)
+    summary_table[n.timepoint] = summary_table[n.timepoint].astype(str)
+
+    # summary_table_styled = summary_table.style.set_table_styles([dict(selector='th', props=[('text-align', 'center')])])
+    # summary_table_styled.set_properties(**{'text-align': 'center'}).hide_index()
+
+    return summary_table
+
+
+def percent_live_comparison_plot(summary_table):
+    # Getting summary_table into the right format
+    concat_summary_table = pd.concat([summary_table[["inducer_concentration",
+                                                     "timepoint", "CFUs"]].assign(model='CFUs'),
+                                      summary_table[["inducer_concentration",
+                                                     "timepoint", "AutoGater"]].assign(model='AutoGater'),
+                                      summary_table[["inducer_concentration",
+                                                     "timepoint", "State of the Art"]].assign(model='State of the Art')])
+    concat_summary_table.rename(columns={"CFUs": "percent"}, inplace=True)
+
+    concat_summary_table['percent'].update(concat_summary_table.pop('AutoGater'))
+    concat_summary_table['percent'].update(concat_summary_table.pop('State of the Art'))
+    concat_summary_table["timepoint"] = concat_summary_table["timepoint"].astype(float)
+    concat_summary_table["percent"] = concat_summary_table["percent"].str.rstrip('%').astype('float')
+
+    # Plotting code
+    sns.set(style="ticks", font_scale=1.8, rc={"lines.linewidth": 3.0})
+    for c in [str(x) for x in list(concat_summary_table[n.inducer_concentration].unique())]:
+        plt.figure(figsize=(7, 5))
+
+        sc = sns.scatterplot(data=concat_summary_table.loc[concat_summary_table["inducer_concentration"] == c],
+                             x="timepoint", y="percent", s=500, alpha=.7, style="model",
+                             hue="model", hue_order=["CFUs", "State of the Art", "AutoGater"], legend="full")
+
+        legend = plt.legend(bbox_to_anchor=(1.01, 0.9), loc=2, borderaxespad=0.,
+                            handlelength=4, markerscale=1.8)
+        legend.get_frame().set_edgecolor('black')
+        new_labels = ['CFU Derivation', 'Sytox Stain Method Prediction', 'AutoGater Prediction']
+        for t, l in zip(legend.texts, new_labels): t.set_text(l)
+
+        sc.set(xlim=(-0.5, 6.5), xlabel="Time Point (Hours)",
+               ylim=(-5, 105), ylabel="Percent Live",
+               xticks=[0, 0.5, 3, 6], xticklabels=[0, 0.5, 3, 6])
+        sc.set_title("Ethanol Concentration of {}%".format(c), fontweight="bold")
+        plt.show()
