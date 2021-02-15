@@ -368,12 +368,48 @@ def get_conc_df_with_kde_values(run_info: pd.DataFrame, conc, features, cc="RL1-
     return conc_df
 
 
+def get_percent_of_autogater_live_points_above_soa_line(conc_df: pd.DataFrame, point_on_line_1: tuple,
+                                                        point_on_line_2: tuple, cc="RL1-H"):
+    live_preds = conc_df.loc[conc_df["nn_preds"] == 1]
+    num_live_preds = len(live_preds)
+
+    isabove = lambda p, a, b: np.cross(p - a, b - a) < 0
+
+    a = np.array(point_on_line_1)
+    b = np.array(point_on_line_2)
+
+    fig = plt.figure(figsize=(2, 2))
+
+    p = np.random.rand(10, 2) * 5
+    p = np.array(live_preds[["log_{}".format(cc), "log_FSC-A"]])
+
+    plt.plot([a[0], b[0]], [a[1], b[1]], marker="o", color="k")
+    plt.scatter(p[:, 0], p[:, 1], c=isabove(p, a, b), cmap="bwr", vmin=0, vmax=1, s=1)
+
+    plt.xlim(0, 5)
+    plt.ylim(0, 6.5)
+    plt.show()
+
+    live_preds["isabove"] = isabove(p, a, b)
+    num_above = len(live_preds.loc[live_preds["isabove"] == True])
+    num_below = len(live_preds.loc[live_preds["isabove"] == False])
+    percent_above = (num_above / num_live_preds) * 100.0
+    return round(percent_above, 2)
+
+
 def kde_scatter(conc_df, cc="RL1-H", logged=False, subset_ratio=0.5,
+                point_on_line_1: tuple = (2.4, 4), point_on_line_2: tuple = (3.05, 5.75),
                 log_kde=False, n_bins=None, cmap="Spectral_r",
-                pred_col=None, pred_display_type="scatter_density",
-                line_params=([2.4, 3.05], [4, 5.75])):
+                pred_col=None, pred_display_type="scatter_density"):
+    print("% of AutoGater live preds above SOA line: {}".format(
+        get_percent_of_autogater_live_points_above_soa_line(conc_df=conc_df, cc=cc,
+                                                            point_on_line_1=point_on_line_1,
+                                                            point_on_line_2=point_on_line_2)))
+
     dot_size = 1
     lines_color = "cyan"
+    line_params = ([point_on_line_1[0], point_on_line_2[0]],
+                   [point_on_line_1[1], point_on_line_2[1]])
 
     conc_df = conc_df.copy()
 
