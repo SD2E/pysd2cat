@@ -82,7 +82,7 @@ def ms_cluster(df, cols, bandwidth=None):
 
 
 def main():
-    data_dir = '/work/projects/SD2E-Community/prod/data/uploads/'
+    data_dir = '/work2/projects/SD2E-Community/prod/data/uploads/'
 
     ######################
     ## TEST DATA

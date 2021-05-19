@@ -389,7 +389,7 @@ def get_mefl_data_and_metadata_df(metadata_df, fraction=None, max_records=None):
     if runtime is 'jupyter':
         myfile = os.path.join('/home/jupyter/sd2e-community', output.split('data-sd2e-community')[1][1:])
     else:
-        myfile = os.path.join('/work/projects/SD2E-Community/prod/data', output.split('data-sd2e-community')[1][1:])
+        myfile = os.path.join('/work2/projects/SD2E-Community/prod/data', output.split('data-sd2e-community')[1][1:])
     df = pd.read_csv(myfile, memory_map=True)   
     df=df.drop(columns=['strain', 'replicate'])
     ## Join data and metadata
@@ -439,7 +439,7 @@ def get_mefl_histograms_and_metadata_df(metadata_df, results):
         if runtime is 'jupyter':
             myfile = os.path.join('/home/jupyter/sd2e-community', output.split('data-sd2e-community')[1][1:])
         else:
-            myfile = os.path.join('/work/projects/SD2E-Community/prod/data', output.split('data-sd2e-community')[1][1:])
+            myfile = os.path.join('/work2/projects/SD2E-Community/prod/data', output.split('data-sd2e-community')[1][1:])
         df = pd.read_csv(myfile)   
 
         df=df.drop(columns=['strain', 'replicate'])

@@ -128,7 +128,7 @@ def analyze(df):
 def main():
     ## Where data files live
     ##HPC
-    data_dir = '/work/projects/SD2E-Community/prod/data/uploads/'
+    data_dir = '/work2/projects/SD2E-Community/prod/data/uploads/'
     ##Jupyter Hub
     # data_dir = '/home/jupyter/sd2e-community/'
 
