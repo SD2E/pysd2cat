@@ -16,7 +16,7 @@ from keras.regularizers import l1_l2
 from sklearn.metrics import accuracy_score, r2_score
 from collections import OrderedDict, Counter
 from tensorflow.python.ops import gen_array_ops
-from keras.layers import Dense, Dropout, Flatten
+from keras.layers import Dense, Dropout, Flatten, Conv1D
 from names import Names as n
 from scipy.stats import gaussian_kde
 from descartes import PolygonPatch
@@ -121,6 +121,73 @@ def booster_model_v2(input_shape=None, loss=joint_loss_wrapper(2), metrics=None,
     model.add(Dense(units=1, activation='sigmoid'))
     model.compile(loss=loss, optimizer=Adam(lr=lr),
                   metrics=metrics, run_eagerly=True)
+    return model
+
+
+def booster_model_with_cnn(input_shape=None, loss=joint_loss_wrapper(2), metrics=None, lr=0.1):
+    if metrics is None:
+        metrics = [loss]
+
+    model = Sequential()
+
+    # input
+    # model.add(Input(shape=input_shape))
+
+    # first convolution layer
+    # model_output = Conv2D(3, kernel_size=(1, x_train.shape[2]),
+    #                       activation=None)(model_input)
+
+    # model.add(Conv2D(3, kernel_size=(1, input_shape), input_shape=(input_shape, 1), activation='relu'))
+
+    model.add(Conv1D(3, kernel_size=input_shape, input_shape=(input_shape, 1), activation='relu'))
+    model.add(Flatten())
+    model.add(Dense(units=32, activation="relu"))
+    model.add(Dropout(0.1))
+    model.add(Dense(units=16, activation="relu"))
+    model.add(Dropout(0.1))
+    model.add(Dense(units=8, activation="relu"))
+    model.add(Dropout(0.1))
+    model.add(Dense(units=1, activation='sigmoid'))
+    model.compile(loss=loss, optimizer=Adam(lr=lr),
+                  metrics=metrics, run_eagerly=True)
+
+    # from: https://datascience.stackexchange.com/questions/38957/keras-conv1d-for-simple-data-target-prediction
+    # model.add(Conv1D(32, (3), input_shape=(9, 1), activation='relu'))
+    # model.add(Flatten())
+    # model.add(Dense(64, activation='relu'))
+    # model.add(Dense(1, activation='softmax'))
+    # model.compile(loss=loss, optimizer=Adam(lr=lr),
+    #               metrics=metrics, run_eagerly=True)
+
+    return model
+
+
+def booster_model_with_cnn_2(input_shape=None, loss=joint_loss_wrapper(2), metrics=None, lr=0.1):
+    if metrics is None:
+        metrics = [loss]
+
+    model = Sequential()
+    model.add(Conv1D(3, kernel_size=input_shape, input_shape=(input_shape, 1), activation='relu'))
+    model.add(Flatten())
+    model.add(Conv1D(3, kernel_size=2, activation='relu'))
+    model.add(Flatten())
+    model.add(Dense(units=32, activation="relu"))
+    model.add(Dropout(0.1))
+    model.add(Dense(units=16, activation="relu"))
+    model.add(Dropout(0.1))
+    model.add(Dense(units=8, activation="relu"))
+    model.add(Dropout(0.1))
+    model.add(Dense(units=1, activation='sigmoid'))
+    model.compile(loss=loss, optimizer=Adam(lr=lr),
+                  metrics=metrics, run_eagerly=True)
+
+    # model.add(Conv1D(32, (3), input_shape=(9, 1), activation='relu'))
+    # model.add(Flatten())
+    # model.add(Dense(64, activation='relu'))
+    # model.add(Dense(1, activation='softmax'))
+    # model.compile(loss=loss, optimizer=Adam(lr=lr),
+    #               metrics=metrics, run_eagerly=True)
+
     return model
 
 
