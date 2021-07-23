@@ -33,7 +33,10 @@ pd.set_option('display.max_colwidth', None)
 matplotlib.use("tkagg")
 warnings.filterwarnings('ignore')
 
-col_idx = OrderedDict([(n.label, 0), ("inducer_concentration", 1), ("timepoint", 2), ("percent_live", 3)])
+# Set this variable to "inducer_concentration" or "temperature"
+treatment_column = n.inducer_concentration
+
+col_idx = OrderedDict([(n.label, 0), (treatment_column, 1), ("timepoint", 2), ("percent_live", 3)])
 
 
 def training_progress(fitted_model, metrics, num_plots, loss_name, plot_val=None):
@@ -84,7 +87,7 @@ def bin_cross(label_conds_cfus, y_pred):
 def cfu_loss(label_conds_cfus, y_pred):
     cfu_percent_live = label_conds_cfus[:, col_idx["percent_live"]]
     cfu_percent_live = cfu_percent_live / 100.0
-    condition_indices = [col_idx["inducer_concentration"], col_idx["timepoint"]]
+    condition_indices = [col_idx[treatment_column], col_idx["timepoint"]]
     conditions = tf.gather(label_conds_cfus, condition_indices, axis=1)
     y_pred = K.flatten(y_pred)
     y_pred = tf.sigmoid((y_pred - 0.5) * 100)
@@ -222,7 +225,7 @@ def run_model(model_function, lr, loss, metrics, X, Y, epochs, batch_size, verbo
     preds_and_labels[n.label] = preds_and_labels[n.label] * 100
     preds_and_labels["nn_preds"] = class_predictions * 100
     preds_and_labels.rename(columns={"percent_live": "cfu_percent_live"}, inplace=True)
-    groupby_means = preds_and_labels.groupby([n.inducer_concentration, n.timepoint]).mean()
+    groupby_means = preds_and_labels.groupby([treatment_column, n.timepoint]).mean()
     # print(groupby_means)
 
     condition_results = groupby_means.reset_index()
@@ -300,10 +303,11 @@ def plot_percent_live_over_conditions(condition_results, plot_type="scatter",
 
 
 def plot_per_cond(condition_results):
-    for conc in condition_results[n.inducer_concentration].unique():
-        temp = condition_results.loc[condition_results[n.inducer_concentration] == conc]
+    for conc in condition_results[treatment_column].unique():
+        temp = condition_results.loc[condition_results[treatment_column] == conc]
         plot_percent_live_over_conditions(temp, plot_type="mixed", color_by=n.timepoint, fig_height=5,
                                           title="Ethanol Concentration = {}".format(conc))
+        plt.show()
     plt.show()
 
 
@@ -339,7 +343,7 @@ def get_all_run_info(df, X, pl, append_df_cols=None):
     concat.loc[(concat["label"] == 1) & (concat["nn_preds"] == 1), "change_type"] = "Remained Live"
     concat.loc[(concat["label"] == 0) & (concat["nn_preds"] == 1), "change_type"] = "Changed from Dead to Live"
     concat.loc[(concat["label"] == 1) & (concat["nn_preds"] == 0), "change_type"] = "Changed from Live to Dead"
-    concat['nn_percent_live'] = concat.groupby([n.inducer_concentration,
+    concat['nn_percent_live'] = concat.groupby([treatment_column,
                                                 n.timepoint])["nn_preds"].transform('mean') * 100
     concat["label_probs"] = df["label_probs"]
 
@@ -348,7 +352,7 @@ def get_all_run_info(df, X, pl, append_df_cols=None):
 
 def generate_rf_labels_from_conditions(data_df, features,
                                        live_conditions=None, dead_conditions=None):
-    df = data_df.copy()
+    df = data_df.copy().reset_index()
     df["arbitrary_index"] = df.index
 
     if live_conditions is None:
@@ -648,7 +652,7 @@ def kde_scatter(conc_df, cc="RL1-H", logged=False, fraction_of_points_based_on_k
 
 
 def summary_table_of_results(kde_df):
-    summary_table = kde_df.groupby([n.inducer_concentration, n.timepoint], as_index=False).mean()
+    summary_table = kde_df.groupby([treatment_column, n.timepoint], as_index=False).mean()
 
     name_weakly = "Weakly Supervised Model (RF)"
     name_cfu = "CFUs"
@@ -660,7 +664,7 @@ def summary_table_of_results(kde_df):
                                   "nn_preds": name_weakly_boosted,
                                   "SOA_preds": name_SOA}, inplace=True)
 
-    summary_table = summary_table[[n.inducer_concentration, n.timepoint,
+    summary_table = summary_table[[treatment_column, n.timepoint,
                                    name_weakly, name_cfu, name_weakly_boosted, name_SOA]]
     # summary_table = summary_table.loc[summary_table[n.timepoint].isin([0.5, 3.0, 6.0])]
     summary_table[name_weakly] = summary_table[name_weakly] * 100
@@ -686,7 +690,7 @@ def summary_table_of_results(kde_df):
     summary_table[name_weakly_boosted] = summary_table[name_weakly_boosted].astype(int).astype(str) + "%"
     summary_table[name_SOA] = summary_table[name_SOA].astype(int).astype(str) + "%"
 
-    summary_table[n.inducer_concentration] = summary_table[n.inducer_concentration].astype(str)
+    summary_table[treatment_column] = summary_table[treatment_column].astype(str)
     summary_table[n.timepoint] = summary_table[n.timepoint].astype(str)
 
     # summary_table_styled = summary_table.style.set_table_styles([dict(selector='th', props=[('text-align', 'center')])])
@@ -697,11 +701,11 @@ def summary_table_of_results(kde_df):
 
 def percent_live_comparison_plot(summary_table):
     # Getting summary_table into the right format
-    concat_summary_table = pd.concat([summary_table[["inducer_concentration",
+    concat_summary_table = pd.concat([summary_table[[treatment_column,
                                                      "timepoint", "CFUs"]].assign(model='CFUs'),
-                                      summary_table[["inducer_concentration",
+                                      summary_table[[treatment_column,
                                                      "timepoint", "AutoGater"]].assign(model='AutoGater'),
-                                      summary_table[["inducer_concentration",
+                                      summary_table[[treatment_column,
                                                      "timepoint", "State of the Art"]].assign(model='State of the Art')])
     concat_summary_table.rename(columns={"CFUs": "percent"}, inplace=True)
 
@@ -712,10 +716,10 @@ def percent_live_comparison_plot(summary_table):
 
     # Plotting code
     sns.set(style="ticks", font_scale=1.8, rc={"lines.linewidth": 3.0})
-    for c in [str(x) for x in list(concat_summary_table[n.inducer_concentration].unique())]:
+    for c in [str(x) for x in list(concat_summary_table[treatment_column].unique())]:
         plt.figure(figsize=(7, 5))
 
-        sc = sns.scatterplot(data=concat_summary_table.loc[concat_summary_table["inducer_concentration"] == c],
+        sc = sns.scatterplot(data=concat_summary_table.loc[concat_summary_table[treatment_column] == c],
                              x="timepoint", y="percent", s=500, alpha=.7, style="model",
                              hue="model", hue_order=["CFUs", "State of the Art", "AutoGater"], legend="full")
 
