@@ -547,11 +547,14 @@ def kde_scatter(conc_df, cc="RL1-H", logged=False, fraction_of_points_based_on_k
     else:
         good_cluster = 1
 
+    # the next two commands are for creating a visual boundary around the points we will be selecting
     cluster_boundary = alphashape.alphashape(list(zip(subset_df.loc[subset_df["kmeans"] == good_cluster, ssc],
                                                       subset_df.loc[subset_df["kmeans"] == good_cluster, fsc])), 0)
+    # second plot (just a boundary line) overlaid on first plot:
     ax1.add_patch(PolygonPatch(cluster_boundary, alpha=1.0, ec=lines_color, fc="none", lw=5))
 
-    # Third plot:
+    # Begin creating third plot, which is actually the second standalone plot, and plots FSC against stain
+    #       for the points that were selected in the first plot:
     subset_no_debris = subset_df.loc[subset_df["kmeans"] == good_cluster]
     ax3.scatter(subset_no_debris[cc], subset_no_debris[fsc],
                 c=get_point_density_values(x=subset_no_debris[cc], y=subset_no_debris[fsc]),
@@ -600,10 +603,10 @@ def kde_scatter(conc_df, cc="RL1-H", logged=False, fraction_of_points_based_on_k
         ax5.plot(line_params[0], line_params[1], c=lines_color, linestyle="dashed")
         ax7.plot(line_params[0], line_params[1], c=lines_color, linestyle="dashed")
 
-        #             ax4.set_title("Predicted Healthy Cells", fontweight="bold", fontsize=30)
-        #             ax5.set_title("Predicted Healthy Cells", fontweight="bold", fontsize=30)
-        #             ax6.set_title("Predicted Dead, Dying, and Debris", fontweight="bold", fontsize=30)
-        #             ax7.set_title("Predicted Dead, Dying, and Debris", fontweight="bold", fontsize=30)
+        ax4.set_title("Predicted Healthy Cells", fontweight="bold", fontsize=30)
+        ax5.set_title("Predicted Healthy Cells", fontweight="bold", fontsize=30)
+        ax6.set_title("Predicted Dead, Dying, and Debris", fontweight="bold", fontsize=30)
+        ax7.set_title("Predicted Dead, Dying, and Debris", fontweight="bold", fontsize=30)
 
         ax4.set_xlim(ax1.get_xlim())
         ax5.set_xlim(ax3.get_xlim())
