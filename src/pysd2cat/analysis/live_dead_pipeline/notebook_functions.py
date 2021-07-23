@@ -482,7 +482,26 @@ def get_percent_of_autogater_live_points_left_of_soa_line(conc_df: pd.DataFrame,
 
 def kde_scatter(conc_df, cc="RL1-H", logged=False, fraction_of_points_based_on_kde=0.9,
                 point_1_that_defines_line: tuple = (2.4, 4), point_2_that_defines_line: tuple = (3.05, 5.75),
-                n_bins=None, cmap="Spectral_r", pred_col=None):
+                n_bins=None, cmap="Spectral_r", pred_col=None, kmeans_sota=True):
+    """
+    Creates Scatterplots based on KDE values. Scatterplots look like SOTA scatterplots.
+    First row of plots is SOTA, second row is AutoGater's healthy preds, third row is AutoGater's dead preds.
+
+    :param conc_df: should be output of get_conc_df_with_kde_values function
+    :param cc: color channel
+    :param logged: if you want to plot logged or not logged values
+    :param fraction_of_points_based_on_kde: this subselects a fraction of points based on their KDE values (how concentrated they are)
+    :param point_1_that_defines_line: first point that defines line
+    :param point_2_that_defines_line: second point that defines line
+    :param n_bins: if this is specified, plots colors based on bins of density, instead of colors as a continuous density
+    :param cmap: color map
+    :param pred_col: AutoGater's prediction column
+    :param kmeans_sota: If True, will run kmeans (n_clusters=2) on points in subset_df to separate debris from non-debris.
+                        But some datasets might only have a single cluster, so you might want to make this False or your dataset
+                        will be cut in half. For example, for Duke 2.0 data this should be set to False,
+                        but for Strateos data it should be set to True.
+    :return: DataFrame with SOTA and AutoGater predictions
+    """
     print("Percent of AutoGater live predictions that are left of the SOA dashed line: {}".format(
         get_percent_of_autogater_live_points_left_of_soa_line(conc_df=conc_df, cc=cc,
                                                               point_1_that_defines_line=point_1_that_defines_line,
@@ -530,32 +549,37 @@ def kde_scatter(conc_df, cc="RL1-H", logged=False, fraction_of_points_based_on_k
         ax1.set_ylabel(fsc)
 
     # Get subset of data based on fraction specified by fraction_of_points_based_on_kde
-    # also don't include points with 0 values in the subset because they are trash and mess up kmeans
+    # also don't include points with 0 values in the subset because they are trash and also mess up kmeans
     subset_df = conc_df.loc[conc_df[fsc] != 0]
     subset_df = subset_df.loc[subset_df[ssc] != 0]
     subset_df = subset_df.tail(int(len(subset_df) * fraction_of_points_based_on_kde))  # tail works because we sorted by kde earlier
 
     # Overlay alpha_shape of the subset we got on top of first plot
-    # first doing a KMeans with 2 clusters to get an alpha shape around each cluster
-    subset_df["kmeans"] = KMeans(n_clusters=2, random_state=5).fit(subset_df[[ssc, fsc]]).labels_
 
-    # always get the cluster with higher mean FSC:
-    cluster_0_fsc_mean = subset_df.loc[subset_df["kmeans"] == 0, fsc].mean()
-    cluster_1_fsc_mean = subset_df.loc[subset_df["kmeans"] == 1, fsc].mean()
-    if cluster_0_fsc_mean > cluster_1_fsc_mean:
-        good_cluster = 0
+    if kmeans_sota:
+        # first doing a KMeans with 2 clusters to get an alpha shape around each cluster
+        subset_df["kmeans"] = KMeans(n_clusters=2, random_state=5).fit(subset_df[[ssc, fsc]]).labels_
+
+        # always get the cluster with higher mean FSC:
+        cluster_0_fsc_mean = subset_df.loc[subset_df["kmeans"] == 0, fsc].mean()
+        cluster_1_fsc_mean = subset_df.loc[subset_df["kmeans"] == 1, fsc].mean()
+        if cluster_0_fsc_mean > cluster_1_fsc_mean:
+            good_cluster = 0
+        else:
+            good_cluster = 1
+
+        subset_no_debris = subset_df.loc[subset_df["kmeans"] == good_cluster]
     else:
-        good_cluster = 1
+        subset_no_debris = subset_df.copy()
 
-    # the next two commands are for creating a visual boundary around the points we will be selecting
-    cluster_boundary = alphashape.alphashape(list(zip(subset_df.loc[subset_df["kmeans"] == good_cluster, ssc],
-                                                      subset_df.loc[subset_df["kmeans"] == good_cluster, fsc])), 0)
-    # second plot (just a boundary line) overlaid on first plot:
+    cluster_boundary = alphashape.alphashape(list(zip(subset_no_debris[ssc],
+                                                      subset_no_debris[fsc])), 0)
+
+    # second plot (just a visual boundary line) overlaid on first plot:
     ax1.add_patch(PolygonPatch(cluster_boundary, alpha=1.0, ec=lines_color, fc="none", lw=5))
 
     # Begin creating third plot, which is actually the second standalone plot, and plots FSC against stain
     #       for the points that were selected in the first plot:
-    subset_no_debris = subset_df.loc[subset_df["kmeans"] == good_cluster]
     ax3.scatter(subset_no_debris[cc], subset_no_debris[fsc],
                 c=get_point_density_values(x=subset_no_debris[cc], y=subset_no_debris[fsc]),
                 s=dot_size, cmap=cmap)
@@ -642,7 +666,7 @@ def kde_scatter(conc_df, cc="RL1-H", logged=False, fraction_of_points_based_on_k
     plt.show()
 
     # Calculate SOA_preds by getting points left of boundary line in ax3
-    cluster_of_interest = subset_df.loc[subset_df["kmeans"] == good_cluster]  # this gives us only the points in ax3
+    cluster_of_interest = subset_no_debris.copy()  # this gives us only the points in ax3
     cluster_of_interest["SOA_preds"] = are_points_left_of_line(point_1_that_defines_line=point_1_that_defines_line,
                                                                point_2_that_defines_line=point_2_that_defines_line,
                                                                x_values=cluster_of_interest[cc],
