@@ -677,12 +677,14 @@ def summary_table_of_results(kde_df):
     sns.scatterplot(summary_table["CFUs"], summary_table["AutoGater"], legend="full", label="AutoGater")
     plt.xlim(-5, 105)
     plt.ylim(-5, 105)
-    plt.ylabel("Model")
+    plt.ylabel("Model Percent-Live")
     plt.show()
-    soa_r2 = r2_score(summary_table["State of the Art"], summary_table["CFUs"])
-    autogater_r2 = r2_score(summary_table["AutoGater"], summary_table["CFUs"])
-    print("R-Squared between CFUs and State of the Art: {}".format(soa_r2))
-    print("R-Squared between CFUs and AutoGater: {}".format(autogater_r2))
+    soa_r2 = round(r2_score(summary_table["State of the Art"], summary_table["CFUs"]), 2)
+    autogater_r2 = round(r2_score(summary_table["AutoGater"], summary_table["CFUs"]), 2)
+    rfc_r2 = round(r2_score(summary_table["Weakly Supervised Model (RF)"], summary_table["CFUs"]), 2)
+    print("R-Squared between CFUs and State-of-the-Art predicted Percent-Live: {}".format(soa_r2))
+    print("R-Squared between CFUs and AutoGater predicted Percent-Live: {}".format(autogater_r2))
+    print("R-Squared between CFUs and RFC predicted Percent-Live: {}".format(rfc_r2))
     print()
 
     summary_table[name_weakly] = summary_table[name_weakly].astype(int).astype(str) + "%"
@@ -699,7 +701,7 @@ def summary_table_of_results(kde_df):
     return summary_table
 
 
-def percent_live_comparison_plot(summary_table):
+def percent_live_comparison_plot(summary_table, legend="full"):
     # Getting summary_table into the right format
     concat_summary_table = pd.concat([summary_table[[treatment_column,
                                                      "timepoint", "CFUs"]].assign(model='CFUs'),
@@ -721,13 +723,14 @@ def percent_live_comparison_plot(summary_table):
 
         sc = sns.scatterplot(data=concat_summary_table.loc[concat_summary_table[treatment_column] == c],
                              x="timepoint", y="percent", s=500, alpha=.7, style="model",
-                             hue="model", hue_order=["CFUs", "State of the Art", "AutoGater"], legend="full")
+                             hue="model", hue_order=["CFUs", "State of the Art", "AutoGater"], legend=legend)
 
-        legend = plt.legend(bbox_to_anchor=(1.01, 0.9), loc=2, borderaxespad=0.,
-                            handlelength=4, markerscale=1.8)
-        legend.get_frame().set_edgecolor('black')
-        new_labels = ['CFU Derivation', 'Sytox Stain Method Prediction', 'AutoGater Prediction']
-        for t, l in zip(legend.texts, new_labels): t.set_text(l)
+        if legend is not False:
+            legend = plt.legend(bbox_to_anchor=(1.01, 0.9), loc=2, borderaxespad=0.,
+                                handlelength=4, markerscale=1.8)
+            legend.get_frame().set_edgecolor('black')
+            new_labels = ['CFU Derivation', 'Sytox Stain Method Prediction', 'AutoGater Prediction']
+            for t, l in zip(legend.texts, new_labels): t.set_text(l)
 
         sc.set(xlim=(-0.5, 6.5), xlabel="Time Point (Hours)",
                ylim=(-5, 105), ylabel="Percent Live",
