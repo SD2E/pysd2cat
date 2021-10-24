@@ -16,7 +16,7 @@ from keras.regularizers import l1_l2
 from sklearn.metrics import accuracy_score, r2_score
 from collections import OrderedDict, Counter
 from tensorflow.python.ops import gen_array_ops
-from keras.layers import Dense, Dropout, Flatten
+from keras.layers import Dense, Dropout, Flatten, Conv1D
 from names import Names as n
 from scipy.stats import gaussian_kde
 from descartes import PolygonPatch
@@ -33,7 +33,10 @@ pd.set_option('display.max_colwidth', None)
 matplotlib.use("tkagg")
 warnings.filterwarnings('ignore')
 
-col_idx = OrderedDict([(n.label, 0), ("inducer_concentration", 1), ("timepoint", 2), ("percent_live", 3)])
+# Set this variable to "inducer_concentration" or "temperature"
+treatment_column = n.inducer_concentration
+
+col_idx = OrderedDict([(n.label, 0), (treatment_column, 1), ("timepoint", 2), ("percent_live", 3)])
 
 
 def training_progress(fitted_model, metrics, num_plots, loss_name, plot_val=None):
@@ -84,7 +87,7 @@ def bin_cross(label_conds_cfus, y_pred):
 def cfu_loss(label_conds_cfus, y_pred):
     cfu_percent_live = label_conds_cfus[:, col_idx["percent_live"]]
     cfu_percent_live = cfu_percent_live / 100.0
-    condition_indices = [col_idx["inducer_concentration"], col_idx["timepoint"]]
+    condition_indices = [col_idx[treatment_column], col_idx["timepoint"]]
     conditions = tf.gather(label_conds_cfus, condition_indices, axis=1)
     y_pred = K.flatten(y_pred)
     y_pred = tf.sigmoid((y_pred - 0.5) * 100)
@@ -124,6 +127,73 @@ def booster_model_v2(input_shape=None, loss=joint_loss_wrapper(2), metrics=None,
     return model
 
 
+def booster_model_with_cnn(input_shape=None, loss=joint_loss_wrapper(2), metrics=None, lr=0.1):
+    if metrics is None:
+        metrics = [loss]
+
+    model = Sequential()
+
+    # input
+    # model.add(Input(shape=input_shape))
+
+    # first convolution layer
+    # model_output = Conv2D(3, kernel_size=(1, x_train.shape[2]),
+    #                       activation=None)(model_input)
+
+    # model.add(Conv2D(3, kernel_size=(1, input_shape), input_shape=(input_shape, 1), activation='relu'))
+
+    model.add(Conv1D(3, kernel_size=input_shape, input_shape=(input_shape, 1), activation='relu'))
+    model.add(Flatten())
+    model.add(Dense(units=32, activation="relu"))
+    model.add(Dropout(0.1))
+    model.add(Dense(units=16, activation="relu"))
+    model.add(Dropout(0.1))
+    model.add(Dense(units=8, activation="relu"))
+    model.add(Dropout(0.1))
+    model.add(Dense(units=1, activation='sigmoid'))
+    model.compile(loss=loss, optimizer=Adam(lr=lr),
+                  metrics=metrics, run_eagerly=True)
+
+    # from: https://datascience.stackexchange.com/questions/38957/keras-conv1d-for-simple-data-target-prediction
+    # model.add(Conv1D(32, (3), input_shape=(9, 1), activation='relu'))
+    # model.add(Flatten())
+    # model.add(Dense(64, activation='relu'))
+    # model.add(Dense(1, activation='softmax'))
+    # model.compile(loss=loss, optimizer=Adam(lr=lr),
+    #               metrics=metrics, run_eagerly=True)
+
+    return model
+
+
+def booster_model_with_cnn_2(input_shape=None, loss=joint_loss_wrapper(2), metrics=None, lr=0.1):
+    if metrics is None:
+        metrics = [loss]
+
+    model = Sequential()
+    model.add(Conv1D(3, kernel_size=input_shape, input_shape=(input_shape, 1), activation='relu'))
+    model.add(Flatten())
+    model.add(Conv1D(3, kernel_size=2, activation='relu'))
+    model.add(Flatten())
+    model.add(Dense(units=32, activation="relu"))
+    model.add(Dropout(0.1))
+    model.add(Dense(units=16, activation="relu"))
+    model.add(Dropout(0.1))
+    model.add(Dense(units=8, activation="relu"))
+    model.add(Dropout(0.1))
+    model.add(Dense(units=1, activation='sigmoid'))
+    model.compile(loss=loss, optimizer=Adam(lr=lr),
+                  metrics=metrics, run_eagerly=True)
+
+    # model.add(Conv1D(32, (3), input_shape=(9, 1), activation='relu'))
+    # model.add(Flatten())
+    # model.add(Dense(64, activation='relu'))
+    # model.add(Dense(1, activation='softmax'))
+    # model.compile(loss=loss, optimizer=Adam(lr=lr),
+    #               metrics=metrics, run_eagerly=True)
+
+    return model
+
+
 def run_model(model_function, lr, loss, metrics, X, Y, epochs, batch_size, verbose, shuffle, plot_type="scatter"):
     # reset model each time
     tf.compat.v1.reset_default_graph
@@ -155,7 +225,7 @@ def run_model(model_function, lr, loss, metrics, X, Y, epochs, batch_size, verbo
     preds_and_labels[n.label] = preds_and_labels[n.label] * 100
     preds_and_labels["nn_preds"] = class_predictions * 100
     preds_and_labels.rename(columns={"percent_live": "cfu_percent_live"}, inplace=True)
-    groupby_means = preds_and_labels.groupby([n.inducer_concentration, n.timepoint]).mean()
+    groupby_means = preds_and_labels.groupby([treatment_column, n.timepoint]).mean()
     # print(groupby_means)
 
     condition_results = groupby_means.reset_index()
@@ -233,10 +303,11 @@ def plot_percent_live_over_conditions(condition_results, plot_type="scatter",
 
 
 def plot_per_cond(condition_results):
-    for conc in condition_results[n.inducer_concentration].unique():
-        temp = condition_results.loc[condition_results[n.inducer_concentration] == conc]
+    for conc in condition_results[treatment_column].unique():
+        temp = condition_results.loc[condition_results[treatment_column] == conc]
         plot_percent_live_over_conditions(temp, plot_type="mixed", color_by=n.timepoint, fig_height=5,
                                           title="Ethanol Concentration = {}".format(conc))
+        plt.show()
     plt.show()
 
 
@@ -272,7 +343,7 @@ def get_all_run_info(df, X, pl, append_df_cols=None):
     concat.loc[(concat["label"] == 1) & (concat["nn_preds"] == 1), "change_type"] = "Remained Live"
     concat.loc[(concat["label"] == 0) & (concat["nn_preds"] == 1), "change_type"] = "Changed from Dead to Live"
     concat.loc[(concat["label"] == 1) & (concat["nn_preds"] == 0), "change_type"] = "Changed from Live to Dead"
-    concat['nn_percent_live'] = concat.groupby([n.inducer_concentration,
+    concat['nn_percent_live'] = concat.groupby([treatment_column,
                                                 n.timepoint])["nn_preds"].transform('mean') * 100
     concat["label_probs"] = df["label_probs"]
 
@@ -281,7 +352,7 @@ def get_all_run_info(df, X, pl, append_df_cols=None):
 
 def generate_rf_labels_from_conditions(data_df, features,
                                        live_conditions=None, dead_conditions=None):
-    df = data_df.copy()
+    df = data_df.copy().reset_index()
     df["arbitrary_index"] = df.index
 
     if live_conditions is None:
@@ -411,7 +482,26 @@ def get_percent_of_autogater_live_points_left_of_soa_line(conc_df: pd.DataFrame,
 
 def kde_scatter(conc_df, cc="RL1-H", logged=False, fraction_of_points_based_on_kde=0.9,
                 point_1_that_defines_line: tuple = (2.4, 4), point_2_that_defines_line: tuple = (3.05, 5.75),
-                n_bins=None, cmap="Spectral_r", pred_col=None):
+                n_bins=None, cmap="Spectral_r", pred_col=None, kmeans_sota=True):
+    """
+    Creates Scatterplots based on KDE values. Scatterplots look like SOTA scatterplots.
+    First row of plots is SOTA, second row is AutoGater's healthy preds, third row is AutoGater's dead preds.
+
+    :param conc_df: should be output of get_conc_df_with_kde_values function
+    :param cc: color channel
+    :param logged: if you want to plot logged or not logged values
+    :param fraction_of_points_based_on_kde: this subselects a fraction of points based on their KDE values (how concentrated they are)
+    :param point_1_that_defines_line: first point that defines line
+    :param point_2_that_defines_line: second point that defines line
+    :param n_bins: if this is specified, plots colors based on bins of density, instead of colors as a continuous density
+    :param cmap: color map
+    :param pred_col: AutoGater's prediction column
+    :param kmeans_sota: If True, will run kmeans (n_clusters=2) on points in subset_df to separate debris from non-debris.
+                        But some datasets might only have a single cluster, so you might want to make this False or your dataset
+                        will be cut in half. For example, for Duke 2.0 data this should be set to False,
+                        but for Strateos data it should be set to True.
+    :return: DataFrame with SOTA and AutoGater predictions
+    """
     print("Percent of AutoGater live predictions that are left of the SOA dashed line: {}".format(
         get_percent_of_autogater_live_points_left_of_soa_line(conc_df=conc_df, cc=cc,
                                                               point_1_that_defines_line=point_1_that_defines_line,
@@ -459,29 +549,37 @@ def kde_scatter(conc_df, cc="RL1-H", logged=False, fraction_of_points_based_on_k
         ax1.set_ylabel(fsc)
 
     # Get subset of data based on fraction specified by fraction_of_points_based_on_kde
-    # also don't include points with 0 values in the subset because they are trash and mess up kmeans
+    # also don't include points with 0 values in the subset because they are trash and also mess up kmeans
     subset_df = conc_df.loc[conc_df[fsc] != 0]
     subset_df = subset_df.loc[subset_df[ssc] != 0]
     subset_df = subset_df.tail(int(len(subset_df) * fraction_of_points_based_on_kde))  # tail works because we sorted by kde earlier
 
     # Overlay alpha_shape of the subset we got on top of first plot
-    # first doing a KMeans with 2 clusters to get an alpha shape around each cluster
-    subset_df["kmeans"] = KMeans(n_clusters=2, random_state=5).fit(subset_df[[ssc, fsc]]).labels_
 
-    # always get the cluster with higher mean FSC:
-    cluster_0_fsc_mean = subset_df.loc[subset_df["kmeans"] == 0, fsc].mean()
-    cluster_1_fsc_mean = subset_df.loc[subset_df["kmeans"] == 1, fsc].mean()
-    if cluster_0_fsc_mean > cluster_1_fsc_mean:
-        good_cluster = 0
+    if kmeans_sota:
+        # first doing a KMeans with 2 clusters to get an alpha shape around each cluster
+        subset_df["kmeans"] = KMeans(n_clusters=2, random_state=5).fit(subset_df[[ssc, fsc]]).labels_
+
+        # always get the cluster with higher mean FSC:
+        cluster_0_fsc_mean = subset_df.loc[subset_df["kmeans"] == 0, fsc].mean()
+        cluster_1_fsc_mean = subset_df.loc[subset_df["kmeans"] == 1, fsc].mean()
+        if cluster_0_fsc_mean > cluster_1_fsc_mean:
+            good_cluster = 0
+        else:
+            good_cluster = 1
+
+        subset_no_debris = subset_df.loc[subset_df["kmeans"] == good_cluster]
     else:
-        good_cluster = 1
+        subset_no_debris = subset_df.copy()
 
-    cluster_boundary = alphashape.alphashape(list(zip(subset_df.loc[subset_df["kmeans"] == good_cluster, ssc],
-                                                      subset_df.loc[subset_df["kmeans"] == good_cluster, fsc])), 0)
+    cluster_boundary = alphashape.alphashape(list(zip(subset_no_debris[ssc],
+                                                      subset_no_debris[fsc])), 0)
+
+    # second plot (just a visual boundary line) overlaid on first plot:
     ax1.add_patch(PolygonPatch(cluster_boundary, alpha=1.0, ec=lines_color, fc="none", lw=5))
 
-    # Third plot:
-    subset_no_debris = subset_df.loc[subset_df["kmeans"] == good_cluster]
+    # Begin creating third plot, which is actually the second standalone plot, and plots FSC against stain
+    #       for the points that were selected in the first plot:
     ax3.scatter(subset_no_debris[cc], subset_no_debris[fsc],
                 c=get_point_density_values(x=subset_no_debris[cc], y=subset_no_debris[fsc]),
                 s=dot_size, cmap=cmap)
@@ -529,10 +627,10 @@ def kde_scatter(conc_df, cc="RL1-H", logged=False, fraction_of_points_based_on_k
         ax5.plot(line_params[0], line_params[1], c=lines_color, linestyle="dashed")
         ax7.plot(line_params[0], line_params[1], c=lines_color, linestyle="dashed")
 
-        #             ax4.set_title("Predicted Healthy Cells", fontweight="bold", fontsize=30)
-        #             ax5.set_title("Predicted Healthy Cells", fontweight="bold", fontsize=30)
-        #             ax6.set_title("Predicted Dead, Dying, and Debris", fontweight="bold", fontsize=30)
-        #             ax7.set_title("Predicted Dead, Dying, and Debris", fontweight="bold", fontsize=30)
+        ax4.set_title("Predicted Healthy Cells", fontweight="bold", fontsize=30)
+        ax5.set_title("Predicted Healthy Cells", fontweight="bold", fontsize=30)
+        ax6.set_title("Predicted Dead, Dying, and Debris", fontweight="bold", fontsize=30)
+        ax7.set_title("Predicted Dead, Dying, and Debris", fontweight="bold", fontsize=30)
 
         ax4.set_xlim(ax1.get_xlim())
         ax5.set_xlim(ax3.get_xlim())
@@ -568,7 +666,7 @@ def kde_scatter(conc_df, cc="RL1-H", logged=False, fraction_of_points_based_on_k
     plt.show()
 
     # Calculate SOA_preds by getting points left of boundary line in ax3
-    cluster_of_interest = subset_df.loc[subset_df["kmeans"] == good_cluster]  # this gives us only the points in ax3
+    cluster_of_interest = subset_no_debris.copy()  # this gives us only the points in ax3
     cluster_of_interest["SOA_preds"] = are_points_left_of_line(point_1_that_defines_line=point_1_that_defines_line,
                                                                point_2_that_defines_line=point_2_that_defines_line,
                                                                x_values=cluster_of_interest[cc],
@@ -581,7 +679,7 @@ def kde_scatter(conc_df, cc="RL1-H", logged=False, fraction_of_points_based_on_k
 
 
 def summary_table_of_results(kde_df):
-    summary_table = kde_df.groupby([n.inducer_concentration, n.timepoint], as_index=False).mean()
+    summary_table = kde_df.groupby([treatment_column, n.timepoint], as_index=False).mean()
 
     name_weakly = "Weakly Supervised Model (RF)"
     name_cfu = "CFUs"
@@ -593,7 +691,7 @@ def summary_table_of_results(kde_df):
                                   "nn_preds": name_weakly_boosted,
                                   "SOA_preds": name_SOA}, inplace=True)
 
-    summary_table = summary_table[[n.inducer_concentration, n.timepoint,
+    summary_table = summary_table[[treatment_column, n.timepoint,
                                    name_weakly, name_cfu, name_weakly_boosted, name_SOA]]
     # summary_table = summary_table.loc[summary_table[n.timepoint].isin([0.5, 3.0, 6.0])]
     summary_table[name_weakly] = summary_table[name_weakly] * 100
@@ -606,12 +704,14 @@ def summary_table_of_results(kde_df):
     sns.scatterplot(summary_table["CFUs"], summary_table["AutoGater"], legend="full", label="AutoGater")
     plt.xlim(-5, 105)
     plt.ylim(-5, 105)
-    plt.ylabel("Model")
+    plt.ylabel("Model Percent-Live")
     plt.show()
-    soa_r2 = r2_score(summary_table["State of the Art"], summary_table["CFUs"])
-    autogater_r2 = r2_score(summary_table["AutoGater"], summary_table["CFUs"])
-    print("R-Squared between CFUs and State of the Art: {}".format(soa_r2))
-    print("R-Squared between CFUs and AutoGater: {}".format(autogater_r2))
+    soa_r2 = round(r2_score(summary_table["State of the Art"], summary_table["CFUs"]), 2)
+    autogater_r2 = round(r2_score(summary_table["AutoGater"], summary_table["CFUs"]), 2)
+    rfc_r2 = round(r2_score(summary_table["Weakly Supervised Model (RF)"], summary_table["CFUs"]), 2)
+    print("R-Squared between CFUs and State-of-the-Art predicted Percent-Live: {}".format(soa_r2))
+    print("R-Squared between CFUs and AutoGater predicted Percent-Live: {}".format(autogater_r2))
+    print("R-Squared between CFUs and RFC predicted Percent-Live: {}".format(rfc_r2))
     print()
 
     summary_table[name_weakly] = summary_table[name_weakly].astype(int).astype(str) + "%"
@@ -619,7 +719,7 @@ def summary_table_of_results(kde_df):
     summary_table[name_weakly_boosted] = summary_table[name_weakly_boosted].astype(int).astype(str) + "%"
     summary_table[name_SOA] = summary_table[name_SOA].astype(int).astype(str) + "%"
 
-    summary_table[n.inducer_concentration] = summary_table[n.inducer_concentration].astype(str)
+    summary_table[treatment_column] = summary_table[treatment_column].astype(str)
     summary_table[n.timepoint] = summary_table[n.timepoint].astype(str)
 
     # summary_table_styled = summary_table.style.set_table_styles([dict(selector='th', props=[('text-align', 'center')])])
@@ -628,13 +728,13 @@ def summary_table_of_results(kde_df):
     return summary_table
 
 
-def percent_live_comparison_plot(summary_table):
+def percent_live_comparison_plot(summary_table, legend="full"):
     # Getting summary_table into the right format
-    concat_summary_table = pd.concat([summary_table[["inducer_concentration",
+    concat_summary_table = pd.concat([summary_table[[treatment_column,
                                                      "timepoint", "CFUs"]].assign(model='CFUs'),
-                                      summary_table[["inducer_concentration",
+                                      summary_table[[treatment_column,
                                                      "timepoint", "AutoGater"]].assign(model='AutoGater'),
-                                      summary_table[["inducer_concentration",
+                                      summary_table[[treatment_column,
                                                      "timepoint", "State of the Art"]].assign(model='State of the Art')])
     concat_summary_table.rename(columns={"CFUs": "percent"}, inplace=True)
 
@@ -645,18 +745,19 @@ def percent_live_comparison_plot(summary_table):
 
     # Plotting code
     sns.set(style="ticks", font_scale=1.8, rc={"lines.linewidth": 3.0})
-    for c in [str(x) for x in list(concat_summary_table[n.inducer_concentration].unique())]:
+    for c in [str(x) for x in list(concat_summary_table[treatment_column].unique())]:
         plt.figure(figsize=(7, 5))
 
-        sc = sns.scatterplot(data=concat_summary_table.loc[concat_summary_table["inducer_concentration"] == c],
+        sc = sns.scatterplot(data=concat_summary_table.loc[concat_summary_table[treatment_column] == c],
                              x="timepoint", y="percent", s=500, alpha=.7, style="model",
-                             hue="model", hue_order=["CFUs", "State of the Art", "AutoGater"], legend="full")
+                             hue="model", hue_order=["CFUs", "State of the Art", "AutoGater"], legend=legend)
 
-        legend = plt.legend(bbox_to_anchor=(1.01, 0.9), loc=2, borderaxespad=0.,
-                            handlelength=4, markerscale=1.8)
-        legend.get_frame().set_edgecolor('black')
-        new_labels = ['CFU Derivation', 'Sytox Stain Method Prediction', 'AutoGater Prediction']
-        for t, l in zip(legend.texts, new_labels): t.set_text(l)
+        if legend is not False:
+            legend = plt.legend(bbox_to_anchor=(1.01, 0.9), loc=2, borderaxespad=0.,
+                                handlelength=4, markerscale=1.8)
+            legend.get_frame().set_edgecolor('black')
+            new_labels = ['CFU Derivation', 'Sytox Stain Method Prediction', 'AutoGater Prediction']
+            for t, l in zip(legend.texts, new_labels): t.set_text(l)
 
         sc.set(xlim=(-0.5, 6.5), xlabel="Time Point (Hours)",
                ylim=(-5, 105), ylabel="Percent Live",
